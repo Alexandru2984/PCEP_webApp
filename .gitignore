@@ -1,0 +1,50 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+env/
+
+# --- Django ---
+*.log
+db.sqlite3
+staticfiles/
+media/
+backend/staticfiles/
+backend/media/
+
+# --- Node / React ---
+node_modules/
+dist/
+.eslintcache
+.vite/
+frontend/dist/
+
+# --- Env & secrets ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- Coverage ---
+coverage/
