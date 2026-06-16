@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { fetchQuizSet, submitAnswer } from '../api'
-import { loadSettings, saveSettings } from '../storage'
+import { fetchQuizSet, submitAnswer, gradeAnswers } from '../api'
+import { loadSettings, saveSettings, appendAttempt } from '../storage'
+import { formatElapsed } from '../format'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
 import ReviewScreen from './ReviewScreen'
 import QuizSetup from './QuizSetup'
+import ExamView from './ExamView'
 
 export default function QuizContainer() {
   const [phase, setPhase] = useState('setup')
@@ -14,9 +16,26 @@ export default function QuizContainer() {
   const [feedback, setFeedback] = useState(null)
   const [history, setHistory] = useState([])
   const [lastConfig, setLastConfig] = useState(loadSettings)
+  const [startedAt, setStartedAt] = useState(0)
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
   const score = history.filter((h) => h.feedback?.is_correct).length
+
+  const recordAttempt = (items, total, elapsed) => {
+    const correct = items.filter((i) => i.feedback?.is_correct).length
+    appendAttempt({
+      date: new Date().toISOString(),
+      mode: lastConfig?.mode ?? 'practice',
+      module: lastConfig?.module ?? '',
+      difficulty: lastConfig?.difficulty ?? '',
+      score: correct,
+      total,
+      pct: total > 0 ? Math.round((correct / total) * 100) : 0,
+      elapsedMs: elapsed,
+    })
+  }
 
   const startQuiz = async (config) => {
     setPhase('loading')
@@ -33,7 +52,8 @@ export default function QuizContainer() {
       setSelectedChoiceId(null)
       setFeedback(null)
       setHistory([])
-      setPhase('answering')
+      setStartedAt(Date.now())
+      setPhase(config.mode === 'exam' ? 'exam' : 'answering')
     } catch (e) {
       setError(e?.response?.data?.detail || e?.message || 'Failed to load quiz.')
       setPhase('error')
@@ -57,15 +77,54 @@ export default function QuizContainer() {
     }
   }
 
+  const finish = (items, total) => {
+    const elapsed = Date.now() - startedAt
+    setElapsedMs(elapsed)
+    recordAttempt(items, total, elapsed)
+    setHistory(items)
+    setPhase('done')
+  }
+
   const handleNext = () => {
     if (index + 1 >= questions.length) {
-      setPhase('done')
+      finish(history, questions.length)
       return
     }
     setIndex((i) => i + 1)
     setSelectedChoiceId(null)
     setFeedback(null)
     setPhase('answering')
+  }
+
+  const handleExamSubmit = async (answers) => {
+    setSubmitting(true)
+    setError(null)
+    const payload = questions.map((q) => ({
+      question_id: q.id,
+      choice_id: answers[q.id] ?? null,
+    }))
+    try {
+      const data = await gradeAnswers(payload)
+      const byQuestion = new Map(data.results.map((r) => [r.question_id, r]))
+      const items = questions.map((q) => {
+        const r = byQuestion.get(q.id)
+        return {
+          question: q,
+          pickedChoiceId: r?.choice_id ?? null,
+          feedback: {
+            is_correct: r?.is_correct ?? false,
+            correct_choice_id: r?.correct_choice_id ?? null,
+            explanation: r?.explanation ?? '',
+          },
+        }
+      })
+      finish(items, questions.length)
+    } catch (e) {
+      setError(e?.response?.data?.detail || e?.message || 'Failed to grade exam.')
+      setPhase('error')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const resetToSetup = () => {
@@ -103,6 +162,17 @@ export default function QuizContainer() {
     )
   }
 
+  if (phase === 'exam') {
+    return (
+      <ExamView
+        questions={questions}
+        onSubmit={handleExamSubmit}
+        onQuit={resetToSetup}
+        submitting={submitting}
+      />
+    )
+  }
+
   if (phase === 'done') {
     return (
       <ReviewScreen
@@ -110,6 +180,7 @@ export default function QuizContainer() {
         score={score}
         total={questions.length}
         onRestart={resetToSetup}
+        elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
       />
     )
   }

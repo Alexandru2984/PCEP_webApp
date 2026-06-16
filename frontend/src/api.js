@@ -18,4 +18,8 @@ export const submitAnswer = (questionId, choiceId) =>
     .post(`/questions/${questionId}/answer/`, { choice_id: choiceId })
     .then((r) => r.data)
 
+// answers: [{ question_id, choice_id|null }] — grades a whole exam in one call.
+export const gradeAnswers = (answers) =>
+  api.post('/grade/', { answers }).then((r) => r.data)
+
 export default api

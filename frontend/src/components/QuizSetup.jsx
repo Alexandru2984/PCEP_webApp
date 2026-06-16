@@ -20,7 +20,21 @@ const COUNTS = [10, 20, 30, 50]
 const selectClass =
   'rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-slate-500'
 
+const MODES = [
+  {
+    value: 'practice',
+    title: 'Practice',
+    subtitle: 'Instant feedback & explanation after every answer',
+  },
+  {
+    value: 'exam',
+    title: 'Exam simulation',
+    subtitle: 'Timed, no hints, graded at the end like the real PCEP',
+  },
+]
+
 export default function QuizSetup({ onStart, initial }) {
+  const [mode, setMode] = useState(initial?.mode ?? 'practice')
   const [module, setModule] = useState(initial?.module ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? '')
   const [count, setCount] = useState(initial?.count ?? 30)
@@ -30,10 +44,35 @@ export default function QuizSetup({ onStart, initial }) {
       <h2 className="mb-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
         Start a new quiz
       </h2>
-      <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
-        Pick a scope and question count. Leave filters on defaults for a full mixed-bag
-        PCEP run.
+      <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
+        Pick a mode and scope. Leave filters on defaults for a full mixed-bag PCEP run.
       </p>
+
+      <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {MODES.map((m) => {
+          const active = mode === m.value
+          return (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => setMode(m.value)}
+              aria-pressed={active}
+              className={`rounded-lg border p-3 text-left transition-colors ${
+                active
+                  ? 'border-sky-500 bg-sky-50 dark:border-sky-500 dark:bg-sky-950/40'
+                  : 'border-slate-300 bg-white hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900'
+              }`}
+            >
+              <div className="font-semibold text-slate-900 dark:text-slate-100">
+                {m.title}
+              </div>
+              <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                {m.subtitle}
+              </div>
+            </button>
+          )
+        })}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col text-sm">
@@ -95,10 +134,10 @@ export default function QuizSetup({ onStart, initial }) {
 
       <button
         type="button"
-        onClick={() => onStart({ module, difficulty, count })}
+        onClick={() => onStart({ mode, module, difficulty, count })}
         className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
       >
-        Start quiz
+        {mode === 'exam' ? 'Start exam' : 'Start practice'}
       </button>
     </div>
   )
