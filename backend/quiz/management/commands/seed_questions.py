@@ -35,6 +35,7 @@ class Command(BaseCommand):
                 text=q['text'],
                 code_snippet=q.get('code_snippet', ''),
                 difficulty=q['difficulty'],
+                module=q.get('module', Question.MODULE_1),
             )
             for c in q['choices']:
                 Choice.objects.create(

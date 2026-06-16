@@ -11,6 +11,17 @@ class Question(models.Model):
         (DIFFICULTY_HARD, 'Hard'),
     ]
 
+    MODULE_1 = 'module1'
+    MODULE_2 = 'module2'
+    MODULE_3 = 'module3'
+    MODULE_4 = 'module4'
+    MODULE_CHOICES = [
+        (MODULE_1, 'Module 1 — Fundamentals'),
+        (MODULE_2, 'Module 2 — Control Flow'),
+        (MODULE_3, 'Module 3 — Data Collections'),
+        (MODULE_4, 'Module 4 — Functions & Exceptions'),
+    ]
+
     text = models.TextField(help_text="Main question text shown to the user.")
     code_snippet = models.TextField(
         blank=True,
@@ -22,6 +33,13 @@ class Question(models.Model):
         choices=DIFFICULTY_CHOICES,
         default=DIFFICULTY_MEDIUM,
     )
+    module = models.CharField(
+        max_length=16,
+        choices=MODULE_CHOICES,
+        default=MODULE_1,
+        db_index=True,
+        help_text="PCEP-30-02 syllabus module this question belongs to.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -30,7 +48,7 @@ class Question(models.Model):
 
     def __str__(self):
         preview = self.text[:60] + ('…' if len(self.text) > 60 else '')
-        return f"[{self.difficulty}] {preview}"
+        return f"[{self.module}/{self.difficulty}] {preview}"
 
 
 class Choice(models.Model):

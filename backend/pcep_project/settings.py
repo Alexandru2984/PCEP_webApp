@@ -15,6 +15,17 @@ SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-dev-only-CHANGE-I
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['*'])
 
+# In production (DEBUG=False) refuse to boot with insecure defaults.
+if not DEBUG:
+    if SECRET_KEY.startswith('django-insecure-'):
+        raise RuntimeError(
+            'DJANGO_SECRET_KEY must be set to a non-default value when DEBUG=False.'
+        )
+    if ALLOWED_HOSTS == ['*']:
+        raise RuntimeError(
+            'DJANGO_ALLOWED_HOSTS must be restricted (not "*") when DEBUG=False.'
+        )
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -105,4 +116,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ],
+    'DEFAULT_THROTTLE_RATES': {
+        'submit_answer': '120/min',
+    },
 }
