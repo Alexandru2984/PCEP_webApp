@@ -21,3 +21,13 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 class AnswerRequestSerializer(serializers.Serializer):
     choice_id = serializers.IntegerField()
+
+
+class AnswerItemSerializer(serializers.Serializer):
+    question_id = serializers.IntegerField()
+    # null/omitted = the question was left unanswered (counts as wrong).
+    choice_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+
+
+class GradeRequestSerializer(serializers.Serializer):
+    answers = AnswerItemSerializer(many=True, allow_empty=False, max_length=100)

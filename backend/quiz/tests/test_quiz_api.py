@@ -118,3 +118,60 @@ def test_submit_validates_payload(api_client, make_question):
         format='json',
     )
     assert resp.status_code == 400
+
+
+def test_grade_scores_a_batch(api_client, make_question):
+    q1 = make_question(correct_index=0)  # answered correctly
+    q2 = make_question(correct_index=1)  # answered wrong
+    q3 = make_question(correct_index=2)  # left blank
+    correct1 = q1.choices.get(is_correct=True)
+    wrong2 = q2.choices.filter(is_correct=False).first()
+
+    resp = api_client.post(
+        '/api/grade/',
+        data={
+            'answers': [
+                {'question_id': q1.id, 'choice_id': correct1.id},
+                {'question_id': q2.id, 'choice_id': wrong2.id},
+                {'question_id': q3.id, 'choice_id': None},
+            ]
+        },
+        format='json',
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['count'] == 3
+    assert body['score'] == 1
+    by_q = {r['question_id']: r for r in body['results']}
+    assert by_q[q1.id]['is_correct'] is True
+    assert by_q[q2.id]['is_correct'] is False
+    # Skipped question still reveals the correct choice for review.
+    assert by_q[q3.id]['is_correct'] is False
+    assert by_q[q3.id]['correct_choice_id'] == q3.choices.get(is_correct=True).id
+
+
+def test_grade_rejects_empty_answers(api_client):
+    resp = api_client.post('/api/grade/', data={'answers': []}, format='json')
+    assert resp.status_code == 400
+
+
+def test_grade_rejects_unknown_question(api_client, make_question):
+    q = make_question()
+    resp = api_client.post(
+        '/api/grade/',
+        data={'answers': [{'question_id': 999999, 'choice_id': q.choices.first().id}]},
+        format='json',
+    )
+    assert resp.status_code == 400
+
+
+def test_grade_rejects_foreign_choice(api_client, make_question):
+    q1 = make_question()
+    q2 = make_question()
+    foreign = q2.choices.first()
+    resp = api_client.post(
+        '/api/grade/',
+        data={'answers': [{'question_id': q1.id, 'choice_id': foreign.id}]},
+        format='json',
+    )
+    assert resp.status_code == 400

@@ -8,7 +8,11 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from .models import Choice, Question
-from .serializers import AnswerRequestSerializer, QuestionSerializer
+from .serializers import (
+    AnswerRequestSerializer,
+    GradeRequestSerializer,
+    QuestionSerializer,
+)
 
 
 VALID_DIFFICULTIES = {d for d, _ in Question.DIFFICULTY_CHOICES}
@@ -108,3 +112,51 @@ def submit_answer(request, question_id):
         'correct_choice_id': correct_choice.id if correct_choice else None,
         'explanation': picked.explanation,
     })
+
+
+@api_view(['POST'])
+@throttle_classes([SubmitAnswerThrottle])
+def grade(request):
+    """Grade a whole batch of answers in one request (used by exam mode).
+
+    Body: {"answers": [{"question_id": N, "choice_id": M | null}, ...]}
+    Returns one result per answer with correctness, the correct choice id and
+    the picked choice's explanation. A null/foreign choice_id counts as wrong.
+    """
+    request_ser = GradeRequestSerializer(data=request.data)
+    request_ser.is_valid(raise_exception=True)
+    answers = request_ser.validated_data['answers']
+
+    question_ids = {a['question_id'] for a in answers}
+    questions = (
+        Question.objects.filter(id__in=question_ids).prefetch_related('choices')
+    )
+    question_map = {q.id: q for q in questions}
+
+    results = []
+    for answer in answers:
+        question = question_map.get(answer['question_id'])
+        if question is None:
+            return Response(
+                {'detail': f"Unknown question id {answer['question_id']}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        choices = {c.id: c for c in question.choices.all()}
+        picked = choices.get(answer['choice_id'])
+        if answer['choice_id'] is not None and picked is None:
+            return Response(
+                {'detail': f"Choice {answer['choice_id']} does not belong to "
+                           f"question {question.id}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        correct = next((c for c in choices.values() if c.is_correct), None)
+        results.append({
+            'question_id': question.id,
+            'choice_id': answer['choice_id'],
+            'is_correct': bool(picked and picked.is_correct),
+            'correct_choice_id': correct.id if correct else None,
+            'explanation': picked.explanation if picked else '',
+        })
+
+    score = sum(1 for r in results if r['is_correct'])
+    return Response({'count': len(results), 'score': score, 'results': results})
