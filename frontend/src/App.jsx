@@ -6,7 +6,8 @@ export default function App() {
       <header className="max-w-3xl mx-auto mb-6">
         <h1 className="text-3xl font-bold text-slate-900">PCEP Quiz</h1>
         <p className="text-slate-600 mt-1">
-          Python Certified Entry-Level Programmer — practice questions with instant feedback and detailed explanations.
+          Python Certified Entry-Level Programmer — practice questions with instant
+          feedback and detailed explanations.
         </p>
       </header>
 
@@ -15,10 +16,7 @@ export default function App() {
       </main>
 
       <footer className="max-w-3xl mx-auto mt-8 text-center text-sm text-slate-500">
-        <a
-          href="/admin/"
-          className="hover:text-slate-700 underline underline-offset-2"
-        >
+        <a href="/admin/" className="hover:text-slate-700 underline underline-offset-2">
           Admin panel
         </a>
       </footer>

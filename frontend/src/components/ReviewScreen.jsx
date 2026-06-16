@@ -29,8 +29,8 @@ function ReviewItem({ index, item }) {
               skipped
                 ? 'bg-slate-200 text-slate-700'
                 : ok
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-red-100 text-red-800'
             }`}
           >
             {skipped ? 'skipped' : ok ? '✓ correct' : '✗ wrong'}
@@ -61,7 +61,9 @@ function ReviewItem({ index, item }) {
                 {String.fromCharCode(65 + i)}.
               </span>
               <span className="flex-1">{c.text}</span>
-              {isCorrect && <span className="text-green-700 text-xs font-semibold">correct</span>}
+              {isCorrect && (
+                <span className="text-green-700 text-xs font-semibold">correct</span>
+              )}
               {isPicked && !isCorrect && (
                 <span className="text-red-700 text-xs font-semibold">your pick</span>
               )}
@@ -97,7 +99,9 @@ export default function ReviewScreen({ items, score, total, onRestart }) {
             <p className="text-slate-700 mt-1">
               <span className="font-semibold">{score}</span> of{' '}
               <span className="font-semibold">{total}</span> correct —{' '}
-              <span className={`font-bold ${passed ? 'text-green-600' : 'text-orange-600'}`}>
+              <span
+                className={`font-bold ${passed ? 'text-green-600' : 'text-orange-600'}`}
+              >
                 {pct}%
               </span>
               {passed ? ' · passing' : ' · below 70% PCEP threshold'}
@@ -142,11 +146,7 @@ export default function ReviewScreen({ items, score, total, onRestart }) {
       ) : (
         <ul className="space-y-3">
           {shown.map((item) => (
-            <ReviewItem
-              key={item.question.id}
-              index={items.indexOf(item)}
-              item={item}
-            />
+            <ReviewItem key={item.question.id} index={items.indexOf(item)} item={item} />
           ))}
         </ul>
       )}

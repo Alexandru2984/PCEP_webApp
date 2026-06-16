@@ -28,8 +28,8 @@ export default function QuestionCard({
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div className="flex items-center justify-between text-sm text-slate-500 mb-3">
         <span>
-          Question <span className="font-semibold text-slate-700">{questionNumber}</span> of{' '}
-          <span className="font-semibold text-slate-700">{totalQuestions}</span>
+          Question <span className="font-semibold text-slate-700">{questionNumber}</span>{' '}
+          of <span className="font-semibold text-slate-700">{totalQuestions}</span>
         </span>
         <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs uppercase tracking-wide">
           {question.difficulty}

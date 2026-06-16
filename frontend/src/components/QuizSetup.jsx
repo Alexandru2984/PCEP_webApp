@@ -26,7 +26,8 @@ export default function QuizSetup({ onStart, initial }) {
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <h2 className="text-xl font-semibold text-slate-900 mb-1">Start a new quiz</h2>
       <p className="text-slate-600 text-sm mb-6">
-        Pick a scope and question count. Leave filters on defaults for a full mixed-bag PCEP run.
+        Pick a scope and question count. Leave filters on defaults for a full mixed-bag
+        PCEP run.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -38,7 +39,9 @@ export default function QuizSetup({ onStart, initial }) {
             className="border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
             {MODULES.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
             ))}
           </select>
         </label>
@@ -51,7 +54,9 @@ export default function QuizSetup({ onStart, initial }) {
             className="border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-slate-400"
           >
             {DIFFICULTIES.map((d) => (
-              <option key={d.value} value={d.value}>{d.label}</option>
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
             ))}
           </select>
         </label>
