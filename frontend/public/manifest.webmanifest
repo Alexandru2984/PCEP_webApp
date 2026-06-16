@@ -1,0 +1,17 @@
+{
+  "name": "PCEP Quiz",
+  "short_name": "PCEP Quiz",
+  "description": "Practice quiz for the PCEP — Certified Entry-Level Python Programmer exam.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

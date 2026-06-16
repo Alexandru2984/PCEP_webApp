@@ -3,11 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PCEP Quiz</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>
+      PCEP Quiz — Practice for the Certified Entry-Level Python Programmer exam
+    </title>
     <meta
       name="description"
-      content="Practice quiz for the Python Certified Entry-Level Programmer (PCEP) certification."
+      content="Free practice quiz for the PCEP (Certified Entry-Level Python Programmer) exam: 100+ questions across all four modules with instant feedback and per-option explanations."
     />
+
+    <!-- Open Graph / social share -->
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="PCEP Quiz — practice for the Python certification"
+    />
+    <meta
+      property="og:description"
+      content="100+ PCEP exam questions with instant feedback and explanations. Practice mode or timed exam simulation."
+    />
+    <meta property="og:url" content="https://pcep.micutu.com" />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- Apply saved theme before paint to avoid a flash of the wrong color scheme -->
+    <script>
+      try {
+        var t = JSON.parse(localStorage.getItem('pcep.theme'))
+        var dark =
+          t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
+
     <script
       defer
       src="https://analytics.micutu.com/script.js"

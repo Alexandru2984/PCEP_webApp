@@ -1,22 +1,31 @@
 import QuizContainer from './components/QuizContainer'
+import ThemeToggle from './components/ThemeToggle'
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
-      <header className="max-w-3xl mx-auto mb-6">
-        <h1 className="text-3xl font-bold text-slate-900">PCEP Quiz</h1>
-        <p className="text-slate-600 mt-1">
-          Python Certified Entry-Level Programmer — practice questions with instant
-          feedback and detailed explanations.
-        </p>
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <header className="mx-auto mb-6 flex max-w-3xl items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
+            PCEP Quiz
+          </h1>
+          <p className="mt-1 text-slate-600 dark:text-slate-400">
+            Python Certified Entry-Level Programmer — practice questions with instant
+            feedback and detailed explanations.
+          </p>
+        </div>
+        <ThemeToggle />
       </header>
 
-      <main className="max-w-3xl mx-auto">
+      <main className="mx-auto max-w-3xl">
         <QuizContainer />
       </main>
 
-      <footer className="max-w-3xl mx-auto mt-8 text-center text-sm text-slate-500">
-        <a href="/admin/" className="hover:text-slate-700 underline underline-offset-2">
+      <footer className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-500 dark:text-slate-500">
+        <a
+          href="/admin/"
+          className="underline underline-offset-2 hover:text-slate-700 dark:hover:text-slate-300"
+        >
           Admin panel
         </a>
       </footer>

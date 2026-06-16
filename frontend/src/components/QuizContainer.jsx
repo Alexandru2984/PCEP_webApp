@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { fetchQuizSet, submitAnswer } from '../api'
+import { loadSettings, saveSettings } from '../storage'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
 import ReviewScreen from './ReviewScreen'
@@ -12,7 +13,7 @@ export default function QuizContainer() {
   const [selectedChoiceId, setSelectedChoiceId] = useState(null)
   const [feedback, setFeedback] = useState(null)
   const [history, setHistory] = useState([])
-  const [lastConfig, setLastConfig] = useState(null)
+  const [lastConfig, setLastConfig] = useState(loadSettings)
   const [error, setError] = useState(null)
 
   const score = history.filter((h) => h.feedback?.is_correct).length
@@ -21,6 +22,7 @@ export default function QuizContainer() {
     setPhase('loading')
     setError(null)
     setLastConfig(config)
+    saveSettings(config)
     try {
       const data = await fetchQuizSet(config)
       if (!data.questions || data.questions.length === 0) {
@@ -77,20 +79,23 @@ export default function QuizContainer() {
 
   if (phase === 'loading') {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-        <p className="text-slate-600">Loading quiz…</p>
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
+        <p className="text-slate-600 dark:text-slate-400">Loading quiz…</p>
       </div>
     )
   }
 
   if (phase === 'error') {
     return (
-      <div className="bg-white rounded-xl border border-red-200 p-6">
-        <p className="text-red-700 font-semibold mb-2">Something went wrong.</p>
-        <p className="text-slate-700 mb-4">{error}</p>
+      <div className="rounded-xl border border-red-200 bg-white p-6 dark:border-red-900 dark:bg-slate-800">
+        <p className="mb-2 font-semibold text-red-700 dark:text-red-400">
+          Something went wrong.
+        </p>
+        <p className="mb-4 text-slate-700 dark:text-slate-300">{error}</p>
         <button
+          type="button"
           onClick={resetToSetup}
-          className="bg-slate-900 hover:bg-slate-700 text-white px-4 py-2 rounded-lg"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
         >
           Back to setup
         </button>
@@ -110,8 +115,31 @@ export default function QuizContainer() {
   }
 
   const current = questions[index]
+  const progress = Math.round((index / questions.length) * 100)
   return (
     <div>
+      <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+        <div
+          className="h-full rounded-full bg-slate-900 transition-all dark:bg-sky-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="mb-3 flex items-center justify-between text-sm">
+        <span className="text-slate-500 dark:text-slate-400">
+          Score:{' '}
+          <span className="font-semibold text-slate-700 dark:text-slate-200">
+            {score}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={resetToSetup}
+          className="text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+        >
+          Quit
+        </button>
+      </div>
+
       <QuestionCard
         question={current}
         questionNumber={index + 1}
