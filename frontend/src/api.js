@@ -6,8 +6,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-export const fetchQuizSet = (count = 30) =>
-  api.get(`/quiz-set/?count=${count}`).then((r) => r.data)
+export const fetchQuizSet = ({ count = 30, module = '', difficulty = '' } = {}) => {
+  const params = new URLSearchParams({ count: String(count) })
+  if (module) params.set('module', module)
+  if (difficulty) params.set('difficulty', difficulty)
+  return api.get(`/quiz-set/?${params.toString()}`).then((r) => r.data)
+}
 
 export const submitAnswer = (questionId, choiceId) =>
   api
