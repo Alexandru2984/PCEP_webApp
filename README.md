@@ -27,7 +27,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ## Features
 
-- 📚 **100+ questions** across all four PCEP modules with syntax-highlighted code
+- 📚 **150+ questions** across all four PCEP modules with syntax-highlighted code
 - 🎯 **Per-option explanations** — wrong answers explain the exact misconception
 - ⏱️ **Two modes** — Practice (instant feedback) and a timed **Exam simulation**
   with a question navigator, flagging, and auto-submit
