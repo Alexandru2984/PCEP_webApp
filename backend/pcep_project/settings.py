@@ -145,4 +145,9 @@ REST_FRAMEWORK = {
         'anon': '200/min',
         'submit_answer': '120/min',
     },
+    # Behind Cloudflare -> nginx (which restores the real client IP via
+    # CF-Connecting-IP and appends it to X-Forwarded-For), trust exactly one
+    # proxy hop so throttling keys on the real visitor IP and can't be evaded
+    # by spoofing an X-Forwarded-For prefix.
+    'NUM_PROXIES': 1,
 }
