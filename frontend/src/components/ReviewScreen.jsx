@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import CodeBlock from './CodeBlock'
+import { celebrate } from '../confetti'
+import { useCountUp } from '../useCountUp'
 
 const MODULE_LABELS = {
   module1: 'M1 · Fundamentals',
@@ -98,6 +100,27 @@ export default function ReviewScreen({ items, score, total, onRestart, elapsedLa
 
   const pct = total > 0 ? Math.round((score / total) * 100) : 0
   const passed = pct >= 70
+  const animatedPct = useCountUp(pct)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (passed) celebrate()
+  }, [passed])
+
+  const share = async () => {
+    const text = `I scored ${score}/${total} (${pct}%) on the PCEP practice exam${passed ? ' ✅' : ''} — try it at https://pcep.micutu.com 🐍`
+    try {
+      if (navigator.share) {
+        await navigator.share({ text, url: 'https://pcep.micutu.com' })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }
+    } catch {
+      /* user dismissed the share sheet — ignore */
+    }
+  }
 
   const tab = (active) =>
     `px-3 py-1.5 rounded-full border text-sm transition-colors ${
@@ -120,19 +143,28 @@ export default function ReviewScreen({ items, score, total, onRestart, elapsedLa
               <span
                 className={`font-bold ${passed ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}
               >
-                {pct}%
+                {animatedPct}%
               </span>
               {passed ? ' · passing' : ' · below 70% PCEP threshold'}
               {elapsedLabel ? ` · ${elapsedLabel}` : ''}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onRestart}
-            className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
-          >
-            New quiz
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={share}
+              className="rounded-lg border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              {copied ? 'Copied ✓' : 'Share'}
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
+            >
+              New quiz
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 flex gap-2">
