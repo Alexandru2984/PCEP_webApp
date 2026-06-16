@@ -45,6 +45,25 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
   const go = (i) => setIndex(Math.max(0, Math.min(total - 1, i)))
   const lowOnTime = timeLeft <= 60
 
+  // Keyboard: 1–4 / A–D answer, ← → navigate, F flag.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key === 'ArrowLeft') return go(index - 1)
+      if (e.key === 'ArrowRight') return go(index + 1)
+      if (e.key.toLowerCase() === 'f') return toggleFlag()
+      const n = Number.parseInt(e.key, 10)
+      const idx = Number.isNaN(n) ? 'abcd'.indexOf(e.key.toLowerCase()) : n - 1
+      if (idx >= 0 && idx < current.choices.length) {
+        e.preventDefault()
+        pick(current.choices[idx].id)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, questions])
+
   const navState = (q, i) => {
     if (i === index) return 'current'
     if (flagged.has(q.id)) return 'flagged'

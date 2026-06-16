@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchQuizSet, submitAnswer, gradeAnswers } from '../api'
 import { loadSettings, saveSettings, appendAttempt } from '../storage'
 import { formatElapsed } from '../format'
@@ -132,6 +132,29 @@ export default function QuizContainer() {
     setError(null)
   }
 
+  // Keyboard shortcuts for practice mode: 1–4 / A–D to answer, Enter/→ to advance.
+  useEffect(() => {
+    if (phase !== 'answering' && phase !== 'reviewing') return
+    const onKey = (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (phase === 'answering') {
+        const choices = questions[index]?.choices ?? []
+        const n = Number.parseInt(e.key, 10)
+        const idx = Number.isNaN(n) ? 'abcd'.indexOf(e.key.toLowerCase()) : n - 1
+        if (idx >= 0 && idx < choices.length) {
+          e.preventDefault()
+          handleSelect(choices[idx].id)
+        }
+      } else if (e.key === 'Enter' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleNext()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, index, questions])
+
   if (phase === 'setup') {
     return <QuizSetup onStart={startQuiz} initial={lastConfig} />
   }
@@ -220,12 +243,17 @@ export default function QuizContainer() {
         feedback={feedback}
         disabled={phase === 'reviewing'}
       />
-      {feedback && (
+      {feedback ? (
         <FeedbackBox
           feedback={feedback}
           onNext={handleNext}
           isLast={index + 1 >= questions.length}
         />
+      ) : (
+        <p className="mt-3 text-center text-xs text-slate-400 dark:text-slate-500">
+          Tip: press <kbd className="font-mono">1</kbd>–<kbd className="font-mono">4</kbd>{' '}
+          to answer, <kbd className="font-mono">Enter</kbd> for next
+        </p>
       )}
     </div>
   )
