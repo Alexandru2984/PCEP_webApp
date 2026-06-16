@@ -8,26 +8,41 @@
 
 A practice-quiz web app for the **PCEP™ — Certified Entry-Level Python Programmer**
 certification. Every question gives instant feedback and a per-option explanation that
-tells you *why* each wrong answer is wrong — so you learn the concept, not just the key.
+tells you _why_ each wrong answer is wrong — so you learn the concept, not just the key.
 
 🔗 **Live:** [pcep.micutu.com](https://pcep.micutu.com)
 
 > Questions are organised by the four official PCEP-30-02 syllabus modules and tagged by
 > difficulty, so you can drill a weak area or take a full mixed mock exam.
 
+## Screenshots
+
+| Practice mode (dark)                                        | Exam simulation (light)                     |
+| ----------------------------------------------------------- | ------------------------------------------- |
+| ![Practice](docs/screenshots/03-practice-feedback-dark.png) | ![Exam](docs/screenshots/04-exam-light.png) |
+
+| Review & explanations                           | Progress dashboard                                    |
+| ----------------------------------------------- | ----------------------------------------------------- |
+| ![Review](docs/screenshots/05-review-light.png) | ![Dashboard](docs/screenshots/06-dashboard-light.png) |
+
 ## Features
 
-- 📚 **112+ questions** across all four PCEP modules with code snippets
+- 📚 **100+ questions** across all four PCEP modules with syntax-highlighted code
 - 🎯 **Per-option explanations** — wrong answers explain the exact misconception
+- ⏱️ **Two modes** — Practice (instant feedback) and a timed **Exam simulation**
+  with a question navigator, flagging, and auto-submit
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
-- 📊 **End-of-quiz review** — see every question, filter to just the ones you missed
+- 📊 **Progress dashboard** — attempt history and per-module mastery (local-first)
+- 📈 **End-of-quiz review** — see every question, filter to just the ones you missed
+- ⌨️ **Keyboard shortcuts** and full dark mode
+- 📱 **Installable PWA** with Open Graph share cards
 - ✅ Scored against the official **70% pass threshold**
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, DB-backed health probe
 
 ## Tech stack
 
-| Layer    | Tech                                                      |
+| Layer    | Tech                                                     |
 | -------- | -------------------------------------------------------- |
 | Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn |
 | Frontend | React 18 · Vite · Tailwind CSS 4 · Axios                 |
@@ -77,7 +92,7 @@ docker compose --profile build run --rm frontend-builder   # build the React app
 ## Testing & quality
 
 ```bash
-# Backend — 17 tests (API behaviour + seed-data integrity)
+# Backend — 21 tests (API behaviour + seed-data integrity)
 cd backend && python -m pytest
 
 # Frontend — lint, format check, production build
@@ -89,12 +104,13 @@ CI runs all of the above on every push and pull request, plus
 
 ## API reference
 
-| Method | Endpoint                          | Description                                       |
-| ------ | --------------------------------- | ------------------------------------------------- |
-| `GET`  | `/api/health/`                    | Liveness probe (200 only if the DB is reachable)  |
-| `GET`  | `/api/quiz-set/`                  | Random question set. Params: `count`, `module`, `difficulty` |
-| `GET`  | `/api/questions/<id>/`            | Single question (choices only — no answer key)    |
-| `POST` | `/api/questions/<id>/answer/`     | Submit `{ "choice_id": N }`; returns correctness + explanation |
+| Method | Endpoint                      | Description                                                                        |
+| ------ | ----------------------------- | ---------------------------------------------------------------------------------- |
+| `GET`  | `/api/health/`                | Liveness probe (200 only if the DB is reachable)                                   |
+| `GET`  | `/api/quiz-set/`              | Random question set. Params: `count`, `module`, `difficulty`                       |
+| `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                     |
+| `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + explanation                     |
+| `POST` | `/api/grade/`                 | Grade a batch: `{ "answers": [{ "question_id": N, "choice_id": M }] }` (exam mode) |
 
 ## Project layout
 
