@@ -27,15 +27,8 @@
     <meta property="og:url" content="https://pcep.micutu.com" />
     <meta name="twitter:card" content="summary" />
 
-    <!-- Apply saved theme before paint to avoid a flash of the wrong color scheme -->
-    <script>
-      try {
-        var t = JSON.parse(localStorage.getItem('pcep.theme'))
-        var dark =
-          t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)
-        if (dark) document.documentElement.classList.add('dark')
-      } catch (e) {}
-    </script>
+    <!-- Apply saved theme before paint (external so the CSP can forbid inline scripts) -->
+    <script src="/theme-init.js"></script>
 
     <script
       defer

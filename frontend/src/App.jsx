@@ -21,13 +21,8 @@ export default function App() {
         <QuizContainer />
       </main>
 
-      <footer className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-500 dark:text-slate-500">
-        <a
-          href="/admin/"
-          className="underline underline-offset-2 hover:text-slate-700 dark:hover:text-slate-300"
-        >
-          Admin panel
-        </a>
+      <footer className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-400 dark:text-slate-600">
+        Practice for the PCEP™ certification · built with Django &amp; React
       </footer>
     </div>
   )
