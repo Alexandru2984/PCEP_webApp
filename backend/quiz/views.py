@@ -21,6 +21,7 @@ VALID_MODULES = {m for m, _ in Question.MODULE_CHOICES}
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([])  # liveness/readiness probes must not be rate-limited
 def health(request):
     """Liveness/readiness probe: 200 only when the database is reachable."""
     try:

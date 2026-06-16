@@ -175,3 +175,15 @@ def test_grade_rejects_foreign_choice(api_client, make_question):
         format='json',
     )
     assert resp.status_code == 400
+
+
+def test_basic_auth_credentials_are_not_an_oracle(api_client, question_bank):
+    """HTTP Basic auth must be disabled so the public API can't be used to
+    brute-force Django credentials (bad creds are ignored, not rejected 401)."""
+    import base64
+
+    creds = base64.b64encode(b'admin:definitely-wrong').decode()
+    resp = api_client.get(
+        '/api/quiz-set/?count=1', HTTP_AUTHORIZATION=f'Basic {creds}'
+    )
+    assert resp.status_code == 200

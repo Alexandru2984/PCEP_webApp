@@ -129,7 +129,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ],
+    # This API is fully public and read-only. Disabling authentication removes
+    # DRF's default BasicAuthentication, so the endpoints can't be abused as a
+    # credential-guessing oracle against the Django user database.
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    # Throttle every endpoint by default (anonymous IP), with a tighter scope
+    # for answer/grade submissions.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
     'DEFAULT_THROTTLE_RATES': {
+        'anon': '200/min',
         'submit_answer': '120/min',
     },
 }
