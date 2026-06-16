@@ -1,7 +1,9 @@
+from django.db import connection
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.decorators import api_view, throttle_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.generics import RetrieveAPIView
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
@@ -11,6 +13,20 @@ from .serializers import AnswerRequestSerializer, QuestionSerializer
 
 VALID_DIFFICULTIES = {d for d, _ in Question.DIFFICULTY_CHOICES}
 VALID_MODULES = {m for m, _ in Question.MODULE_CHOICES}
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health(request):
+    """Liveness/readiness probe: 200 only when the database is reachable."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+    except Exception:
+        return Response({'status': 'error', 'database': 'down'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    return Response({'status': 'ok', 'database': 'up'})
 
 
 class SubmitAnswerThrottle(AnonRateThrottle):

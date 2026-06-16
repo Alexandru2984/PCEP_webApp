@@ -6,6 +6,12 @@ from quiz.models import Question
 pytestmark = pytest.mark.django_db
 
 
+def test_health_endpoint_reports_ok(api_client):
+    resp = api_client.get('/api/health/')
+    assert resp.status_code == 200
+    assert resp.json() == {'status': 'ok', 'database': 'up'}
+
+
 def test_quiz_set_returns_requested_count(api_client, question_bank):
     resp = api_client.get('/api/quiz-set/?count=3')
     assert resp.status_code == 200
