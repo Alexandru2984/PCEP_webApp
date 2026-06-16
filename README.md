@@ -1,34 +1,111 @@
-# PCEP WebApp
+# PCEP Quiz
 
-Quiz web application for preparing the **PCEP** (Python Certified Entry-Level Programmer) certification. Each question has multiple-choice answers with immediate feedback and a detailed explanation for wrong answers.
+[![CI](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml/badge.svg)](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/Django-5.1-092E20.svg)](https://www.djangoproject.com/)
+[![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev/)
 
-## Stack
-- **Backend**: Django + Django REST Framework (PostgreSQL, Gunicorn)
-- **Frontend**: React + Vite + Tailwind CSS (Axios for API calls)
-- **Deploy**: Docker Compose (db + backend) + system Nginx reverse proxy + Let's Encrypt
+A practice-quiz web app for the **PCEP™ — Certified Entry-Level Python Programmer**
+certification. Every question gives instant feedback and a per-option explanation that
+tells you *why* each wrong answer is wrong — so you learn the concept, not just the key.
 
-## Production
-`https://pcep.micutu.com`
+🔗 **Live:** [pcep.micutu.com](https://pcep.micutu.com)
+
+> Questions are organised by the four official PCEP-30-02 syllabus modules and tagged by
+> difficulty, so you can drill a weak area or take a full mixed mock exam.
+
+## Features
+
+- 📚 **112+ questions** across all four PCEP modules with code snippets
+- 🎯 **Per-option explanations** — wrong answers explain the exact misconception
+- 🧩 **Filter by module & difficulty**, choose how many questions to take
+- 📊 **End-of-quiz review** — see every question, filter to just the ones you missed
+- ✅ Scored against the official **70% pass threshold**
+- 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
+- 🛡️ Rate-limited API, hardened production settings, DB-backed health probe
+
+## Tech stack
+
+| Layer    | Tech                                                      |
+| -------- | -------------------------------------------------------- |
+| Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn |
+| Frontend | React 18 · Vite · Tailwind CSS 4 · Axios                 |
+| Tooling  | pytest · ESLint · Prettier · GitHub Actions CI           |
+| Deploy   | Docker Compose · system Nginx · Let's Encrypt            |
 
 ## Architecture
+
 ```
 Internet → system nginx (80/443) ──┬── /admin/, /api/ → 127.0.0.1:8001 (Docker: gunicorn)
                                    └── /               → /var/www/pcep/frontend (React build)
 ```
 
-## Layout
+## Local development
+
+### Backend
+
+```bash
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Point Django at a local Postgres and seed the bank
+export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=True
+export POSTGRES_HOST=localhost POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=...
+python manage.py migrate
+python manage.py seed_questions          # add --reset to wipe first
+python manage.py runserver
 ```
-backend/        Django project + DRF app (created in Step 2)
-frontend/       React + Vite app (created in Step 4)
-nginx/          Template config for system nginx (sites-available)
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev        # Vite dev server, proxies /api to Django (see vite.config.js)
+```
+
+### With Docker
+
+```bash
+cp .env.example .env          # then fill in real secrets
+docker compose up --build     # db + backend on 127.0.0.1:8001
+docker compose --profile build run --rm frontend-builder   # build the React app
+```
+
+## Testing & quality
+
+```bash
+# Backend — 17 tests (API behaviour + seed-data integrity)
+cd backend && python -m pytest
+
+# Frontend — lint, format check, production build
+cd frontend && npm run lint && npm run format:check && npm run build
+```
+
+CI runs all of the above on every push and pull request, plus
+`manage.py check --deploy` against a production-like config.
+
+## API reference
+
+| Method | Endpoint                          | Description                                       |
+| ------ | --------------------------------- | ------------------------------------------------- |
+| `GET`  | `/api/health/`                    | Liveness probe (200 only if the DB is reachable)  |
+| `GET`  | `/api/quiz-set/`                  | Random question set. Params: `count`, `module`, `difficulty` |
+| `GET`  | `/api/questions/<id>/`            | Single question (choices only — no answer key)    |
+| `POST` | `/api/questions/<id>/answer/`     | Submit `{ "choice_id": N }`; returns correctness + explanation |
+
+## Project layout
+
+```
+backend/     Django project + DRF quiz app, management commands, tests
+frontend/    React + Vite + Tailwind app
+nginx/       Template config for system nginx
+.github/     CI workflow
 docker-compose.yml
-.env.example    Copy to .env and fill in real values
 ```
 
-## Development
-1. `cp .env.example .env` and set real secrets.
-2. `docker compose up --build` to bring up db + backend.
-3. `docker compose --profile build run --rm frontend-builder` to build the React app.
+## License
 
-## Deploy
-See deployment notes in Step 5 / Step 6 of the setup pipeline.
+[MIT](LICENSE) © Dragne Alexandru Mihai
