@@ -63,7 +63,7 @@ Internet → system nginx (80/443) ──┬── /admin/, /api/ → 127.0.0.1:
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # Point Django at a local Postgres and seed the bank
 export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=True
@@ -92,7 +92,8 @@ docker compose --profile build run --rm frontend-builder   # build the React app
 ## Testing & quality
 
 ```bash
-# Backend — 21 tests (API behaviour + seed-data integrity)
+# Backend — 22 tests (API behaviour + seed-data integrity)
+# Uses SQLite test settings locally; CI runs the same suite against PostgreSQL.
 cd backend && python -m pytest
 
 # Frontend — lint, format check, production build
