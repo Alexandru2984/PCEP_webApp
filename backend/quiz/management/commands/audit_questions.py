@@ -52,7 +52,14 @@ class Command(BaseCommand):
                     f'  - #{index} [{question["module"]}/{question["difficulty"]}] '
                     f'{question["text"]} | {question.get("code_snippet", "")!r}'
                 )
+
+        if summary['warnings']:
+            self.stdout.write(self.style.WARNING('\nCoverage warnings:'))
+            for warning in summary['warnings']:
+                self.stdout.write(f'  - {warning}')
+
+        if summary['duplicates'] or summary['warnings']:
             if options['fail_on_warnings']:
-                raise CommandError('Question bank has duplicate prompts.')
+                raise CommandError('Question bank has warnings.')
 
         self.stdout.write(self.style.SUCCESS('\nQuestion bank audit complete.'))

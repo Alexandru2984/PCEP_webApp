@@ -5,6 +5,7 @@ from .seed_data import ALL_QUESTIONS
 
 VALID_MODULES = ('module1', 'module2', 'module3', 'module4')
 VALID_DIFFICULTIES = ('easy', 'medium', 'hard')
+MIN_HARD_PER_MODULE = 8
 
 
 def question_key(question):
@@ -51,7 +52,20 @@ def validation_errors(questions=ALL_QUESTIONS):
     return errors
 
 
-def question_bank_summary(questions=ALL_QUESTIONS):
+def coverage_warnings(questions=ALL_QUESTIONS):
+    summary = question_bank_summary(questions, include_warnings=False)
+    warnings = []
+    for module in VALID_MODULES:
+        hard_count = summary['matrix'][module]['hard']
+        if hard_count < MIN_HARD_PER_MODULE:
+            warnings.append(
+                f'{module} has {hard_count} hard questions, '
+                f'expected at least {MIN_HARD_PER_MODULE}'
+            )
+    return warnings
+
+
+def question_bank_summary(questions=ALL_QUESTIONS, include_warnings=True):
     by_module = Counter(q.get('module') for q in questions)
     by_difficulty = Counter(q.get('difficulty') for q in questions)
     matrix = {
@@ -65,7 +79,7 @@ def question_bank_summary(questions=ALL_QUESTIONS):
         }
         for module in VALID_MODULES
     }
-    return {
+    summary = {
         'total': len(questions),
         'by_module': by_module,
         'by_difficulty': by_difficulty,
@@ -73,3 +87,6 @@ def question_bank_summary(questions=ALL_QUESTIONS):
         'duplicates': duplicate_questions(questions),
         'errors': validation_errors(questions),
     }
+    if include_warnings:
+        summary['warnings'] = coverage_warnings(questions)
+    return summary
