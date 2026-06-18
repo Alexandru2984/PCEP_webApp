@@ -95,6 +95,7 @@ docker compose --profile build run --rm frontend-builder   # build the React app
 # Backend — 22 tests (API behaviour + seed-data integrity)
 # Uses SQLite test settings locally; CI runs the same suite against PostgreSQL.
 cd backend && python -m pytest
+DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions
 
 # Frontend — lint, format check, production build
 cd frontend && npm run lint && npm run format:check && npm run build

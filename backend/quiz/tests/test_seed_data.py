@@ -1,3 +1,4 @@
+from quiz.question_bank import question_bank_summary, validation_errors
 from quiz.seed_data import ALL_QUESTIONS
 
 
@@ -33,3 +34,14 @@ def test_every_question_has_valid_module_and_difficulty():
 def test_bank_covers_all_four_modules():
     modules = {q['module'] for q in ALL_QUESTIONS}
     assert modules == VALID_MODULES
+
+
+def test_question_bank_has_no_shape_errors():
+    assert validation_errors() == []
+
+
+def test_question_bank_summary_counts_every_question():
+    summary = question_bank_summary()
+    assert summary['total'] == len(ALL_QUESTIONS)
+    assert sum(summary['by_module'].values()) == len(ALL_QUESTIONS)
+    assert sum(summary['by_difficulty'].values()) == len(ALL_QUESTIONS)
