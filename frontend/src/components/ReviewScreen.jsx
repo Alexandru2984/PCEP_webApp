@@ -93,7 +93,14 @@ function ReviewItem({ index, item }) {
   )
 }
 
-export default function ReviewScreen({ items, score, total, onRestart, elapsedLabel }) {
+export default function ReviewScreen({
+  items,
+  score,
+  total,
+  onRestart,
+  elapsedLabel,
+  streakStats,
+}) {
   const [filter, setFilter] = useState('wrong')
   const wrong = items.filter((i) => !i.feedback?.is_correct)
   const shown = filter === 'wrong' ? wrong : items
@@ -148,6 +155,11 @@ export default function ReviewScreen({ items, score, total, onRestart, elapsedLa
               {passed ? ' · passing' : ' · below 70% PCEP threshold'}
               {elapsedLabel ? ` · ${elapsedLabel}` : ''}
             </p>
+            {streakStats?.best > 1 && (
+              <div className="mt-3 inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
+                Best streak: {streakStats.best}
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             <button

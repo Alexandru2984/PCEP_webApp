@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchQuizSet, submitAnswer, gradeAnswers } from '../api'
 import { loadSettings, saveSettings, appendAttempt, loadHistory } from '../storage'
 import { formatElapsed } from '../format'
+import { getStreakStats } from '../streak'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
 import ReviewScreen from './ReviewScreen'
@@ -24,9 +25,11 @@ export default function QuizContainer() {
   const [view, setView] = useState('setup')
 
   const score = history.filter((h) => h.feedback?.is_correct).length
+  const streak = getStreakStats(history)
 
   const recordAttempt = (items, total, elapsed) => {
     const correct = items.filter((i) => i.feedback?.is_correct).length
+    const attemptStreak = getStreakStats(items)
     appendAttempt({
       date: new Date().toISOString(),
       mode: lastConfig?.mode ?? 'practice',
@@ -36,6 +39,7 @@ export default function QuizContainer() {
       total,
       pct: total > 0 ? Math.round((correct / total) * 100) : 0,
       elapsedMs: elapsed,
+      bestStreak: attemptStreak.best,
     })
   }
 
@@ -237,6 +241,7 @@ export default function QuizContainer() {
         total={questions.length}
         onRestart={resetToSetup}
         elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
+        streakStats={getStreakStats(history)}
       />
     )
   }
@@ -251,13 +256,23 @@ export default function QuizContainer() {
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className="mb-3 flex items-center justify-between text-sm">
-        <span className="text-slate-500 dark:text-slate-400">
-          Score:{' '}
-          <span className="font-semibold text-slate-700 dark:text-slate-200">
-            {score}
+      <div className="mb-3 flex items-center justify-between gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-slate-500 dark:text-slate-400">
+          <span>
+            Score:{' '}
+            <span className="font-semibold text-slate-700 dark:text-slate-200">
+              {score}
+            </span>
           </span>
-        </span>
+          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            Streak {streak.current}
+          </span>
+          {streak.best > 1 && (
+            <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
+              Best {streak.best}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={resetToSetup}

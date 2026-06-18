@@ -55,6 +55,7 @@ export default function Dashboard() {
   const bestPct = Math.max(...attempts.map((a) => a.pct))
   const avgPct = Math.round(attempts.reduce((s, a) => s + a.pct, 0) / totalAttempts)
   const totalAnswered = attempts.reduce((s, a) => s + a.total, 0)
+  const bestStreak = Math.max(...attempts.map((a) => a.bestStreak ?? 0))
 
   // Per-module mastery across every attempt scoped to a single module.
   const byModule = {}
@@ -82,7 +83,7 @@ export default function Dashboard() {
         <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
           Your progress
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Stat label="Attempts" value={totalAttempts} />
           <Stat
             label="Best score"
@@ -91,6 +92,11 @@ export default function Dashboard() {
           />
           <Stat label="Average" value={`${avgPct}%`} />
           <Stat label="Questions" value={totalAnswered} />
+          <Stat
+            label="Best streak"
+            value={bestStreak}
+            accent={bestStreak >= 5 ? 'text-green-600 dark:text-green-400' : undefined}
+          />
         </div>
 
         {modules.length > 0 && (
@@ -140,6 +146,7 @@ export default function Dashboard() {
                 <div className="text-xs text-slate-400 dark:text-slate-500">
                   {new Date(a.date).toLocaleDateString()}
                   {a.elapsedMs ? ` · ${formatElapsed(a.elapsedMs)}` : ''}
+                  {a.bestStreak ? ` · streak ${a.bestStreak}` : ''}
                 </div>
               </div>
               <div
