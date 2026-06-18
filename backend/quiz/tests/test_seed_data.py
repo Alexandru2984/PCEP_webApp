@@ -1,4 +1,8 @@
-from quiz.question_bank import question_bank_summary, validation_errors
+from quiz.question_bank import (
+    duplicate_questions,
+    question_bank_summary,
+    validation_errors,
+)
 from quiz.seed_data import ALL_QUESTIONS
 
 
@@ -45,3 +49,7 @@ def test_question_bank_summary_counts_every_question():
     assert summary['total'] == len(ALL_QUESTIONS)
     assert sum(summary['by_module'].values()) == len(ALL_QUESTIONS)
     assert sum(summary['by_difficulty'].values()) == len(ALL_QUESTIONS)
+
+
+def test_question_bank_has_no_duplicate_prompts():
+    assert duplicate_questions() == []
