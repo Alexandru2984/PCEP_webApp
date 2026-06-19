@@ -35,6 +35,7 @@ docker compose build backend
 docker compose up -d backend
 curl -fsS -H 'X-Forwarded-Proto: https' http://127.0.0.1:8001/api/health/
 docker compose exec backend python manage.py audit_questions --fail-on-warnings
+docker compose exec backend python manage.py seed_questions --dry-run
 docker compose exec backend python manage.py seed_questions --reset
 ```
 

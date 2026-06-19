@@ -69,7 +69,7 @@ pip install -r requirements-dev.txt
 export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=True
 export POSTGRES_HOST=localhost POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=...
 python manage.py migrate
-python manage.py seed_questions          # add --reset to wipe first
+python manage.py seed_questions          # idempotent: adds missing questions
 python manage.py runserver
 ```
 
