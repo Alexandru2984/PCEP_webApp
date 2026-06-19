@@ -92,6 +92,10 @@ docker compose --profile build run --rm frontend-builder   # build the React app
 ## Testing & quality
 
 ```bash
+make test
+make audit
+make django-check
+
 # Backend — 22 tests (API behaviour + seed-data integrity)
 # Uses SQLite test settings locally; CI runs the same suite against PostgreSQL.
 cd backend && python -m pytest
@@ -103,6 +107,8 @@ cd frontend && npm run lint && npm run format:check && npm run build
 
 CI runs all of the above on every push and pull request, plus
 `manage.py check --deploy` against a production-like config.
+
+Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## API reference
 
