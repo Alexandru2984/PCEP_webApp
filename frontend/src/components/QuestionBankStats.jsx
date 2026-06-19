@@ -1,17 +1,9 @@
+import { getScopeTotal } from '../questionStats'
+
 const DIFFICULTY_LABELS = {
   easy: 'Easy',
   medium: 'Medium',
   hard: 'Hard',
-}
-
-function getScopeTotal(stats, selectedModule, selectedDifficulty) {
-  if (!stats) return 0
-  if (selectedModule && selectedDifficulty) {
-    return stats.matrix?.[selectedModule]?.[selectedDifficulty] ?? 0
-  }
-  if (selectedModule) return stats.by_module?.[selectedModule] ?? 0
-  if (selectedDifficulty) return stats.by_difficulty?.[selectedDifficulty] ?? 0
-  return stats.total ?? 0
 }
 
 export default function QuestionBankStats({
@@ -25,8 +17,10 @@ export default function QuestionBankStats({
     return (
       <section
         className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700"
+        role="status"
         aria-live="polite"
       >
+        <span className="sr-only">Loading question-bank stats</span>
         <div className="h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {[0, 1, 2].map((item) => (
@@ -42,7 +36,10 @@ export default function QuestionBankStats({
 
   if (error) {
     return (
-      <section className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+      <section
+        className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700"
+        role="alert"
+      >
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Question-bank snapshot
         </p>

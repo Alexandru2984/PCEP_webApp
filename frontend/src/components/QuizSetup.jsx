@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getScopeTotal } from '../questionStats'
 import QuestionBankStats from './QuestionBankStats'
 
 const MODULES = [
@@ -39,6 +40,13 @@ export default function QuizSetup({ onStart, initial, stats, statsLoading, stats
   const [module, setModule] = useState(initial?.module ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? '')
   const [count, setCount] = useState(initial?.count ?? 30)
+  const canUseStats = stats && !statsLoading && !statsError
+  const scopeTotal = canUseStats ? getScopeTotal(stats, module, difficulty) : null
+  const effectiveCount =
+    scopeTotal && scopeTotal > 0 ? Math.min(count, scopeTotal) : count
+  const isEmptyScope = canUseStats && scopeTotal === 0
+  const isCappedByScope = canUseStats && scopeTotal > 0 && effectiveCount < count
+  const startLabel = mode === 'exam' ? 'Start exam' : 'Start practice'
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -120,6 +128,7 @@ export default function QuizSetup({ onStart, initial, stats, statsLoading, stats
                 type="button"
                 key={n}
                 onClick={() => setCount(n)}
+                aria-pressed={count === n}
                 className={`rounded-lg border px-4 py-2 transition-colors ${
                   count === n
                     ? 'border-slate-900 bg-slate-900 text-white dark:border-sky-600 dark:bg-sky-600'
@@ -130,15 +139,27 @@ export default function QuizSetup({ onStart, initial, stats, statsLoading, stats
               </button>
             ))}
           </div>
+          <p className="mt-2 min-h-5 text-xs text-slate-500 dark:text-slate-400">
+            {isCappedByScope
+              ? `This scope has ${scopeTotal} questions; the quiz will use all available.`
+              : canUseStats
+                ? `${scopeTotal} questions match the selected scope.`
+                : 'The requested count is clamped by what the question bank can serve.'}
+          </p>
         </div>
       </div>
 
       <button
         type="button"
-        onClick={() => onStart({ mode, module, difficulty, count })}
-        className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
+        disabled={isEmptyScope}
+        onClick={() => onStart({ mode, module, difficulty, count: effectiveCount })}
+        className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-sky-600 dark:hover:bg-sky-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
       >
-        {mode === 'exam' ? 'Start exam' : 'Start practice'}
+        {isEmptyScope
+          ? 'No questions in this scope'
+          : isCappedByScope
+            ? `${startLabel} with ${effectiveCount}`
+            : startLabel}
       </button>
 
       <QuestionBankStats

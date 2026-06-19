@@ -193,16 +193,18 @@ export default function QuizContainer() {
   if (phase === 'setup') {
     const attemptCount = loadHistory().length
     const tab = (active) =>
-      `rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+      `rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 ${
         active
           ? 'bg-slate-900 text-white dark:bg-sky-600'
           : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
       }`
     return (
       <div>
-        <div className="mb-4 flex gap-2">
+        <div className="mb-4 flex gap-2" role="tablist" aria-label="Quiz workspace">
           <button
             type="button"
+            role="tab"
+            aria-selected={view === 'setup'}
             onClick={() => setView('setup')}
             className={tab(view === 'setup')}
           >
@@ -210,6 +212,8 @@ export default function QuizContainer() {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={view === 'progress'}
             onClick={() => setView('progress')}
             className={tab(view === 'progress')}
           >
@@ -233,7 +237,11 @@ export default function QuizContainer() {
 
   if (phase === 'loading') {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
+      <div
+        className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800"
+        role="status"
+        aria-live="polite"
+      >
         <p className="text-slate-600 dark:text-slate-400">Loading quiz…</p>
       </div>
     )
@@ -241,7 +249,10 @@ export default function QuizContainer() {
 
   if (phase === 'error') {
     return (
-      <div className="rounded-xl border border-red-200 bg-white p-6 dark:border-red-900 dark:bg-slate-800">
+      <div
+        className="rounded-xl border border-red-200 bg-white p-6 dark:border-red-900 dark:bg-slate-800"
+        role="alert"
+      >
         <p className="mb-2 font-semibold text-red-700 dark:text-red-400">
           Something went wrong.
         </p>
