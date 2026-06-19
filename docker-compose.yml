@@ -22,7 +22,10 @@ services:
     container_name: pcep_backend
     restart: unless-stopped
     env_file:
-      - .env
+      # Optional so `docker compose config` (CI) works without a .env on disk;
+      # in real deploys the file is present and supplies the backend secrets.
+      - path: .env
+        required: false
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
