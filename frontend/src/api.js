@@ -13,6 +13,8 @@ export const fetchQuizSet = ({ count = 30, module = '', difficulty = '' } = {}) 
   return api.get(`/quiz-set/?${params.toString()}`).then((r) => r.data)
 }
 
+export const fetchQuestionStats = () => api.get('/stats/').then((r) => r.data)
+
 export const submitAnswer = (questionId, choiceId) =>
   api
     .post(`/questions/${questionId}/answer/`, { choice_id: choiceId })

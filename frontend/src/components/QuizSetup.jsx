@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import QuestionBankStats from './QuestionBankStats'
 
 const MODULES = [
   { value: '', label: 'All modules' },
@@ -33,7 +34,7 @@ const MODES = [
   },
 ]
 
-export default function QuizSetup({ onStart, initial }) {
+export default function QuizSetup({ onStart, initial, stats, statsLoading, statsError }) {
   const [mode, setMode] = useState(initial?.mode ?? 'practice')
   const [module, setModule] = useState(initial?.module ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? '')
@@ -139,6 +140,14 @@ export default function QuizSetup({ onStart, initial }) {
       >
         {mode === 'exam' ? 'Start exam' : 'Start practice'}
       </button>
+
+      <QuestionBankStats
+        stats={stats}
+        loading={statsLoading}
+        error={statsError}
+        selectedModule={module}
+        selectedDifficulty={difficulty}
+      />
     </div>
   )
 }

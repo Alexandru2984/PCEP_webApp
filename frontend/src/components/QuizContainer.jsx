@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchQuizSet, submitAnswer, gradeAnswers } from '../api'
+import { fetchQuizSet, submitAnswer, gradeAnswers, fetchQuestionStats } from '../api'
 import { loadSettings, saveSettings, appendAttempt, loadHistory } from '../storage'
 import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
@@ -23,6 +23,9 @@ export default function QuizContainer() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [view, setView] = useState('setup')
+  const [questionStats, setQuestionStats] = useState(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [statsError, setStatsError] = useState(null)
 
   const score = history.filter((h) => h.feedback?.is_correct).length
   const streak = getStreakStats(history)
@@ -138,6 +141,32 @@ export default function QuizContainer() {
     setError(null)
   }
 
+  useEffect(() => {
+    let active = true
+
+    const loadStats = async () => {
+      setStatsLoading(true)
+      setStatsError(null)
+      try {
+        const data = await fetchQuestionStats()
+        if (!active) return
+        setQuestionStats(data)
+      } catch (e) {
+        if (!active) return
+        setStatsError(
+          e?.response?.data?.detail || e?.message || 'Could not load question-bank stats.'
+        )
+      } finally {
+        if (active) setStatsLoading(false)
+      }
+    }
+
+    loadStats()
+    return () => {
+      active = false
+    }
+  }, [])
+
   // Keyboard shortcuts for practice mode: 1–4 / A–D to answer, Enter/→ to advance.
   useEffect(() => {
     if (phase !== 'answering' && phase !== 'reviewing') return
@@ -190,7 +219,13 @@ export default function QuizContainer() {
         {view === 'progress' ? (
           <Dashboard />
         ) : (
-          <QuizSetup onStart={startQuiz} initial={lastConfig} />
+          <QuizSetup
+            onStart={startQuiz}
+            initial={lastConfig}
+            stats={questionStats}
+            statsLoading={statsLoading}
+            statsError={statsError}
+          />
         )}
       </div>
     )

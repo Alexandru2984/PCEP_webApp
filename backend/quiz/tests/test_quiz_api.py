@@ -12,6 +12,42 @@ def test_health_endpoint_reports_ok(api_client):
     assert resp.json() == {'status': 'ok', 'database': 'up'}
 
 
+def test_stats_endpoint_reports_question_bank_coverage(api_client, question_bank):
+    resp = api_client.get('/api/stats/')
+    assert resp.status_code == 200
+
+    body = resp.json()
+    assert body['total'] == 5
+    assert body['pass_threshold'] == 70
+    assert body['by_module'] == {
+        'module1': 2,
+        'module2': 1,
+        'module3': 1,
+        'module4': 1,
+    }
+    assert body['by_difficulty'] == {'easy': 2, 'medium': 1, 'hard': 2}
+    assert body['matrix']['module1'] == {'easy': 1, 'medium': 0, 'hard': 1}
+    assert body['matrix']['module2'] == {'easy': 0, 'medium': 1, 'hard': 0}
+    assert body['modules'][0] == {
+        'value': 'module1',
+        'label': 'Module 1 — Fundamentals',
+        'total': 2,
+        'easy': 1,
+        'medium': 0,
+        'hard': 1,
+    }
+
+
+def test_stats_endpoint_only_exposes_aggregate_data(api_client, question_bank):
+    resp = api_client.get('/api/stats/')
+    assert resp.status_code == 200
+
+    body = resp.json()
+    forbidden_keys = {'questions', 'choices', 'text', 'code_snippet', 'explanation'}
+    assert forbidden_keys.isdisjoint(body)
+    assert all(forbidden_keys.isdisjoint(module) for module in body['modules'])
+
+
 def test_quiz_set_returns_requested_count(api_client, question_bank):
     resp = api_client.get('/api/quiz-set/?count=3')
     assert resp.status_code == 200

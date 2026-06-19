@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path('health/', views.health, name='health'),
+    path('stats/', views.stats, name='stats'),
     path('quiz-set/', views.quiz_set, name='quiz-set'),
     path('grade/', views.grade, name='grade'),
     path('questions/<int:pk>/', views.QuestionDetailView.as_view(), name='question-detail'),

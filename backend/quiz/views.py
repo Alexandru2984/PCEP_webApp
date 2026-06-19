@@ -1,4 +1,5 @@
 from django.db import connection
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -17,6 +18,7 @@ from .serializers import (
 
 VALID_DIFFICULTIES = {d for d, _ in Question.DIFFICULTY_CHOICES}
 VALID_MODULES = {m for m, _ in Question.MODULE_CHOICES}
+PASS_THRESHOLD = 70
 
 
 @api_view(['GET'])
@@ -32,6 +34,52 @@ def health(request):
         return Response({'status': 'error', 'database': 'down'},
                         status=status.HTTP_503_SERVICE_UNAVAILABLE)
     return Response({'status': 'ok', 'database': 'up'})
+
+
+@api_view(['GET'])
+def stats(request):
+    """Return aggregate question-bank coverage without exposing answers."""
+    modules = dict(Question.MODULE_CHOICES)
+    difficulties = dict(Question.DIFFICULTY_CHOICES)
+    module_counts = {key: 0 for key in modules}
+    difficulty_counts = {key: 0 for key in difficulties}
+    matrix = {
+        module: {difficulty: 0 for difficulty in difficulties}
+        for module in modules
+    }
+
+    for row in Question.objects.values('module').annotate(total=Count('id')):
+        module_counts[row['module']] = row['total']
+
+    for row in Question.objects.values('difficulty').annotate(total=Count('id')):
+        difficulty_counts[row['difficulty']] = row['total']
+
+    rows = (
+        Question.objects.values('module', 'difficulty')
+        .annotate(total=Count('id'))
+        .order_by()
+    )
+    for row in rows:
+        matrix[row['module']][row['difficulty']] = row['total']
+
+    module_summaries = []
+    for value, label in Question.MODULE_CHOICES:
+        summary = {
+            'value': value,
+            'label': label,
+            'total': module_counts[value],
+        }
+        summary.update(matrix[value])
+        module_summaries.append(summary)
+
+    return Response({
+        'total': Question.objects.count(),
+        'by_module': module_counts,
+        'by_difficulty': difficulty_counts,
+        'matrix': matrix,
+        'modules': module_summaries,
+        'pass_threshold': PASS_THRESHOLD,
+    })
 
 
 class SubmitAnswerThrottle(AnonRateThrottle):
