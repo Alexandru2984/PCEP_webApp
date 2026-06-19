@@ -31,7 +31,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ## Features
 
-- 📚 **160+ questions** across all four PCEP modules with syntax-highlighted code
+- 📚 **210+ questions** across all four PCEP modules with syntax-highlighted code
 - 🐍 **Run the code, don't just read it** — every snippet has a built-in Python
   interpreter (Pyodide on WebAssembly). Edit it, hit **Run**, and see real
   `stdout`/tracebacks **entirely in your browser** — no backend, no server cost.
@@ -110,7 +110,7 @@ make test
 make audit
 make django-check
 
-# Backend — 22 tests (API behaviour + seed-data integrity)
+# Backend — 31 tests (API behaviour + seed-data integrity)
 # Uses SQLite test settings locally; CI runs the same suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions
