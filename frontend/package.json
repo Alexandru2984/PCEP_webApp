@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "fetch-pyodide": "bash scripts/fetch-pyodide.sh",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",

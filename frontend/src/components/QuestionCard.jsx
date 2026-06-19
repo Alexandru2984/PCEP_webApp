@@ -1,4 +1,5 @@
 import CodeBlock from './CodeBlock'
+import CodeRunner from './CodeRunner'
 
 const DIFFICULTY_BADGE = {
   easy: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
@@ -14,6 +15,7 @@ export default function QuestionCard({
   selectedChoiceId,
   feedback,
   disabled,
+  runnable = false,
 }) {
   const getChoiceClass = (choice) => {
     const base =
@@ -59,9 +61,12 @@ export default function QuestionCard({
         {question.text}
       </h2>
 
-      {question.code_snippet && (
-        <CodeBlock code={question.code_snippet} className="mb-4" />
-      )}
+      {question.code_snippet &&
+        (runnable ? (
+          <CodeRunner key={question.id} code={question.code_snippet} className="mb-4" />
+        ) : (
+          <CodeBlock code={question.code_snippet} className="mb-4" />
+        ))}
 
       <div className="space-y-2" role="radiogroup" aria-label="Answer choices">
         {question.choices.map((choice, idx) => {

@@ -53,6 +53,27 @@ curl -fsS https://pcep.micutu.com/ >/dev/null
 The deploy target backs up the existing static directory as
 `/var/www/pcep/frontend.bak.<timestamp>` before publishing `frontend/dist`.
 
+### In-browser Python runner (Pyodide)
+
+`make build-frontend` depends on `fetch-pyodide`, which downloads the self-hosted
+Pyodide runtime into `frontend/public/pyodide/` (git-ignored, ~12 MB) only when
+it is missing. `vite build` then copies it into `dist/`, so it publishes
+same-origin at `/pyodide/*` alongside `/py-worker.js` — no third-party CDN.
+
+The SPA `location /` block in `nginx/pcep.micutu.com.conf` already grants the two
+CSP capabilities the runner needs: `worker-src 'self'` (the Web Worker) and
+`script-src 'wasm-unsafe-eval'` (WASM compilation). No `'unsafe-eval'` is required.
+After changing the live vhost, keep backups **outside** `sites-enabled/`
+(e.g. `/etc/nginx/_mybackups/`) so a stray `.bak` is not parsed as a second vhost,
+then `sudo nginx -t && sudo systemctl reload nginx`.
+
+Smoke-test after deploy:
+
+```bash
+curl -fsS https://pcep.micutu.com/py-worker.js -o /dev/null
+curl -fsS https://pcep.micutu.com/pyodide/pyodide.asm.wasm -o /dev/null   # ~8 MB, application/wasm
+```
+
 ## Rollback
 
 Frontend rollback:

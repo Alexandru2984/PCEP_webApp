@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import CodeBlock from './CodeBlock'
+import CodeRunner from './CodeRunner'
 import { celebrate } from '../confetti'
 import { useCountUp } from '../useCountUp'
 
@@ -44,7 +44,7 @@ function ReviewItem({ index, item }) {
 
       <p className="font-semibold text-slate-900 dark:text-slate-100">{question.text}</p>
       {question.code_snippet && (
-        <CodeBlock code={question.code_snippet} className="mt-2" />
+        <CodeRunner code={question.code_snippet} className="mt-2" />
       )}
 
       <ul className="mt-3 space-y-1.5">

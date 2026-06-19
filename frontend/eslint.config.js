@@ -4,7 +4,8 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist', 'node_modules'] },
+  // dist + the self-hosted Pyodide runtime (vendored, minified) are not ours to lint.
+  { ignores: ['dist', 'node_modules', 'public/pyodide'] },
   {
     // Config files run in Node, not the browser.
     files: ['*.config.js'],

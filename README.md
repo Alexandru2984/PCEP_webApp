@@ -25,9 +25,17 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 | ----------------------------------------------- | ----------------------------------------------------- |
 | ![Review](docs/screenshots/05-review-light.png) | ![Dashboard](docs/screenshots/06-dashboard-light.png) |
 
+| Run any snippet right in the question (Pyodide / WebAssembly) |
+| ------------------------------------------------------------- |
+| ![Code runner](docs/screenshots/07-code-runner-light.png)     |
+
 ## Features
 
-- 📚 **150+ questions** across all four PCEP modules with syntax-highlighted code
+- 📚 **160+ questions** across all four PCEP modules with syntax-highlighted code
+- 🐍 **Run the code, don't just read it** — every snippet has a built-in Python
+  interpreter (Pyodide on WebAssembly). Edit it, hit **Run**, and see real
+  `stdout`/tracebacks **entirely in your browser** — no backend, no server cost.
+  Runaway loops are sandboxed in a Web Worker and killed on a timeout.
 - 🎯 **Per-option explanations** — wrong answers explain the exact misconception
 - ⏱️ **Two modes** — Practice (instant feedback) and a timed **Exam simulation**
   with a question navigator, flagging, and auto-submit
@@ -45,7 +53,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 | Layer    | Tech                                                     |
 | -------- | -------------------------------------------------------- |
 | Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn |
-| Frontend | React 18 · Vite · Tailwind CSS 4 · Axios                 |
+| Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM) |
 | Tooling  | pytest · ESLint · Prettier · GitHub Actions CI           |
 | Deploy   | Docker Compose · system Nginx · Let's Encrypt            |
 
@@ -78,8 +86,14 @@ python manage.py runserver
 ```bash
 cd frontend
 npm install
-npm run dev        # Vite dev server, proxies /api to Django (see vite.config.js)
+npm run fetch-pyodide   # one-time: downloads the self-hosted Python runtime (~12 MB,
+                        # git-ignored) used by the in-browser code runner
+npm run dev             # Vite dev server, proxies /api to Django (see vite.config.js)
 ```
+
+> The build succeeds without the Pyodide step, but the **Run** button needs it.
+> `npm run build` copies `public/pyodide/` into `dist/`, so it ships same-origin
+> at `/pyodide/*` — no third-party CDN, and the CSP only needs `'wasm-unsafe-eval'`.
 
 ### With Docker
 

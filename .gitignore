@@ -28,6 +28,9 @@ dist/
 .vite/
 frontend/dist/
 
+# --- Self-hosted Pyodide runtime (~12 MB; fetched via npm run fetch-pyodide) ---
+frontend/public/pyodide/
+
 # --- Env & secrets ---
 .env
 .env.local

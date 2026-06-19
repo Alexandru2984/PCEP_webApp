@@ -5,7 +5,7 @@ COMPOSE ?= docker compose
 FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend django-check compose-up compose-build seed-reset deploy-frontend status
+.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build seed-reset deploy-frontend status
 
 help:
 	@printf '%s\n' \
@@ -49,8 +49,13 @@ audit-frontend:
 
 build: build-frontend
 
-build-frontend:
+build-frontend: fetch-pyodide
 	cd frontend && $(NPM) run build
+
+# Self-hosted Python runtime for the in-browser code runner (git-ignored, ~12 MB).
+# Fetched only when missing so repeat builds stay fast.
+fetch-pyodide:
+	cd frontend && [ -d public/pyodide ] || $(NPM) run fetch-pyodide
 
 django-check:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.settings DJANGO_DEBUG=False DJANGO_SECRET_KEY=a-sufficiently-long-production-secret-key-for-local-check DJANGO_ALLOWED_HOSTS=pcep.micutu.com POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=dummy POSTGRES_HOST=localhost POSTGRES_PORT=5432 ../$(PYTHON) manage.py check --deploy --fail-level WARNING

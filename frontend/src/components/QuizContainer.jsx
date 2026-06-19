@@ -172,6 +172,10 @@ export default function QuizContainer() {
     if (phase !== 'answering' && phase !== 'reviewing') return
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
+      // Don't hijack digits/letters while the learner is typing in the code editor.
+      const t = e.target
+      if (t?.tagName === 'TEXTAREA' || t?.tagName === 'INPUT' || t?.isContentEditable)
+        return
       if (phase === 'answering') {
         const choices = questions[index]?.choices ?? []
         const n = Number.parseInt(e.key, 10)
@@ -336,6 +340,7 @@ export default function QuizContainer() {
         selectedChoiceId={selectedChoiceId}
         feedback={feedback}
         disabled={phase === 'reviewing'}
+        runnable
       />
       {feedback ? (
         <FeedbackBox
