@@ -14,6 +14,8 @@ export default function QuestionBankStats({
   selectedDifficulty,
 }) {
   if (loading) {
+    // Skeleton mirrors the loaded layout's height so swapping in real data
+    // causes (almost) no layout shift — keeps CLS low.
     return (
       <section
         className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700"
@@ -21,12 +23,34 @@ export default function QuestionBankStats({
         aria-live="polite"
       >
         <span className="sr-only">Loading question-bank stats</span>
-        <div className="h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="flex items-end justify-between gap-3">
+          <div className="space-y-2">
+            <div className="h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="h-3 w-52 animate-pulse rounded bg-slate-100 dark:bg-slate-900" />
+          </div>
+          <div className="h-8 w-12 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {[0, 1, 2].map((item) => (
             <div
               key={item}
               className="h-16 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-900"
+            />
+          ))}
+        </div>
+        <div className="mt-4 space-y-3">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item}>
+              <div className="mb-1 h-3 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-900" />
+              <div className="h-2 animate-pulse rounded-full bg-slate-100 dark:bg-slate-900" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex gap-2">
+          {[0, 1, 2].map((item) => (
+            <div
+              key={item}
+              className="h-7 w-20 animate-pulse rounded-full bg-slate-100 dark:bg-slate-900"
             />
           ))}
         </div>

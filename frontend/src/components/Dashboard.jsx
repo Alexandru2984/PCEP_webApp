@@ -119,7 +119,7 @@ export default function Dashboard() {
           <button
             type="button"
             onClick={handleClear}
-            className="text-xs text-slate-400 underline underline-offset-2 hover:text-red-500 dark:text-slate-500"
+            className="text-xs text-slate-500 underline underline-offset-2 hover:text-red-500 dark:text-slate-400"
           >
             Clear history
           </button>
@@ -143,7 +143,7 @@ export default function Dashboard() {
                     {a.difficulty ? ` · ${a.difficulty}` : ''}
                   </span>
                 </div>
-                <div className="text-xs text-slate-400 dark:text-slate-500">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   {new Date(a.date).toLocaleDateString()}
                   {a.elapsedMs ? ` · ${formatElapsed(a.elapsedMs)}` : ''}
                   {a.bestStreak ? ` · streak ${a.bestStreak}` : ''}
@@ -157,7 +157,7 @@ export default function Dashboard() {
                 }`}
               >
                 {a.pct}%
-                <span className="ml-1 text-xs font-normal text-slate-400">
+                <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                   ({a.score}/{a.total})
                 </span>
               </div>

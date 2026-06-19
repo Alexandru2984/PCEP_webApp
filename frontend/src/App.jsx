@@ -21,7 +21,7 @@ export default function App() {
         <QuizContainer />
       </main>
 
-      <footer className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-400 dark:text-slate-600">
+      <footer className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-600 dark:text-slate-400">
         Practice for the PCEP™ certification · built with Django &amp; React
       </footer>
     </div>

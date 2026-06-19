@@ -72,7 +72,7 @@ export default function CodeRunner({ code, className = '' }) {
           type="button"
           onClick={run}
           disabled={running}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {running ? (
             <>
@@ -110,7 +110,7 @@ export default function CodeRunner({ code, className = '' }) {
           </span>
         )}
         {!running && (
-          <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">
+          <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">
             runs in your browser · <kbd className="font-mono">Ctrl</kbd>+
             <kbd className="font-mono">Enter</kbd>
           </span>

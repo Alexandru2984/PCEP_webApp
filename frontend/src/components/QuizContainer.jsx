@@ -349,7 +349,7 @@ export default function QuizContainer() {
           isLast={index + 1 >= questions.length}
         />
       ) : (
-        <p className="mt-3 text-center text-xs text-slate-400 dark:text-slate-500">
+        <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
           Tip: press <kbd className="font-mono">1</kbd>–<kbd className="font-mono">4</kbd>{' '}
           to answer, <kbd className="font-mono">Enter</kbd> for next
         </p>

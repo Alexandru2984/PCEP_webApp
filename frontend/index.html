@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="canonical" href="https://pcep.micutu.com/" />
     <meta name="theme-color" content="#0f172a" />
     <title>
       PCEP Quiz — Practice for the Certified Entry-Level Python Programmer exam
     </title>
     <meta
       name="description"
-      content="Free practice quiz for the PCEP (Certified Entry-Level Python Programmer) exam: 100+ questions across all four modules with instant feedback and per-option explanations."
+      content="Free practice quiz for the PCEP (Certified Entry-Level Python Programmer) exam: 200+ questions across all four modules with instant feedback, per-option explanations, and a built-in Python code runner."
     />
 
     <!-- Open Graph / social share -->
@@ -22,10 +23,33 @@
     />
     <meta
       property="og:description"
-      content="100+ PCEP exam questions with instant feedback and explanations. Practice mode or timed exam simulation."
+      content="200+ PCEP exam questions with instant feedback, explanations, and a run-it-yourself Python sandbox. Practice mode or timed exam simulation."
     />
     <meta property="og:url" content="https://pcep.micutu.com" />
     <meta name="twitter:card" content="summary" />
+
+    <!-- Structured data: JSON-LD is a data block, exempt from script-src CSP. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "PCEP Quiz",
+        "url": "https://pcep.micutu.com/",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any modern web browser",
+        "browserRequirements": "Requires JavaScript and WebAssembly",
+        "description": "Free practice quiz for the PCEP — Certified Entry-Level Python Programmer exam: 200+ questions across all four syllabus modules with instant feedback, per-option explanations, and an in-browser Python code runner.",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "educationalUse": "self-assessment",
+        "learningResourceType": "quiz",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "about": {
+          "@type": "Thing",
+          "name": "PCEP — Certified Entry-Level Python Programmer certification"
+        }
+      }
+    </script>
 
     <!-- Apply saved theme before paint (external so the CSP can forbid inline scripts) -->
     <script src="/theme-init.js"></script>

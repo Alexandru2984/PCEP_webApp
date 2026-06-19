@@ -75,7 +75,7 @@ export default function QuizSetup({ onStart, initial, stats, statsLoading, stats
               <div className="font-semibold text-slate-900 dark:text-slate-100">
                 {m.title}
               </div>
-              <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
                 {m.subtitle}
               </div>
             </button>

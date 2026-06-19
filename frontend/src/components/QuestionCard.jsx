@@ -81,7 +81,7 @@ export default function QuestionCard({
               disabled={disabled}
               className={getChoiceClass(choice)}
             >
-              <span className="font-mono text-slate-400 dark:text-slate-500">
+              <span className="font-mono text-slate-500 dark:text-slate-400">
                 {String.fromCharCode(65 + idx)}.
               </span>
               <span className="flex-1">{choice.text}</span>

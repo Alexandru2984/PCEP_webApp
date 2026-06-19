@@ -91,7 +91,7 @@ function highlight(code) {
     if (m.index > last) nodes.push(code.slice(last, m.index))
     const [text, comment, string, number, ident] = m
     let cls = null
-    if (comment) cls = 'text-slate-500 italic'
+    if (comment) cls = 'text-slate-400 italic'
     else if (string) cls = 'text-emerald-300'
     else if (number) cls = 'text-amber-300'
     else if (KEYWORDS.has(ident)) cls = 'text-sky-400'
