@@ -54,7 +54,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 | -------- | -------------------------------------------------------- |
 | Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn |
 | Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM) |
-| Tooling  | pytest · ESLint · Prettier · GitHub Actions CI           |
+| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI  |
 | Deploy   | Docker Compose · system Nginx · Let's Encrypt            |
 
 ## Architecture
@@ -120,8 +120,9 @@ make django-check
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions
 
-# Frontend — lint, format check, production build
-cd frontend && npm run lint && npm run format:check && npm run build
+# Frontend — 29 Vitest unit tests (scoring/streak/storage/stats + a component
+# smoke test), then lint, format check, and the production build.
+cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 ```
 
 CI runs all of the above on every push and pull request, plus
