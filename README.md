@@ -36,12 +36,14 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   interpreter (Pyodide on WebAssembly). Edit it, hit **Run**, and see real
   `stdout`/tracebacks **entirely in your browser** — no backend, no server cost.
   Runaway loops are sandboxed in a Web Worker and killed on a timeout.
-- 🎯 **Per-option explanations** — wrong answers explain the exact misconception
+- 🎯 **Per-option explanations** — a wrong pick explains the exact misconception
+  _and_ why the correct answer is right (skipped exam questions included)
 - ⏱️ **Two modes** — Practice (instant feedback) and a timed **Exam simulation**
   with a question navigator, flagging, and auto-submit
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
 - 📊 **Progress dashboard** — attempt history and per-module mastery (local-first)
-- 📈 **End-of-quiz review** — see every question, filter to just the ones you missed
+- 📈 **End-of-quiz report** — per-module and per-difficulty breakdown with a
+  "focus area" recommendation, plus a question-by-question review filtered to misses
 - ⌨️ **Keyboard shortcuts** and full dark mode
 - 📱 **Installable PWA** with Open Graph share cards
 - ✅ Scored against the official **70% pass threshold**
@@ -50,12 +52,12 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ## Tech stack
 
-| Layer    | Tech                                                     |
-| -------- | -------------------------------------------------------- |
-| Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn |
+| Layer    | Tech                                                      |
+| -------- | --------------------------------------------------------- |
+| Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn  |
 | Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM) |
-| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI  |
-| Deploy   | Docker Compose · system Nginx · Let's Encrypt            |
+| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI   |
+| Deploy   | Docker Compose · system Nginx · Let's Encrypt             |
 
 ## Architecture
 
@@ -120,8 +122,9 @@ make django-check
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions
 
-# Frontend — 29 Vitest unit tests (scoring/streak/storage/stats + a component
-# smoke test), then lint, format check, and the production build.
+# Frontend — 36 Vitest unit tests (scoring/streak/storage/stats logic plus
+# component tests for the feedback box, score summary and the end-of-quiz
+# report), then lint, format check, and the production build.
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 ```
 
@@ -132,13 +135,13 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 
 ## API reference
 
-| Method | Endpoint                      | Description                                                                        |
-| ------ | ----------------------------- | ---------------------------------------------------------------------------------- |
-| `GET`  | `/api/health/`                | Liveness probe (200 only if the DB is reachable)                                   |
-| `GET`  | `/api/quiz-set/`              | Random question set. Params: `count`, `module`, `difficulty`                       |
-| `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                     |
-| `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + explanation                     |
-| `POST` | `/api/grade/`                 | Grade a batch: `{ "answers": [{ "question_id": N, "choice_id": M }] }` (exam mode) |
+| Method | Endpoint                      | Description                                                                          |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------ |
+| `GET`  | `/api/health/`                | Liveness probe (200 only if the DB is reachable)                                     |
+| `GET`  | `/api/quiz-set/`              | Random question set. Params: `count`, `module`, `difficulty`                         |
+| `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
+| `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
+| `POST` | `/api/grade/`                 | Grade a batch: `{ "answers": [{ "question_id": N, "choice_id": M }] }` (exam mode)   |
 
 ## Project layout
 

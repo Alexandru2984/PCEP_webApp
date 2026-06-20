@@ -124,6 +124,7 @@ export default function QuizContainer() {
             is_correct: r?.is_correct ?? false,
             correct_choice_id: r?.correct_choice_id ?? null,
             explanation: r?.explanation ?? '',
+            correct_explanation: r?.correct_explanation ?? '',
           },
         }
       })

@@ -159,7 +159,11 @@ def submit_answer(request, question_id):
     return Response({
         'is_correct': picked.is_correct,
         'correct_choice_id': correct_choice.id if correct_choice else None,
+        # The picked choice's explanation — for a wrong pick, WHY it is wrong.
         'explanation': picked.explanation,
+        # The correct choice's explanation — the underlying concept. Lets the UI
+        # always show why the right answer is right, even on a wrong/blank pick.
+        'correct_explanation': correct_choice.explanation if correct_choice else '',
     })
 
 
@@ -204,7 +208,11 @@ def grade(request):
             'choice_id': answer['choice_id'],
             'is_correct': bool(picked and picked.is_correct),
             'correct_choice_id': correct.id if correct else None,
+            # Picked choice's explanation ('' when the question was skipped),
+            # plus the correct choice's explanation so review always shows why
+            # the right answer is right.
             'explanation': picked.explanation if picked else '',
+            'correct_explanation': correct.explanation if correct else '',
         })
 
     score = sum(1 for r in results if r['is_correct'])

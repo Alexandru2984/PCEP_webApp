@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import CodeRunner from './CodeRunner'
+import PerformanceReport from './PerformanceReport'
 import { celebrate } from '../confetti'
 import { useCountUp } from '../useCountUp'
 
@@ -18,6 +19,10 @@ function ReviewItem({ index, item }) {
   const ok = feedback?.is_correct
   const correctId = feedback?.correct_choice_id
   const skipped = pickedChoiceId == null
+  const correctExplanation = feedback?.correct_explanation
+  // Show the concept behind the right answer whenever the learner missed it.
+  const showCorrectWhy =
+    !ok && correctExplanation && correctExplanation !== feedback?.explanation
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
@@ -85,8 +90,17 @@ function ReviewItem({ index, item }) {
 
       {feedback?.explanation && (
         <div className="mt-3 whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">
-          <span className="font-semibold">Why: </span>
+          <span className="font-semibold">
+            {ok ? 'Why: ' : 'Why your pick is wrong: '}
+          </span>
           {feedback.explanation}
+        </div>
+      )}
+
+      {showCorrectWhy && (
+        <div className="mt-2 whitespace-pre-wrap rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+          <span className="font-semibold">Why the correct answer is right: </span>
+          {correctExplanation}
         </div>
       )}
     </li>
@@ -196,6 +210,8 @@ export default function ReviewScreen({
           </button>
         </div>
       </div>
+
+      <PerformanceReport items={items} />
 
       {shown.length === 0 ? (
         <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center font-medium text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">

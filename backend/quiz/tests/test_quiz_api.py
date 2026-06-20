@@ -103,6 +103,8 @@ def test_submit_correct_answer(api_client, make_question):
     assert body['is_correct'] is True
     assert body['correct_choice_id'] == correct.id
     assert 'choice 2' in body['explanation'].lower()
+    # On a correct pick the picked and correct explanations are the same choice.
+    assert body['correct_explanation'] == correct.explanation
 
 
 def test_submit_wrong_answer_returns_its_own_explanation(api_client, make_question):
@@ -121,6 +123,10 @@ def test_submit_wrong_answer_returns_its_own_explanation(api_client, make_questi
     assert body['correct_choice_id'] == correct.id
     # Explanation is the picked choice's — so the user learns WHY their pick was wrong.
     assert body['explanation'] == wrong.explanation
+    # ...and the correct choice's explanation is returned too, so the UI can also
+    # show WHY the right answer is right.
+    assert body['correct_explanation'] == correct.explanation
+    assert body['correct_explanation'] != body['explanation']
 
 
 def test_submit_rejects_choice_from_another_question(api_client, make_question):
@@ -184,6 +190,15 @@ def test_grade_scores_a_batch(api_client, make_question):
     # Skipped question still reveals the correct choice for review.
     assert by_q[q3.id]['is_correct'] is False
     assert by_q[q3.id]['correct_choice_id'] == q3.choices.get(is_correct=True).id
+    # A skipped question has no picked explanation, but still carries the
+    # correct choice's explanation so the learner can review it.
+    assert by_q[q3.id]['explanation'] == ''
+    assert (
+        by_q[q3.id]['correct_explanation']
+        == q3.choices.get(is_correct=True).explanation
+    )
+    # A wrong answer carries both its own explanation and the correct one.
+    assert by_q[q2.id]['correct_explanation'] == q2.choices.get(is_correct=True).explanation
 
 
 def test_grade_rejects_empty_answers(api_client):

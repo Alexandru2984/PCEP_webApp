@@ -1,5 +1,12 @@
 export default function FeedbackBox({ feedback, onNext, isLast }) {
   const ok = feedback.is_correct
+  // On a wrong pick we have two distinct things to teach: why the chosen option
+  // is wrong, and why the right one is right. Show both. When the correct
+  // explanation is missing or identical to the pick's, fall back to one block.
+  const correctExplanation = feedback.correct_explanation
+  const showCorrect =
+    !ok && correctExplanation && correctExplanation !== feedback.explanation
+
   return (
     <div
       role="status"
@@ -23,10 +30,21 @@ export default function FeedbackBox({ feedback, onNext, isLast }) {
         </h3>
       </div>
 
-      <div className="whitespace-pre-wrap leading-relaxed text-slate-800 dark:text-slate-200">
-        <span className="font-semibold">Explanation: </span>
-        {feedback.explanation}
-      </div>
+      {feedback.explanation && (
+        <div className="leading-relaxed whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+          <span className="font-semibold">
+            {ok ? 'Explanation: ' : 'Why your answer is wrong: '}
+          </span>
+          {feedback.explanation}
+        </div>
+      )}
+
+      {showCorrect && (
+        <div className="mt-3 rounded-lg border border-green-300 bg-green-100/60 p-3 leading-relaxed whitespace-pre-wrap text-green-900 dark:border-green-800 dark:bg-green-950/60 dark:text-green-200">
+          <span className="font-semibold">Why the correct answer is right: </span>
+          {correctExplanation}
+        </div>
+      )}
 
       <div className="mt-4 flex justify-end">
         <button
