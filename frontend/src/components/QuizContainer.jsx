@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { fetchQuizSet, submitAnswer, gradeAnswers, fetchQuestionStats } from '../api'
 import {
   loadSettings,
@@ -12,11 +12,26 @@ import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
-import ReviewScreen from './ReviewScreen'
 import QuizSetup from './QuizSetup'
-import ExamView from './ExamView'
-import FlashcardView from './FlashcardView'
-import Dashboard from './Dashboard'
+
+// Loaded on demand: none of these are on the first-paint (setup) path, so they
+// ship as separate chunks and stay out of the initial bundle.
+const ReviewScreen = lazy(() => import('./ReviewScreen'))
+const ExamView = lazy(() => import('./ExamView'))
+const FlashcardView = lazy(() => import('./FlashcardView'))
+const Dashboard = lazy(() => import('./Dashboard'))
+
+function LoadingCard() {
+  return (
+    <div
+      className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="text-slate-600 dark:text-slate-400">Loading…</p>
+    </div>
+  )
+}
 
 // Fisher-Yates: an unbiased in-place shuffle for building a mistakes session.
 function shuffle(arr) {
@@ -273,7 +288,9 @@ export default function QuizContainer() {
           </button>
         </div>
         {view === 'progress' ? (
-          <Dashboard onDrill={startModuleDrill} />
+          <Suspense fallback={<LoadingCard />}>
+            <Dashboard onDrill={startModuleDrill} />
+          </Suspense>
         ) : (
           <QuizSetup
             onStart={startQuiz}
@@ -324,36 +341,42 @@ export default function QuizContainer() {
 
   if (phase === 'exam') {
     return (
-      <ExamView
-        questions={questions}
-        onSubmit={handleExamSubmit}
-        onQuit={resetToSetup}
-        submitting={submitting}
-      />
+      <Suspense fallback={<LoadingCard />}>
+        <ExamView
+          questions={questions}
+          onSubmit={handleExamSubmit}
+          onQuit={resetToSetup}
+          submitting={submitting}
+        />
+      </Suspense>
     )
   }
 
   if (phase === 'flashcards') {
     return (
-      <FlashcardView
-        questions={questions}
-        onFinish={(items) => finish(items, questions.length)}
-        onQuit={resetToSetup}
-      />
+      <Suspense fallback={<LoadingCard />}>
+        <FlashcardView
+          questions={questions}
+          onFinish={(items) => finish(items, questions.length)}
+          onQuit={resetToSetup}
+        />
+      </Suspense>
     )
   }
 
   if (phase === 'done') {
     return (
-      <ReviewScreen
-        items={history}
-        score={score}
-        total={questions.length}
-        onRestart={resetToSetup}
-        onDrillModule={startModuleDrill}
-        elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
-        streakStats={getStreakStats(history)}
-      />
+      <Suspense fallback={<LoadingCard />}>
+        <ReviewScreen
+          items={history}
+          score={score}
+          total={questions.length}
+          onRestart={resetToSetup}
+          onDrillModule={startModuleDrill}
+          elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
+          streakStats={getStreakStats(history)}
+        />
+      </Suspense>
     )
   }
 

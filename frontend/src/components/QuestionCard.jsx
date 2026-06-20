@@ -1,5 +1,9 @@
+import { lazy, Suspense } from 'react'
 import CodeBlock from './CodeBlock'
-import CodeRunner from './CodeRunner'
+
+// CodeRunner pulls in the Pyodide worker manager — only practice/review need it,
+// so load it on demand and show the static (read-only) CodeBlock until it's ready.
+const CodeRunner = lazy(() => import('./CodeRunner'))
 
 const DIFFICULTY_BADGE = {
   easy: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
@@ -63,7 +67,11 @@ export default function QuestionCard({
 
       {question.code_snippet &&
         (runnable ? (
-          <CodeRunner key={question.id} code={question.code_snippet} className="mb-4" />
+          <Suspense
+            fallback={<CodeBlock code={question.code_snippet} className="mb-4" />}
+          >
+            <CodeRunner key={question.id} code={question.code_snippet} className="mb-4" />
+          </Suspense>
         ) : (
           <CodeBlock code={question.code_snippet} className="mb-4" />
         ))}

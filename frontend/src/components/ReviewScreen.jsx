@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
-import CodeRunner from './CodeRunner'
+import { useEffect, useState, lazy, Suspense } from 'react'
+import CodeBlock from './CodeBlock'
 import PerformanceReport from './PerformanceReport'
 import { celebrate } from '../confetti'
 import { useCountUp } from '../useCountUp'
+
+// Same dynamic specifier as QuestionCard, so the runner ships as one shared
+// chunk. The static CodeBlock stands in until it loads.
+const CodeRunner = lazy(() => import('./CodeRunner'))
 
 const MODULE_LABELS = {
   module1: 'M1 · Fundamentals',
@@ -49,7 +53,9 @@ function ReviewItem({ index, item }) {
 
       <p className="font-semibold text-slate-900 dark:text-slate-100">{question.text}</p>
       {question.code_snippet && (
-        <CodeRunner code={question.code_snippet} className="mt-2" />
+        <Suspense fallback={<CodeBlock code={question.code_snippet} className="mt-2" />}>
+          <CodeRunner code={question.code_snippet} className="mt-2" />
+        </Suspense>
       )}
 
       <ul className="mt-3 space-y-1.5">
