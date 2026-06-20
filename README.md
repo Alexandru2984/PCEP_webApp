@@ -38,8 +38,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   Runaway loops are sandboxed in a Web Worker and killed on a timeout.
 - 🎯 **Per-option explanations** — a wrong pick explains the exact misconception
   _and_ why the correct answer is right (skipped exam questions included)
-- ⏱️ **Two modes** — Practice (instant feedback) and a timed **Exam simulation**
-  with a question navigator, flagging, and auto-submit
+- ⏱️ **Three study modes** — Practice (instant feedback), a timed **Exam
+  simulation** (question navigator, flagging, auto-submit), and **Flashcards**
+  (flip to reveal the answer, self-mark what you know)
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
 - 📊 **Progress dashboard** — attempt history and per-module mastery (local-first)
 - 📈 **End-of-quiz report** — per-module and per-difficulty breakdown with a

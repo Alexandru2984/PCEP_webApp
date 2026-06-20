@@ -15,6 +15,7 @@ import FeedbackBox from './FeedbackBox'
 import ReviewScreen from './ReviewScreen'
 import QuizSetup from './QuizSetup'
 import ExamView from './ExamView'
+import FlashcardView from './FlashcardView'
 import Dashboard from './Dashboard'
 
 // Fisher-Yates: an unbiased in-place shuffle for building a mistakes session.
@@ -79,7 +80,13 @@ export default function QuizContainer() {
       setFeedback(null)
       setHistory([])
       setStartedAt(Date.now())
-      setPhase(config.mode === 'exam' ? 'exam' : 'answering')
+      setPhase(
+        config.mode === 'exam'
+          ? 'exam'
+          : config.mode === 'flashcards'
+            ? 'flashcards'
+            : 'answering'
+      )
     } catch (e) {
       setError(e?.response?.data?.detail || e?.message || 'Failed to load quiz.')
       setPhase('error')
@@ -322,6 +329,16 @@ export default function QuizContainer() {
         onSubmit={handleExamSubmit}
         onQuit={resetToSetup}
         submitting={submitting}
+      />
+    )
+  }
+
+  if (phase === 'flashcards') {
+    return (
+      <FlashcardView
+        questions={questions}
+        onFinish={(items) => finish(items, questions.length)}
+        onQuit={resetToSetup}
       />
     )
   }

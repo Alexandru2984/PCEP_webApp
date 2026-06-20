@@ -152,7 +152,11 @@ export default function Dashboard({ onDrill }) {
                         : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                     }`}
                   >
-                    {a.mode === 'exam' ? 'Exam' : 'Practice'}
+                    {a.mode === 'exam'
+                      ? 'Exam'
+                      : a.mode === 'flashcards'
+                        ? 'Cards'
+                        : 'Practice'}
                   </span>
                   <span className="truncate text-slate-600 dark:text-slate-400">
                     {MODULE_LABELS[a.module] ?? a.module}

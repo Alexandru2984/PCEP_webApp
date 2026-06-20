@@ -33,6 +33,11 @@ const MODES = [
     title: 'Exam simulation',
     subtitle: 'Timed, no hints, graded at the end like the real PCEP',
   },
+  {
+    value: 'flashcards',
+    title: 'Flashcards',
+    subtitle: 'Flip-card drill: reveal the answer, mark what you know',
+  },
 ]
 
 export default function QuizSetup({
@@ -54,7 +59,12 @@ export default function QuizSetup({
     scopeTotal && scopeTotal > 0 ? Math.min(count, scopeTotal) : count
   const isEmptyScope = canUseStats && scopeTotal === 0
   const isCappedByScope = canUseStats && scopeTotal > 0 && effectiveCount < count
-  const startLabel = mode === 'exam' ? 'Start exam' : 'Start practice'
+  const startLabel =
+    mode === 'exam'
+      ? 'Start exam'
+      : mode === 'flashcards'
+        ? 'Start flashcards'
+        : 'Start practice'
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -86,7 +96,7 @@ export default function QuizSetup({
         </button>
       )}
 
-      <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
         {MODES.map((m) => {
           const active = mode === m.value
           return (
