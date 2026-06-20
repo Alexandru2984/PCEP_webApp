@@ -113,6 +113,11 @@ export default function QuizContainer() {
     setPhase('done')
   }
 
+  // One-click practice drill scoped to a single module (used by the end-of-quiz
+  // "focus area" and the dashboard's module mastery rows).
+  const startModuleDrill = (module) =>
+    startQuiz({ mode: 'practice', module, difficulty: '', count: 20 })
+
   // Build a practice session from the locally-stored missed questions — no API
   // call, since we kept the full question objects.
   const startMistakesQuiz = () => {
@@ -261,7 +266,7 @@ export default function QuizContainer() {
           </button>
         </div>
         {view === 'progress' ? (
-          <Dashboard />
+          <Dashboard onDrill={startModuleDrill} />
         ) : (
           <QuizSetup
             onStart={startQuiz}
@@ -328,6 +333,7 @@ export default function QuizContainer() {
         score={score}
         total={questions.length}
         onRestart={resetToSetup}
+        onDrillModule={startModuleDrill}
         elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
         streakStats={getStreakStats(history)}
       />

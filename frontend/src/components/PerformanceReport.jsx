@@ -79,7 +79,7 @@ function Breakdown({ title, rows }) {
   )
 }
 
-export default function PerformanceReport({ items }) {
+export default function PerformanceReport({ items, onDrillModule }) {
   if (!items || items.length === 0) return null
 
   const moduleRows = toRows(
@@ -117,11 +117,22 @@ export default function PerformanceReport({ items }) {
         }`}
       >
         {hasGap ? (
-          <>
-            <span className="font-semibold">Focus area: </span>
-            {weakest.label} — {weakest.correct}/{weakest.total} ({weakest.pct}%). Drill
-            this module next to lift it above the {PASS_THRESHOLD}% pass line.
-          </>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              <span className="font-semibold">Focus area: </span>
+              {weakest.label} — {weakest.correct}/{weakest.total} ({weakest.pct}%). Drill
+              it next to lift it above the {PASS_THRESHOLD}% pass line.
+            </span>
+            {onDrillModule && (
+              <button
+                type="button"
+                onClick={() => onDrillModule(weakest.key)}
+                className="shrink-0 self-start rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 sm:self-auto dark:bg-amber-700 dark:hover:bg-amber-600"
+              >
+                Practice this module →
+              </button>
+            )}
+          </div>
         ) : (
           <>
             <span className="font-semibold">Strong across the board — </span>

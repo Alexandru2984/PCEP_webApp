@@ -112,6 +112,7 @@ export default function ReviewScreen({
   score,
   total,
   onRestart,
+  onDrillModule,
   elapsedLabel,
   streakStats,
 }) {
@@ -211,7 +212,7 @@ export default function ReviewScreen({
         </div>
       </div>
 
-      <PerformanceReport items={items} />
+      <PerformanceReport items={items} onDrillModule={onDrillModule} />
 
       {shown.length === 0 ? (
         <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center font-medium text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">

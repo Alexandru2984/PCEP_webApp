@@ -23,13 +23,24 @@ function Stat({ label, value, accent }) {
   )
 }
 
-function MasteryBar({ label, pct }) {
+function MasteryBar({ label, pct, onDrill }) {
   const tone = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs text-slate-600 dark:text-slate-300">
+      <div className="mb-1 flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
         <span>{label}</span>
-        <span className="font-semibold">{pct}%</span>
+        <span className="flex items-center gap-2">
+          <span className="font-semibold">{pct}%</span>
+          {onDrill && (
+            <button
+              type="button"
+              onClick={onDrill}
+              className="rounded text-sky-600 underline underline-offset-2 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300"
+            >
+              Drill
+            </button>
+          )}
+        </span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
@@ -38,7 +49,7 @@ function MasteryBar({ label, pct }) {
   )
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onDrill }) {
   const [attempts, setAttempts] = useState(loadHistory)
 
   if (attempts.length === 0) {
@@ -105,7 +116,12 @@ export default function Dashboard() {
               Module mastery
             </h3>
             {modules.map((m) => (
-              <MasteryBar key={m.key} label={MODULE_LABELS[m.key] ?? m.key} pct={m.pct} />
+              <MasteryBar
+                key={m.key}
+                label={MODULE_LABELS[m.key] ?? m.key}
+                pct={m.pct}
+                onDrill={onDrill && m.key ? () => onDrill(m.key) : undefined}
+              />
             ))}
           </div>
         )}

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import PerformanceReport from './PerformanceReport'
 
 const item = (module, difficulty, is_correct) => ({
@@ -26,6 +26,26 @@ describe('PerformanceReport', () => {
     const focus = screen.getByText(/Focus area:/i).closest('div')
     expect(focus).toHaveTextContent('M3 · Data Collections')
     expect(focus).toHaveTextContent('33%')
+  })
+
+  it('offers a one-click drill on the weakest module', () => {
+    const onDrillModule = vi.fn()
+    const items = [
+      item('module1', 'easy', true),
+      item('module3', 'hard', false),
+      item('module3', 'medium', false),
+    ]
+    render(<PerformanceReport items={items} onDrillModule={onDrillModule} />)
+    fireEvent.click(screen.getByRole('button', { name: /Practice this module/i }))
+    expect(onDrillModule).toHaveBeenCalledWith('module3')
+  })
+
+  it('shows no drill button when no callback is given', () => {
+    const items = [item('module3', 'hard', false)]
+    render(<PerformanceReport items={items} />)
+    expect(
+      screen.queryByRole('button', { name: /Practice this module/i })
+    ).not.toBeInTheDocument()
   })
 
   it('congratulates when every module clears the pass line', () => {
