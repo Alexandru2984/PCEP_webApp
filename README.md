@@ -44,6 +44,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 📊 **Progress dashboard** — attempt history and per-module mastery (local-first)
 - 📈 **End-of-quiz report** — per-module and per-difficulty breakdown with a
   "focus area" recommendation, plus a question-by-question review filtered to misses
+- 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
+  as a focused drill; answer one correctly and it drops off the list (local-first)
 - ⌨️ **Keyboard shortcuts** and full dark mode
 - 📱 **Installable PWA** with Open Graph share cards
 - ✅ Scored against the official **70% pass threshold**

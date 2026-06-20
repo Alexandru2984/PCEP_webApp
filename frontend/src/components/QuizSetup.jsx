@@ -35,7 +35,15 @@ const MODES = [
   },
 ]
 
-export default function QuizSetup({ onStart, initial, stats, statsLoading, statsError }) {
+export default function QuizSetup({
+  onStart,
+  onPracticeMistakes,
+  mistakesCount = 0,
+  initial,
+  stats,
+  statsLoading,
+  statsError,
+}) {
   const [mode, setMode] = useState(initial?.mode ?? 'practice')
   const [module, setModule] = useState(initial?.module ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? '')
@@ -56,6 +64,27 @@ export default function QuizSetup({ onStart, initial, stats, statsLoading, stats
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
         Pick a mode and scope. Leave filters on defaults for a full mixed-bag PCEP run.
       </p>
+
+      {mistakesCount > 0 && onPracticeMistakes && (
+        <button
+          type="button"
+          onClick={onPracticeMistakes}
+          className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:hover:bg-amber-950/60"
+        >
+          <span>
+            <span className="block font-semibold text-amber-900 dark:text-amber-200">
+              🔁 Practice your mistakes
+            </span>
+            <span className="mt-0.5 block text-xs text-amber-800 dark:text-amber-300/90">
+              Re-drill the {mistakesCount} question{mistakesCount === 1 ? '' : 's'} you
+              missed — answer one correctly and it drops off the list.
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-amber-200 px-2.5 py-1 text-sm font-bold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+            {mistakesCount}
+          </span>
+        </button>
+      )}
 
       <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {MODES.map((m) => {

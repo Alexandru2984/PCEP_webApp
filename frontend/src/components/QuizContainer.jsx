@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { fetchQuizSet, submitAnswer, gradeAnswers, fetchQuestionStats } from '../api'
-import { loadSettings, saveSettings, appendAttempt, loadHistory } from '../storage'
+import {
+  loadSettings,
+  saveSettings,
+  appendAttempt,
+  loadHistory,
+  loadMistakes,
+  updateMistakes,
+} from '../storage'
 import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
 import QuestionCard from './QuestionCard'
@@ -9,6 +16,16 @@ import ReviewScreen from './ReviewScreen'
 import QuizSetup from './QuizSetup'
 import ExamView from './ExamView'
 import Dashboard from './Dashboard'
+
+// Fisher-Yates: an unbiased in-place shuffle for building a mistakes session.
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 export default function QuizContainer() {
   const [phase, setPhase] = useState('setup')
@@ -90,8 +107,26 @@ export default function QuizContainer() {
     const elapsed = Date.now() - startedAt
     setElapsedMs(elapsed)
     recordAttempt(items, total, elapsed)
+    // Record fresh misses and clear any the learner just got right.
+    updateMistakes(items)
     setHistory(items)
     setPhase('done')
+  }
+
+  // Build a practice session from the locally-stored missed questions — no API
+  // call, since we kept the full question objects.
+  const startMistakesQuiz = () => {
+    const stored = loadMistakes()
+    if (stored.length === 0) return
+    setLastConfig({ mode: 'practice', module: '', difficulty: '', source: 'mistakes' })
+    setQuestions(shuffle(stored).slice(0, 50))
+    setIndex(0)
+    setSelectedChoiceId(null)
+    setFeedback(null)
+    setHistory([])
+    setStartedAt(Date.now())
+    setError(null)
+    setPhase('answering')
   }
 
   const handleNext = () => {
@@ -230,6 +265,8 @@ export default function QuizContainer() {
         ) : (
           <QuizSetup
             onStart={startQuiz}
+            onPracticeMistakes={startMistakesQuiz}
+            mistakesCount={loadMistakes().length}
             initial={lastConfig}
             stats={questionStats}
             statsLoading={statsLoading}

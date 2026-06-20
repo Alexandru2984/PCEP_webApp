@@ -5,7 +5,13 @@ import {
   clearHistory,
   saveSettings,
   loadSettings,
+  loadMistakes,
+  updateMistakes,
+  clearMistakes,
 } from './storage'
+
+const wrong = (id) => ({ question: { id }, feedback: { is_correct: false } })
+const right = (id) => ({ question: { id }, feedback: { is_correct: true } })
 
 // localStorage is reset by the global afterEach in src/test/setup.js, but reset
 // here too so each case is independent regardless of run order.
@@ -56,5 +62,48 @@ describe('settings', () => {
     const settings = { module: 'module2', difficulty: 'hard', count: 20 }
     saveSettings(settings)
     expect(loadSettings()).toEqual(settings)
+  })
+})
+
+describe('mistakes', () => {
+  it('starts empty', () => {
+    expect(loadMistakes()).toEqual([])
+  })
+
+  it('records missed (and skipped) questions, newest first', () => {
+    updateMistakes([wrong(1), wrong(2)])
+    expect(loadMistakes().map((q) => q.id)).toEqual([2, 1])
+  })
+
+  it('drops a question once it is answered correctly', () => {
+    updateMistakes([wrong(1), wrong(2)])
+    updateMistakes([right(1)])
+    expect(loadMistakes().map((q) => q.id)).toEqual([2])
+  })
+
+  it('dedupes by id and moves a re-missed question to the front', () => {
+    updateMistakes([wrong(1), wrong(2)])
+    updateMistakes([wrong(1)])
+    expect(loadMistakes().map((q) => q.id)).toEqual([1, 2])
+  })
+
+  it('caps the store at 100, keeping the newest misses', () => {
+    updateMistakes(Array.from({ length: 120 }, (_, i) => wrong(i)))
+    const ids = loadMistakes().map((q) => q.id)
+    expect(ids).toHaveLength(100)
+    expect(ids[0]).toBe(119) // newest kept
+    expect(ids).toContain(20)
+    expect(ids).not.toContain(19) // oldest 20 dropped
+  })
+
+  it('ignores items without a question id', () => {
+    updateMistakes([{ feedback: { is_correct: false } }, wrong(5)])
+    expect(loadMistakes().map((q) => q.id)).toEqual([5])
+  })
+
+  it('clearMistakes empties the store', () => {
+    updateMistakes([wrong(1)])
+    clearMistakes()
+    expect(loadMistakes()).toEqual([])
   })
 })
