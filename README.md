@@ -117,10 +117,12 @@ docker compose --profile build run --rm frontend-builder   # build the React app
 
 ## Testing & quality
 
-Lighthouse on the live site (desktop): **Performance 98 · Accessibility 100 ·
+Lighthouse on the live site (desktop): **Performance 99 · Accessibility 100 ·
 SEO 100 · Best Practices 92**. Accessibility is verified with axe-core (zero
-violations across setup, quiz, and dashboard); the Best-Practices gap is solely
-third-party scripts that the strict CSP intentionally blocks.
+violations across setup, quiz, and dashboard). The Best-Practices gap is entirely
+Cloudflare-injected scripts (the Web Analytics beacon and Rocket Loader) that the
+strict CSP intentionally blocks — turning those two off in the Cloudflare dashboard
+takes it to 100 without weakening the policy.
 
 ```bash
 make test
