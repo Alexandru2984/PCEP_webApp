@@ -29,6 +29,10 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 | ------------------------------------------------------------- |
 | ![Code runner](docs/screenshots/07-code-runner-light.png)     |
 
+| End-of-quiz report with one-click drills        | Flashcards study mode                                   |
+| ----------------------------------------------- | ------------------------------------------------------- |
+| ![Report](docs/screenshots/08-report-light.png) | ![Flashcards](docs/screenshots/09-flashcards-light.png) |
+
 ## Features
 
 - 📚 **300+ questions** across all four PCEP modules with syntax-highlighted code
