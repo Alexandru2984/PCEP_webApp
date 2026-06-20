@@ -51,3 +51,7 @@ docker-compose.override.yml
 
 # --- Coverage ---
 coverage/
+
+# --- Playwright (E2E) ---
+frontend/playwright-report/
+frontend/test-results/

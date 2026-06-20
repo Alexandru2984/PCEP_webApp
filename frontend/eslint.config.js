@@ -5,7 +5,15 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
   // dist + the self-hosted Pyodide runtime (vendored, minified) are not ours to lint.
-  { ignores: ['dist', 'node_modules', 'public/pyodide'] },
+  {
+    ignores: [
+      'dist',
+      'node_modules',
+      'public/pyodide',
+      'playwright-report',
+      'test-results',
+    ],
+  },
   {
     // Config files run in Node, not the browser.
     files: ['*.config.js'],
