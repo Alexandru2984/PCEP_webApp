@@ -53,7 +53,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused drill; answer one correctly and it drops off the list (local-first)
 - ⌨️ **Keyboard shortcuts** and full dark mode
-- 📱 **Installable PWA** with Open Graph share cards
+- 📱 **Installable, offline-capable PWA** — a service worker precaches the app
+  shell and caches the Pyodide runtime, so it loads instantly on repeat visits and
+  the shell works offline; Open Graph share cards too
 - ✅ Scored against the official **70% pass threshold**
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, DB-backed health probe
