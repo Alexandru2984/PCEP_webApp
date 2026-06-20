@@ -31,7 +31,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ## Features
 
-- 📚 **210+ questions** across all four PCEP modules with syntax-highlighted code
+- 📚 **250+ questions** across all four PCEP modules with syntax-highlighted code
 - 🐍 **Run the code, don't just read it** — every snippet has a built-in Python
   interpreter (Pyodide on WebAssembly). Edit it, hit **Run**, and see real
   `stdout`/tracebacks **entirely in your browser** — no backend, no server cost.
