@@ -92,3 +92,16 @@ gunzip -c /home/micu/backups/pcep/pcep_db_<timestamp>.sql.gz \
 
 For a full rollback, restore the DB backup first, then redeploy the matching
 frontend build and backend image.
+
+## Public study pages
+
+`/usr/local/sbin/pcep-seo-pages` is deployed from `scripts/pcep-seo-pages.py`.
+`pcep-seo-pages.timer` regenerates the host pages weekly. It extracts questions
+through the public API serializer: static pages must never contain correct-answer
+flags, answer IDs or per-option explanations. Answers are obtained only after
+interactive submission. Validate with `pytest quiz/tests/test_seo_pages.py`.
+Deploy with `sudo install -m 755 scripts/pcep-seo-pages.py /usr/local/sbin/pcep-seo-pages`
+and `sudo /usr/local/sbin/pcep-seo-pages`. No service restart is necessary.
+The 2026-09-18 security remediation backed up the previous generator and pages
+under `/home/micu/backups/pcep/security-20260918`. Do not restore the vulnerable
+pages. Search engines or third-party caches may retain historical answer content.
