@@ -19,6 +19,8 @@
 - `npm run lint`, `npm run format:check`, `npm run build`: pass. Main JS 218.83 kB / 72.43 kB gzip; shell precache 284.90 KiB.
 - `npm run e2e`: all three blocked by missing Chromium executable, before application assertions run. Install browser and repeat.
 - Public homepage, DB health, stats: 200; 301 questions and 1,204 choices. Nginx validates. Python vulnerability results and restored backend baseline will be added before backend changes.
+- Restored isolated Python 3.12 environment: all 31 original backend tests pass (32 including the new SEO regression), seed audit passes, production deploy check passes. Existing E2E: all 3 pass after installing Chromium. Python audit finds 9 advisories affecting Django 5.1.15 and DRF 3.15.2. Make overrides with absolute Python paths also fail because recipes prepend `../` unconditionally.
+- Dependency decision: Django 5.2.17 LTS receives security support through April 2028 ([official support table](https://www.djangoproject.com/download/)); 5.2 supports Python 3.12 ([upgrade notes](https://docs.djangoproject.com/en/5.2/releases/5.2/)). DRF 3.17.2 addresses the audited advisories; API/admin/migration checks will verify compatibility. No upgrade to Django 6 or React major.
 
 ## Prioritized implementation stages
 
