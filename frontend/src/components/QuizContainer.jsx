@@ -113,16 +113,15 @@ export default function QuizContainer() {
     const tab = (active) =>
       `rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 ${
         active
-          ? 'bg-slate-900 text-white dark:bg-sky-600'
+          ? 'bg-slate-900 text-white dark:bg-sky-700'
           : 'bg-white text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
       }`
     return (
       <div>
-        <div className="mb-4 flex gap-2" role="tablist" aria-label="Quiz workspace">
+        <nav className="mb-4 flex gap-2" aria-label="Quiz workspace">
           <button
             type="button"
-            role="tab"
-            aria-selected={view === 'setup'}
+            aria-pressed={view === 'setup'}
             onClick={() => setView('setup')}
             className={tab(view === 'setup')}
           >
@@ -130,14 +129,13 @@ export default function QuizContainer() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={view === 'progress'}
+            aria-pressed={view === 'progress'}
             onClick={() => setView('progress')}
             className={tab(view === 'progress')}
           >
             Progress{attemptCount > 0 ? ` (${attemptCount})` : ''}
           </button>
-        </div>
+        </nav>
         {view === 'progress' ? (
           <Suspense fallback={<LoadingCard />}>
             <Dashboard
@@ -188,7 +186,7 @@ export default function QuizContainer() {
         <button
           type="button"
           onClick={resetToSetup}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
         >
           Back to setup
         </button>

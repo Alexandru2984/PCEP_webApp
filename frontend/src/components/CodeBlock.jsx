@@ -115,6 +115,8 @@ function highlight(code) {
 export default function CodeBlock({ code, className = '' }) {
   return (
     <pre
+      tabIndex={0}
+      aria-label="Python code"
       className={`overflow-x-auto rounded-lg bg-slate-900 p-4 text-sm leading-relaxed text-slate-100 ring-1 ring-slate-800 ${className}`}
     >
       <code>{highlight(code)}</code>

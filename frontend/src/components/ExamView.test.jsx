@@ -20,11 +20,11 @@ describe('exam recovery and timing', () => {
     vi.setSystemTime(new Date('2026-09-18T12:00:00Z'))
     const onSubmit = vi.fn().mockResolvedValue(false)
     render(<ExamView questions={[question]} onSubmit={onSubmit} onQuit={() => {}} />)
-    fireEvent.click(screen.getByRole('radio', { name: /One/ }))
+    fireEvent.click(screen.getByRole('button', { name: /One/ }))
     vi.setSystemTime(new Date('2026-09-18T12:02:00Z'))
     await act(async () => fireEvent(window, new Event('focus')))
     expect(onSubmit).toHaveBeenCalledExactlyOnceWith({ 1: 11 })
-    expect(screen.getByRole('radio', { name: /Two/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Two/ })).toBeDisabled()
     await act(async () => vi.advanceTimersByTime(5000))
     expect(onSubmit).toHaveBeenCalledTimes(1)
   })
@@ -39,7 +39,7 @@ describe('exam recovery and timing', () => {
         error="Try again"
       />
     )
-    fireEvent.click(screen.getByRole('radio', { name: /One/ }))
+    fireEvent.click(screen.getByRole('button', { name: /One/ }))
     const button = screen.getByRole('button', { name: /Retry grading/ })
     await act(async () => {
       fireEvent.click(button)
@@ -59,16 +59,16 @@ describe('exam recovery and timing', () => {
       </>
     )
     fireEvent.keyDown(screen.getByLabelText('Notes'), { key: '1' })
-    expect(screen.getByRole('radio', { name: /One/ })).toHaveAttribute(
-      'aria-checked',
+    expect(screen.getByRole('button', { name: /One/ })).toHaveAttribute(
+      'aria-pressed',
       'false'
     )
     rerender(
       <ExamView questions={[question]} onSubmit={vi.fn()} onQuit={() => {}} submitting />
     )
     fireEvent.keyDown(window, { key: '1' })
-    expect(screen.getByRole('radio', { name: /One/ })).toHaveAttribute(
-      'aria-checked',
+    expect(screen.getByRole('button', { name: /One/ })).toHaveAttribute(
+      'aria-pressed',
       'false'
     )
   })

@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useState, useRef, lazy, Suspense } from 'react'
 import CodeBlock from './CodeBlock'
 import PerformanceReport from './PerformanceReport'
 import { celebrate } from '../confetti'
@@ -75,7 +75,7 @@ function ReviewItem({ index, item }) {
               key={c.id}
               className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${cls}`}
             >
-              <span className="font-mono text-slate-500">
+              <span className="font-mono text-slate-500 dark:text-slate-400">
                 {String.fromCharCode(65 + i)}.
               </span>
               <span className="flex-1">{c.text}</span>
@@ -122,6 +122,10 @@ export default function ReviewScreen({
   elapsedLabel,
   streakStats,
 }) {
+  const heading = useRef(null)
+  useEffect(() => {
+    heading.current?.focus()
+  }, [])
   const [filter, setFilter] = useState('wrong')
   const wrong = items.filter((i) => !i.feedback?.is_correct)
   const shown = filter === 'wrong' ? wrong : items
@@ -153,7 +157,7 @@ export default function ReviewScreen({
   const tab = (active) =>
     `px-3 py-1.5 rounded-full border text-sm transition-colors ${
       active
-        ? 'bg-slate-900 text-white border-slate-900 dark:bg-sky-600 dark:border-sky-600'
+        ? 'bg-slate-900 text-white border-slate-900 dark:bg-sky-700 dark:border-sky-600'
         : 'bg-white text-slate-700 border-slate-300 hover:border-slate-500 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600'
     }`
 
@@ -162,14 +166,18 @@ export default function ReviewScreen({
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <h2
+              ref={heading}
+              tabIndex={-1}
+              className="text-2xl font-bold text-slate-900 dark:text-slate-100"
+            >
               Quiz complete
             </h2>
             <p className="mt-1 text-slate-700 dark:text-slate-300">
               <span className="font-semibold">{score}</span> of{' '}
               <span className="font-semibold">{total}</span> correct —{' '}
               <span
-                className={`font-bold ${passed ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}
+                className={`font-bold ${passed ? 'text-green-700 dark:text-green-400' : 'text-orange-700 dark:text-orange-400'}`}
               >
                 {animatedPct}%
               </span>
@@ -193,7 +201,7 @@ export default function ReviewScreen({
             <button
               type="button"
               onClick={onRestart}
-              className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
+              className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
             >
               New quiz
             </button>

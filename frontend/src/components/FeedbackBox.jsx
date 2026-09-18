@@ -1,4 +1,10 @@
+import { useEffect, useRef } from 'react'
+
 export default function FeedbackBox({ feedback, onNext, isLast }) {
+  const nextButton = useRef(null)
+  useEffect(() => {
+    nextButton.current?.focus({ preventScroll: true })
+  }, [feedback])
   const ok = feedback.is_correct
   // On a wrong pick we have two distinct things to teach: why the chosen option
   // is wrong, and why the right one is right. Show both. When the correct
@@ -19,7 +25,7 @@ export default function FeedbackBox({ feedback, onNext, isLast }) {
     >
       <div className="mb-2 flex items-center gap-2">
         <span
-          className={`text-2xl font-bold ${ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+          className={`text-2xl font-bold ${ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
         >
           {ok ? '✓' : '✗'}
         </span>
@@ -48,9 +54,10 @@ export default function FeedbackBox({ feedback, onNext, isLast }) {
 
       <div className="mt-4 flex justify-end">
         <button
+          ref={nextButton}
           type="button"
           onClick={onNext}
-          className="rounded-lg bg-slate-900 px-5 py-2 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-600 dark:hover:bg-sky-500"
+          className="rounded-lg bg-slate-900 px-5 py-2 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
         >
           {isLast ? 'See Results →' : 'Next Question →'}
         </button>

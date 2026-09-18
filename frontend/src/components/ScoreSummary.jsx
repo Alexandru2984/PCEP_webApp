@@ -9,7 +9,7 @@ export default function ScoreSummary({ score, total, onRestart }) {
       <h2 className="text-2xl font-bold text-slate-900 mb-2">Quiz complete</h2>
 
       <div
-        className={`text-6xl font-bold my-6 ${passed ? 'text-green-600' : 'text-orange-600'}`}
+        className={`text-6xl font-bold my-6 ${passed ? 'text-green-700' : 'text-orange-700'}`}
       >
         {pct}%
       </div>
@@ -20,7 +20,7 @@ export default function ScoreSummary({ score, total, onRestart }) {
       </p>
       <p
         className={`text-lg font-semibold mb-6 ${
-          passed ? 'text-green-600' : 'text-orange-600'
+          passed ? 'text-green-700' : 'text-orange-700'
         }`}
       >
         {passed

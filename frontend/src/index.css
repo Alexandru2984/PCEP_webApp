@@ -10,3 +10,31 @@
 .dark {
   color-scheme: dark;
 }
+
+button,
+select,
+summary {
+  min-height: 44px;
+}
+
+:focus-visible {
+  outline: 3px solid #0284c7;
+  outline-offset: 3px;
+}
+
+h2,
+h3,
+p,
+li {
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -127,7 +127,7 @@ export default function PerformanceReport({ items, onDrillModule }) {
               <button
                 type="button"
                 onClick={() => onDrillModule(weakest.key)}
-                className="shrink-0 self-start rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 sm:self-auto dark:bg-amber-700 dark:hover:bg-amber-600"
+                className="shrink-0 self-start rounded-lg bg-amber-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 sm:self-auto dark:bg-amber-700 dark:hover:bg-amber-700"
               >
                 Practice this module →
               </button>

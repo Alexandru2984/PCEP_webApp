@@ -27,6 +27,10 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
     marking.current = false
   }, [index])
   const question = questions[index]
+  const heading = useRef(null)
+  useEffect(() => {
+    heading.current?.focus()
+  }, [question.id])
 
   const reveal = useCallback(async () => {
     if (revealed || pending.current) return
@@ -126,9 +130,13 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <p className="font-semibold text-slate-900 dark:text-slate-100">
+        <h2
+          ref={heading}
+          tabIndex={-1}
+          className="font-semibold text-slate-900 dark:text-slate-100"
+        >
           {question.text}
-        </p>
+        </h2>
         {question.code_snippet && (
           <CodeBlock code={question.code_snippet} className="mt-3" />
         )}
@@ -160,7 +168,10 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
         </ul>
 
         {revealed && revealed.correct_explanation && (
-          <div className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3 text-sm whitespace-pre-wrap text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200">
+          <div
+            role="status"
+            className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3 text-sm whitespace-pre-wrap text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200"
+          >
             <span className="font-semibold">Why: </span>
             {revealed.correct_explanation}
           </div>
@@ -171,7 +182,7 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
             type="button"
             onClick={reveal}
             disabled={revealing}
-            className="mt-5 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-60 dark:bg-sky-600 dark:hover:bg-sky-500"
+            className="mt-5 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-60 dark:bg-sky-700 dark:hover:bg-sky-800"
           >
             {revealing ? 'Revealing…' : 'Reveal answer'}
           </button>

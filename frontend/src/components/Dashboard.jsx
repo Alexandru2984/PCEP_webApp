@@ -36,7 +36,7 @@ function MasteryBar({ label, pct, onDrill }) {
             <button
               type="button"
               onClick={onDrill}
-              className="rounded text-sky-600 underline underline-offset-2 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300"
+              className="rounded text-sky-700 underline underline-offset-2 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300"
             >
               Drill
             </button>
@@ -138,14 +138,14 @@ export default function Dashboard({ onDrill, onBookmarks, onMistakes }) {
           <Stat
             label="Best score"
             value={`${bestPct}%`}
-            accent={bestPct >= 70 ? 'text-green-600 dark:text-green-400' : undefined}
+            accent={bestPct >= 70 ? 'text-green-700 dark:text-green-400' : undefined}
           />
           <Stat label="Graded accuracy" value={`${avgPct}%`} />
           <Stat label="Graded questions" value={totalAnswered} />
           <Stat
             label="Best streak"
             value={bestStreak}
-            accent={bestStreak >= 5 ? 'text-green-600 dark:text-green-400' : undefined}
+            accent={bestStreak >= 5 ? 'text-green-700 dark:text-green-400' : undefined}
           />
         </div>
         <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
@@ -223,8 +223,8 @@ export default function Dashboard({ onDrill, onBookmarks, onMistakes }) {
               <div
                 className={`shrink-0 font-bold ${
                   a.pct >= 70
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-orange-600 dark:text-orange-400'
+                    ? 'text-green-700 dark:text-green-400'
+                    : 'text-orange-700 dark:text-orange-400'
                 }`}
               >
                 {a.pct}%

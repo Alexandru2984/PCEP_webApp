@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import CodeBlock from './CodeBlock'
 import BookmarkButton from './BookmarkButton'
 
@@ -22,6 +22,10 @@ export default function QuestionCard({
   disabled,
   runnable = false,
 }) {
+  const heading = useRef(null)
+  useEffect(() => {
+    heading.current?.focus()
+  }, [question.id])
   const getChoiceClass = (choice) => {
     const base =
       'w-full text-left px-4 py-3 rounded-lg border transition-colors flex items-start gap-2'
@@ -37,11 +41,11 @@ export default function QuestionCard({
     if (choice.id === selectedChoiceId) {
       return `${base} border-red-500 bg-red-50 text-red-900 dark:border-red-500 dark:bg-red-950/50 dark:text-red-200`
     }
-    return `${base} border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-500`
+    return `${base} border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400`
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800">
       <div className="mb-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
         <span>
           Question{' '}
@@ -62,7 +66,11 @@ export default function QuestionCard({
         </span>
       </div>
 
-      <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <h2
+        ref={heading}
+        tabIndex={-1}
+        className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100"
+      >
         {question.text}
       </h2>
 
@@ -81,15 +89,14 @@ export default function QuestionCard({
           <CodeBlock code={question.code_snippet} className="mb-4" />
         ))}
 
-      <div className="space-y-2" role="radiogroup" aria-label="Answer choices">
+      <div className="space-y-2" role="group" aria-label="Answer choices">
         {question.choices.map((choice, idx) => {
           const selected = selectedChoiceId === choice.id
           return (
             <button
               key={choice.id}
               type="button"
-              role="radio"
-              aria-checked={selected}
+              aria-pressed={selected}
               onClick={() => !disabled && onAnswerSelect(choice.id)}
               disabled={disabled}
               className={getChoiceClass(choice)}
@@ -97,7 +104,9 @@ export default function QuestionCard({
               <span className="font-mono text-slate-500 dark:text-slate-400">
                 {String.fromCharCode(65 + idx)}.
               </span>
-              <span className="flex-1">{choice.text}</span>
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                {choice.text}
+              </span>
             </button>
           )
         })}
