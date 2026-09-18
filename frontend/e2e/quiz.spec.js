@@ -135,3 +135,48 @@ test('flashcards reveal shows the answer and self-marking advances the deck', as
   // Advancing resets the card, so the reveal control is back for card 2.
   await expect(page.getByRole('button', { name: /Reveal answer/i })).toBeVisible()
 })
+
+test('exam preserves answers through a throttled grading request and retries once', async ({
+  page,
+}) => {
+  await mockApi(page)
+  const submissions = []
+  await page.route('**/api/grade/', async (route) => {
+    const answers = route.request().postDataJSON().answers
+    submissions.push(answers)
+    if (submissions.length === 1)
+      return route.fulfill({
+        status: 429,
+        headers: { 'Retry-After': '1' },
+        json: { detail: 'Throttled' },
+      })
+    const results = answers.map((a) => ({
+      ...a,
+      is_correct: a.choice_id === correctId(a.question_id),
+      correct_choice_id: correctId(a.question_id),
+      explanation: '',
+      correct_explanation: 'Review this concept.',
+    }))
+    return route.fulfill({
+      json: { count: results.length, score: results.length, results },
+    })
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Exam simulation/ }).click()
+  await page.getByRole('button', { name: /Start exam/ }).click()
+  for (let i = 0; i < QUESTIONS.length; i++) {
+    await page.getByRole('radio', { name: /option 1/ }).click()
+    if (i < QUESTIONS.length - 1)
+      await page.getByRole('button', { name: /Next →/ }).click()
+  }
+  await page.getByRole('button', { name: 'Submit exam', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Too many requests')
+  await expect(page.getByRole('radio', { name: /option 1/ })).toHaveAttribute(
+    'aria-checked',
+    'true'
+  )
+  await page.getByRole('button', { name: 'Retry grading' }).click()
+  await expect(page.getByRole('heading', { name: 'Quiz complete' })).toBeVisible()
+  expect(submissions).toHaveLength(2)
+  expect(submissions[1]).toEqual(submissions[0])
+})

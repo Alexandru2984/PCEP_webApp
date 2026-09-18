@@ -1,0 +1,144 @@
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fetchQuizSet, gradeAnswers, submitAnswer } from './api'
+import { loadHistory } from './storage'
+import useQuizSession from './useQuizSession'
+
+vi.mock('./api', async (original) => ({
+  ...(await original()),
+  fetchQuizSet: vi.fn(),
+  gradeAnswers: vi.fn(),
+  submitAnswer: vi.fn(),
+}))
+const question = {
+  id: 1,
+  text: 'Question?',
+  code_snippet: '',
+  module: 'module1',
+  difficulty: 'easy',
+  choices: [
+    { id: 11, text: 'One' },
+    { id: 12, text: 'Two' },
+  ],
+}
+const feedback = {
+  is_correct: true,
+  correct_choice_id: 11,
+  explanation: 'Why',
+  correct_explanation: 'Why',
+}
+const config = { mode: 'practice', count: 10, module: '', difficulty: '' }
+const deferred = () => {
+  let resolve
+  const promise = new Promise((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
+beforeEach(() => {
+  vi.clearAllMocks()
+  fetchQuizSet.mockResolvedValue({ questions: [question] })
+})
+
+describe('quiz session requests', () => {
+  it('blocks duplicate starts and duplicate answer requests synchronously', async () => {
+    const loading = deferred()
+    fetchQuizSet.mockReturnValueOnce(loading.promise)
+    const { result } = renderHook(useQuizSession)
+    let start
+    act(() => {
+      start = result.current.startQuiz(config)
+      result.current.startQuiz(config)
+    })
+    expect(fetchQuizSet).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      loading.resolve({ questions: [question] })
+      await start
+    })
+    const answer = deferred()
+    submitAnswer.mockReturnValueOnce(answer.promise)
+    let answering
+    act(() => {
+      answering = result.current.handleSelect(11)
+      result.current.handleSelect(12)
+    })
+    expect(submitAnswer).toHaveBeenCalledTimes(1)
+    expect(result.current.phase).toBe('submitting-answer')
+    await act(async () => {
+      answer.resolve(feedback)
+      await answering
+    })
+    expect(result.current.history).toHaveLength(1)
+    act(() => {
+      result.current.handleNext()
+      result.current.handleNext()
+    })
+    expect(result.current.phase).toBe('done')
+    expect(loadHistory()).toHaveLength(1)
+  })
+
+  it('cancels loading on reset and ignores stale responses', async () => {
+    const loading = deferred()
+    fetchQuizSet.mockReturnValueOnce(loading.promise)
+    const { result } = renderHook(useQuizSession)
+    let start
+    act(() => {
+      start = result.current.startQuiz(config)
+    })
+    const signal = fetchQuizSet.mock.calls[0][1].signal
+    act(() => result.current.resetToSetup())
+    expect(signal.aborted).toBe(true)
+    await act(async () => {
+      loading.resolve({ questions: [question] })
+      await start
+    })
+    expect(result.current.phase).toBe('setup')
+    expect(result.current.questions).toEqual([])
+  })
+
+  it('keeps practice question and history on a failed answer, then retries', async () => {
+    submitAnswer
+      .mockRejectedValueOnce({ response: { status: 503 } })
+      .mockResolvedValueOnce(feedback)
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+    await act(async () => result.current.handleSelect(11))
+    expect(result.current.phase).toBe('answering')
+    expect(result.current.questions).toHaveLength(1)
+    expect(result.current.error).toMatch(/temporarily unavailable/)
+    expect(result.current.history).toEqual([])
+    await act(async () => result.current.handleSelect(11))
+    expect(result.current.phase).toBe('reviewing')
+  })
+
+  it('keeps an exam mounted after grading failure and safely retries the same answers', async () => {
+    gradeAnswers
+      .mockRejectedValueOnce({
+        response: { status: 429, headers: { 'retry-after': '12' } },
+      })
+      .mockResolvedValueOnce({
+        results: [{ ...feedback, question_id: 1, choice_id: 11 }],
+      })
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'exam' }))
+    await act(async () => result.current.handleExamSubmit({ 1: 11 }))
+    expect(result.current.phase).toBe('exam')
+    expect(result.current.submitting).toBe(false)
+    expect(result.current.error).toMatch(/12 seconds/)
+    expect(loadHistory()).toEqual([])
+    await act(async () => result.current.handleExamSubmit({ 1: 11 }))
+    expect(result.current.phase).toBe('done')
+    expect(gradeAnswers.mock.calls[0][0]).toEqual(gradeAnswers.mock.calls[1][0])
+    expect(loadHistory()).toHaveLength(1)
+  })
+
+  it('rejects incomplete grading without recording a score', async () => {
+    gradeAnswers.mockResolvedValue({ results: [] })
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'exam' }))
+    await act(async () => result.current.handleExamSubmit({ 1: 11 }))
+    expect(result.current.phase).toBe('exam')
+    expect(result.current.error).toMatch(/incomplete grading/)
+    expect(loadHistory()).toEqual([])
+  })
+})

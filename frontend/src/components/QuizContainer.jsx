@@ -1,13 +1,8 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
-import { fetchQuizSet, submitAnswer, gradeAnswers, fetchQuestionStats } from '../api'
-import {
-  loadSettings,
-  saveSettings,
-  appendAttempt,
-  loadHistory,
-  loadMistakes,
-  updateMistakes,
-} from '../storage'
+import { fetchQuestionStats, apiErrorMessage } from '../api'
+import { loadHistory, loadMistakes } from '../storage'
+import useQuizSession from '../useQuizSession'
+import { ignoreShortcut, nativeActivation } from '../shortcuts'
 import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
 import QuestionCard from './QuestionCard'
@@ -33,176 +28,33 @@ function LoadingCard() {
   )
 }
 
-// Fisher-Yates: an unbiased in-place shuffle for building a mistakes session.
-function shuffle(arr) {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
 export default function QuizContainer() {
-  const [phase, setPhase] = useState('setup')
-  const [questions, setQuestions] = useState([])
-  const [index, setIndex] = useState(0)
-  const [selectedChoiceId, setSelectedChoiceId] = useState(null)
-  const [feedback, setFeedback] = useState(null)
-  const [history, setHistory] = useState([])
-  const [lastConfig, setLastConfig] = useState(loadSettings)
-  const [startedAt, setStartedAt] = useState(0)
-  const [elapsedMs, setElapsedMs] = useState(0)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
+  const {
+    phase,
+    questions,
+    index,
+    selectedChoiceId,
+    feedback,
+    history,
+    lastConfig,
+    elapsedMs,
+    submitting,
+    error,
+    startQuiz,
+    handleSelect,
+    handleNext,
+    handleExamSubmit,
+    finish,
+    resetToSetup,
+    startMistakesQuiz,
+    startModuleDrill,
+  } = useQuizSession()
   const [view, setView] = useState('setup')
   const [questionStats, setQuestionStats] = useState(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [statsError, setStatsError] = useState(null)
-
   const score = history.filter((h) => h.feedback?.is_correct).length
   const streak = getStreakStats(history)
-
-  const recordAttempt = (items, total, elapsed) => {
-    const correct = items.filter((i) => i.feedback?.is_correct).length
-    const attemptStreak = getStreakStats(items)
-    appendAttempt({
-      date: new Date().toISOString(),
-      mode: lastConfig?.mode ?? 'practice',
-      module: lastConfig?.module ?? '',
-      difficulty: lastConfig?.difficulty ?? '',
-      score: correct,
-      total,
-      pct: total > 0 ? Math.round((correct / total) * 100) : 0,
-      elapsedMs: elapsed,
-      bestStreak: attemptStreak.best,
-    })
-  }
-
-  const startQuiz = async (config) => {
-    setPhase('loading')
-    setError(null)
-    setLastConfig(config)
-    saveSettings(config)
-    try {
-      const data = await fetchQuizSet(config)
-      if (!data.questions || data.questions.length === 0) {
-        throw new Error('No questions match these filters. Try loosening them.')
-      }
-      setQuestions(data.questions)
-      setIndex(0)
-      setSelectedChoiceId(null)
-      setFeedback(null)
-      setHistory([])
-      setStartedAt(Date.now())
-      setPhase(
-        config.mode === 'exam'
-          ? 'exam'
-          : config.mode === 'flashcards'
-            ? 'flashcards'
-            : 'answering'
-      )
-    } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || 'Failed to load quiz.')
-      setPhase('error')
-    }
-  }
-
-  const handleSelect = async (choiceId) => {
-    if (phase !== 'answering') return
-    setSelectedChoiceId(choiceId)
-    try {
-      const data = await submitAnswer(questions[index].id, choiceId)
-      setFeedback(data)
-      setHistory((h) => [
-        ...h,
-        { question: questions[index], pickedChoiceId: choiceId, feedback: data },
-      ])
-      setPhase('reviewing')
-    } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || 'Failed to submit answer.')
-      setPhase('error')
-    }
-  }
-
-  const finish = (items, total) => {
-    const elapsed = Date.now() - startedAt
-    setElapsedMs(elapsed)
-    recordAttempt(items, total, elapsed)
-    // Record fresh misses and clear any the learner just got right.
-    updateMistakes(items)
-    setHistory(items)
-    setPhase('done')
-  }
-
-  // One-click practice drill scoped to a single module (used by the end-of-quiz
-  // "focus area" and the dashboard's module mastery rows).
-  const startModuleDrill = (module) =>
-    startQuiz({ mode: 'practice', module, difficulty: '', count: 20 })
-
-  // Build a practice session from the locally-stored missed questions — no API
-  // call, since we kept the full question objects.
-  const startMistakesQuiz = () => {
-    const stored = loadMistakes()
-    if (stored.length === 0) return
-    setLastConfig({ mode: 'practice', module: '', difficulty: '', source: 'mistakes' })
-    setQuestions(shuffle(stored).slice(0, 50))
-    setIndex(0)
-    setSelectedChoiceId(null)
-    setFeedback(null)
-    setHistory([])
-    setStartedAt(Date.now())
-    setError(null)
-    setPhase('answering')
-  }
-
-  const handleNext = () => {
-    if (index + 1 >= questions.length) {
-      finish(history, questions.length)
-      return
-    }
-    setIndex((i) => i + 1)
-    setSelectedChoiceId(null)
-    setFeedback(null)
-    setPhase('answering')
-  }
-
-  const handleExamSubmit = async (answers) => {
-    setSubmitting(true)
-    setError(null)
-    const payload = questions.map((q) => ({
-      question_id: q.id,
-      choice_id: answers[q.id] ?? null,
-    }))
-    try {
-      const data = await gradeAnswers(payload)
-      const byQuestion = new Map(data.results.map((r) => [r.question_id, r]))
-      const items = questions.map((q) => {
-        const r = byQuestion.get(q.id)
-        return {
-          question: q,
-          pickedChoiceId: r?.choice_id ?? null,
-          feedback: {
-            is_correct: r?.is_correct ?? false,
-            correct_choice_id: r?.correct_choice_id ?? null,
-            explanation: r?.explanation ?? '',
-            correct_explanation: r?.correct_explanation ?? '',
-          },
-        }
-      })
-      finish(items, questions.length)
-    } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || 'Failed to grade exam.')
-      setPhase('error')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const resetToSetup = () => {
-    setPhase('setup')
-    setError(null)
-  }
 
   useEffect(() => {
     let active = true
@@ -216,9 +68,7 @@ export default function QuizContainer() {
         setQuestionStats(data)
       } catch (e) {
         if (!active) return
-        setStatsError(
-          e?.response?.data?.detail || e?.message || 'Could not load question-bank stats.'
-        )
+        setStatsError(apiErrorMessage(e, 'Could not load question-bank stats.'))
       } finally {
         if (active) setStatsLoading(false)
       }
@@ -234,7 +84,7 @@ export default function QuizContainer() {
   useEffect(() => {
     if (phase !== 'answering' && phase !== 'reviewing') return
     const onKey = (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (ignoreShortcut(e) || nativeActivation(e)) return
       // Don't hijack digits/letters while the learner is typing in the code editor.
       const t = e.target
       if (t?.tagName === 'TEXTAREA' || t?.tagName === 'INPUT' || t?.isContentEditable)
@@ -347,6 +197,7 @@ export default function QuizContainer() {
           onSubmit={handleExamSubmit}
           onQuit={resetToSetup}
           submitting={submitting}
+          error={error}
         />
       </Suspense>
     )
@@ -384,6 +235,19 @@ export default function QuizContainer() {
   const progress = Math.round((index / questions.length) * 100)
   return (
     <div>
+      {error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+        >
+          {error} Select an answer to retry.
+        </p>
+      )}
+      {phase === 'submitting-answer' && (
+        <p role="status" className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+          Checking your answer…
+        </p>
+      )}
       <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <div
           className="h-full rounded-full bg-slate-900 transition-all dark:bg-sky-500"
@@ -423,7 +287,7 @@ export default function QuizContainer() {
         onAnswerSelect={handleSelect}
         selectedChoiceId={selectedChoiceId}
         feedback={feedback}
-        disabled={phase === 'reviewing'}
+        disabled={phase !== 'answering'}
         runnable
       />
       {feedback ? (

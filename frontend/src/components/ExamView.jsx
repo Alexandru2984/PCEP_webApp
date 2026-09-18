@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import QuestionCard from './QuestionCard'
 import { formatClock } from '../format'
+import { ignoreShortcut } from '../shortcuts'
 
-const SECONDS_PER_QUESTION = 80 // mirrors the official PCEP pace (~30 Q / 40 min)
+const SECONDS_PER_QUESTION = 80 // application simulation pace
 
-export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
+export default function ExamView({ questions, onSubmit, onQuit, submitting, error }) {
   const total = questions.length
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState({})
@@ -12,28 +13,49 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
   const [timeLeft, setTimeLeft] = useState(total * SECONDS_PER_QUESTION)
   const [confirming, setConfirming] = useState(false)
   const submittedRef = useRef(false)
+  const autoAttempted = useRef(false)
+  const [deadline] = useState(() => Date.now() + total * SECONDS_PER_QUESTION * 1000)
+  const expiredAnswers = useRef(null)
 
   const answeredCount = Object.keys(answers).length
 
-  const submit = () => {
+  const submit = useCallback(async () => {
     if (submittedRef.current) return
     submittedRef.current = true
-    onSubmit(answers)
-  }
-
-  // Countdown — auto-submits when it reaches zero.
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      submit()
-      return
+    if (Date.now() >= deadline && !expiredAnswers.current)
+      expiredAnswers.current = { ...answers }
+    try {
+      const success = await onSubmit(expiredAnswers.current ?? answers)
+      if (success === false) submittedRef.current = false
+    } catch {
+      submittedRef.current = false
     }
-    const id = setTimeout(() => setTimeLeft((t) => t - 1), 1000)
-    return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft])
+  }, [answers, onSubmit, deadline])
+
+  // Use wall-clock time so background-tab timer suspension does not extend an exam.
+  useEffect(() => {
+    const tick = () => setTimeLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
+    const id = setInterval(tick, 1000)
+    window.addEventListener('focus', tick)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('focus', tick)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [deadline])
+  useEffect(() => {
+    if (timeLeft <= 0 && !autoAttempted.current) {
+      autoAttempted.current = true
+      submit()
+    }
+  }, [timeLeft, submit])
 
   const current = questions[index]
-  const pick = (choiceId) => setAnswers((a) => ({ ...a, [current.id]: choiceId }))
+  const pick = (choiceId) => {
+    if (submitting || submittedRef.current || Date.now() >= deadline) return
+    setAnswers((a) => ({ ...a, [current.id]: choiceId }))
+  }
 
   const toggleFlag = () =>
     setFlagged((f) => {
@@ -48,10 +70,19 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
   // Keyboard: 1–4 / A–D answer, ← → navigate, F flag.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.key === 'ArrowLeft') return go(index - 1)
-      if (e.key === 'ArrowRight') return go(index + 1)
-      if (e.key.toLowerCase() === 'f') return toggleFlag()
+      if (ignoreShortcut(e) || submitting || confirming || timeLeft <= 0) return
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        return go(index - 1)
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        return go(index + 1)
+      }
+      if (e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        return toggleFlag()
+      }
       const n = Number.parseInt(e.key, 10)
       const idx = Number.isNaN(n) ? 'abcd'.indexOf(e.key.toLowerCase()) : n - 1
       if (idx >= 0 && idx < current.choices.length) {
@@ -62,7 +93,7 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, questions])
+  }, [index, questions, submitting, confirming, timeLeft])
 
   const navState = (q, i) => {
     if (i === index) return 'current'
@@ -82,6 +113,23 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
 
   return (
     <div>
+      {error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+        >
+          {error}
+        </p>
+      )}
+      {timeLeft <= 0 && (
+        <p
+          role="status"
+          className="mb-3 text-sm font-medium text-amber-800 dark:text-amber-200"
+        >
+          Time is up. Your answers are locked.{' '}
+          {error ? 'Retry grading to finish.' : 'Submitting your exam…'}
+        </p>
+      )}
       <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
         <div className="flex items-center gap-3 text-sm">
           <span className="rounded-md bg-slate-900 px-2 py-1 font-semibold uppercase tracking-wide text-white dark:bg-sky-600">
@@ -94,6 +142,7 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
         <div
           role="timer"
           aria-live="off"
+          aria-label="Time remaining"
           className={`font-mono text-lg font-bold tabular-nums ${
             lowOnTime
               ? 'text-red-600 dark:text-red-400'
@@ -111,7 +160,7 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
         onAnswerSelect={pick}
         selectedChoiceId={answers[current.id] ?? null}
         feedback={null}
-        disabled={submitting}
+        disabled={submitting || timeLeft <= 0}
       />
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -204,7 +253,7 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting }) {
             disabled={submitting}
             className="rounded-lg bg-green-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-green-500 disabled:opacity-50"
           >
-            {submitting ? 'Grading…' : 'Submit exam'}
+            {submitting ? 'Grading…' : error ? 'Retry grading' : 'Submit exam'}
           </button>
         )}
       </div>

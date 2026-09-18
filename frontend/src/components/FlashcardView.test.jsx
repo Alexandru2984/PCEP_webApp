@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import FlashcardView from './FlashcardView'
 import { submitAnswer } from '../api'
 
-vi.mock('../api', () => ({ submitAnswer: vi.fn() }))
+vi.mock('../api', async (original) => ({ ...(await original()), submitAnswer: vi.fn() }))
 
 const card = (id, choiceIds) => ({
   id,
@@ -73,5 +73,26 @@ describe('FlashcardView', () => {
     )
     expect(screen.getByRole('button', { name: /Reveal answer/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Got it/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps the answer hidden after a network failure and offers a safe retry', async () => {
+    submitAnswer
+      .mockRejectedValueOnce(new Error('Network failure'))
+      .mockResolvedValueOnce({
+        correct_choice_id: 2,
+        correct_explanation: 'Recovered concept',
+      })
+    render(
+      <FlashcardView
+        questions={[card(10, [1, 2])]}
+        onFinish={vi.fn()}
+        onQuit={() => {}}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Reveal answer/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network failure')
+    expect(screen.queryByRole('button', { name: /Got it/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Reveal answer/ }))
+    expect(await screen.findByText(/Recovered concept/)).toBeInTheDocument()
   })
 })

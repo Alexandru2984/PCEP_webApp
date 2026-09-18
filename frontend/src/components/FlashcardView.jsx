@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import CodeBlock from './CodeBlock'
-import { submitAnswer } from '../api'
+import { submitAnswer, apiErrorMessage } from '../api'
+import { ignoreShortcut, nativeActivation } from '../shortcuts'
 
 // A flip-card study mode: read the snippet, reveal the answer, then self-mark
 // "Got it" or "Review later". The reveal POSTs a throwaway guess so the correct
@@ -12,27 +13,46 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
   const [revealed, setRevealed] = useState(null)
   const [revealing, setRevealing] = useState(false)
   const [items, setItems] = useState([])
+  const [error, setError] = useState(null)
+  const pending = useRef(false)
+  const marking = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  useEffect(() => {
+    marking.current = false
+  }, [index])
   const question = questions[index]
 
   const reveal = useCallback(async () => {
-    if (revealed || revealing) return
+    if (revealed || pending.current) return
+    pending.current = true
     setRevealing(true)
+    setError(null)
     try {
       const data = await submitAnswer(question.id, question.choices[0].id)
+      if (!mounted.current) return
+      if (!question.choices.some((c) => c.id === data?.correct_choice_id))
+        throw new Error('The server returned invalid feedback. Please retry.')
       setRevealed({
         correct_choice_id: data.correct_choice_id,
         correct_explanation: data.correct_explanation,
       })
-    } catch {
-      // Network hiccup: still flip so the session can continue.
-      setRevealed({ correct_choice_id: null, correct_explanation: '' })
+    } catch (error) {
+      if (mounted.current) setError(apiErrorMessage(error))
     } finally {
-      setRevealing(false)
+      pending.current = false
+      if (mounted.current) setRevealing(false)
     }
-  }, [question, revealed, revealing])
+  }, [question, revealed])
 
   const mark = (gotIt) => {
-    if (!revealed) return
+    if (!revealed || marking.current) return
+    marking.current = true
     const item = {
       question,
       pickedChoiceId: gotIt ? revealed.correct_choice_id : null,
@@ -56,6 +76,7 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
   // Space / Enter flips the card (when not typing in the code editor).
   useEffect(() => {
     const onKey = (e) => {
+      if (ignoreShortcut(e) || nativeActivation(e)) return
       const t = e.target
       if (t?.tagName === 'TEXTAREA' || t?.tagName === 'INPUT' || t?.isContentEditable)
         return
@@ -72,6 +93,14 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
 
   return (
     <div>
+      {error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+        >
+          {error}
+        </p>
+      )}
       <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <div
           className="h-full rounded-full bg-slate-900 transition-all dark:bg-sky-500"
