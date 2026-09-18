@@ -15,16 +15,19 @@ const MAX_OUTPUT = 10000 // chars; guards against a runaway print loop flooding 
 let pyodidePromise = null
 let outBuf = []
 let truncated = false
+let outputSize = 0
 
 function pushOutput(stream, text) {
   if (truncated) return
-  const remaining = MAX_OUTPUT - outBuf.reduce((n, c) => n + c.text.length, 0)
+  const remaining = MAX_OUTPUT - outputSize
   if (remaining <= 0) {
     truncated = true
-    outBuf.push({ stream: 'stderr', text: '\n… output truncated …' })
     return
   }
-  outBuf.push({ stream, text: text.length > remaining ? text.slice(0, remaining) : text })
+  const chunk = text.slice(0, remaining)
+  outBuf.push({ stream, text: chunk })
+  outputSize += chunk.length
+  if (text.length > remaining) truncated = true
 }
 
 async function getPyodide() {
@@ -56,6 +59,10 @@ self.onmessage = async (event) => {
   }
 
   if (type !== 'run') return
+  if (typeof code !== 'string' || code.length > 20000) {
+    self.postMessage({ type: 'result', id, output: [], error: 'Code is too large.' })
+    return
+  }
 
   let pyodide
   try {
@@ -76,6 +83,7 @@ self.onmessage = async (event) => {
   // state from a previous run. CPython injects __builtins__ automatically.
   outBuf = []
   truncated = false
+  outputSize = 0
   let ns
   let error = null
   try {
@@ -83,10 +91,10 @@ self.onmessage = async (event) => {
     await pyodide.runPythonAsync(code, { globals: ns })
   } catch (err) {
     // Pyodide surfaces the Python traceback in err.message.
-    error = String(err && err.message ? err.message : err)
+    error = String(err && err.message ? err.message : err).slice(0, MAX_OUTPUT)
   } finally {
     if (ns && typeof ns.destroy === 'function') ns.destroy()
   }
 
-  self.postMessage({ type: 'result', id, output: outBuf, error })
+  self.postMessage({ type: 'result', id, output: outBuf, error, truncated })
 }

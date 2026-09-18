@@ -1,129 +1,171 @@
-// Main-thread manager for the in-browser Python runner.
-//
-// One Pyodide worker is shared by every CodeRunner on the page (the 12 MB runtime
-// loads once). Runs are serialized — a single interpreter can only do one thing at
-// a time — and each run is guarded by an execution timeout that *terminates* the
-// worker to kill a runaway `while True:`. The one-time WASM load is awaited
-// separately so it never eats into a snippet's execution budget.
-
+// Shared, serialized interpreter with separate startup/execution deadlines.
+// Termination keeps the UI responsive; it is not a hostile-code sandbox.
 const WORKER_URL = '/py-worker.js'
-
+const LOAD_TIMEOUT_MS = 30_000
+const MAX_QUEUE = 4
+const MAX_CODE = 20_000
+const MAX_OUTPUT = 10_000
 let worker = null
-let status = 'idle' // idle | loading | ready | error
+let status = 'idle'
 let statusError = null
 let readyPromise = null
 let readyResolve = null
-let pending = null // { id, resolve, timer }
+let loadTimer = null
+let pending = null
 let seq = 0
 let queue = Promise.resolve()
+let scheduled = 0
 const listeners = new Set()
 
-function setStatus(next, err = null) {
+function setStatus(next, error = null) {
   status = next
-  statusError = err
-  for (const fn of listeners) fn(status, statusError)
+  statusError = error
+  for (const listener of listeners) listener(status, statusError)
 }
-
-export function getStatus() {
-  return status
+export const getStatus = () => status
+export function subscribeStatus(listener) {
+  listeners.add(listener)
+  listener(status, statusError)
+  return () => listeners.delete(listener)
 }
-
-// React components subscribe to load-state changes (idle → loading → ready/error).
-export function subscribeStatus(fn) {
-  listeners.add(fn)
-  fn(status, statusError)
-  return () => listeners.delete(fn)
+function stopWorker() {
+  clearTimeout(loadTimer)
+  loadTimer = null
+  try {
+    worker?.terminate()
+  } catch {
+    /* already stopped */
+  }
+  worker = null
+  readyResolve?.()
+  readyResolve = null
+  readyPromise = null
 }
-
-function spawn() {
-  // Classic worker — it uses importScripts() to pull in pyodide.js.
-  worker = new Worker(WORKER_URL)
-  worker.onmessage = (event) => {
-    const msg = event.data || {}
-    if (msg.type === 'ready') {
-      setStatus('ready')
-      readyResolve?.()
-      return
-    }
-    if (msg.type === 'fatal') {
-      setStatus('error', msg.error)
-      readyResolve?.() // unblock waiters; runOne checks status afterwards
-      return
-    }
-    if (msg.type === 'result' && pending && msg.id === pending.id) {
-      clearTimeout(pending.timer)
-      const p = pending
-      pending = null
-      p.resolve({ output: msg.output || [], error: msg.error || null, timedOut: false })
+function fail(error) {
+  const active = pending
+  pending = null
+  if (active) {
+    clearTimeout(active.timer)
+    active.resolve({ output: [], error, timedOut: false })
+  }
+  stopWorker()
+  setStatus('error', error)
+}
+function boundedResult(msg) {
+  let remaining = MAX_OUTPUT
+  const output = []
+  if (Array.isArray(msg.output)) {
+    for (const chunk of msg.output.slice(0, 1000)) {
+      if (!remaining || typeof chunk?.text !== 'string') break
+      const text = chunk.text.slice(0, remaining)
+      output.push({ stream: chunk.stream === 'stderr' ? 'stderr' : 'stdout', text })
+      remaining -= text.length
     }
   }
-  worker.onerror = (event) => {
-    setStatus('error', event.message || 'Python worker error')
-    readyResolve?.()
-    if (pending) {
-      clearTimeout(pending.timer)
-      const p = pending
-      pending = null
-      p.resolve({ output: [], error: 'Python worker crashed.', timedOut: false })
-    }
+  return {
+    output,
+    error: typeof msg.error === 'string' ? msg.error.slice(0, MAX_OUTPUT) : null,
+    timedOut: false,
+    truncated: msg.truncated === true,
   }
 }
-
-function startLoading() {
-  setStatus('loading')
-  spawn()
-  worker.postMessage({ type: 'init' })
-}
-
-// Resolve once Pyodide has finished loading (or failed). Never rejects — callers
-// inspect getStatus() afterwards. Safe to call repeatedly / to preload on hover.
 export function warmUp() {
   if (status === 'ready') return Promise.resolve()
-  if (!readyPromise) {
-    readyPromise = new Promise((resolve) => {
-      readyResolve = resolve
-    })
-    startLoading()
+  if (status === 'loading' && readyPromise) return readyPromise
+  const promise = new Promise((resolve) => {
+    readyResolve = resolve
+  })
+  readyPromise = promise
+  setStatus('loading')
+  try {
+    const instance = new Worker(WORKER_URL)
+    worker = instance
+    loadTimer = setTimeout(
+      () => fail('Python startup timed out. Check your connection and run again.'),
+      LOAD_TIMEOUT_MS
+    )
+    instance.onmessage = ({ data: msg = {} }) => {
+      if (worker !== instance) return
+      if (msg.type === 'ready' && status === 'loading') {
+        clearTimeout(loadTimer)
+        loadTimer = null
+        setStatus('ready')
+        readyResolve?.()
+        readyResolve = null
+      } else if (msg.type === 'fatal') {
+        fail(
+          typeof msg.error === 'string'
+            ? msg.error.slice(0, MAX_OUTPUT)
+            : 'Python failed to load. Run again to retry.'
+        )
+      } else if (msg.type === 'result' && pending?.id === msg.id) {
+        clearTimeout(pending.timer)
+        const active = pending
+        pending = null
+        active.resolve(boundedResult(msg))
+      }
+    }
+    instance.onerror = (event) => {
+      if (worker === instance)
+        fail(event.message || 'Python worker crashed. Run again to retry.')
+    }
+    instance.onmessageerror = () => {
+      if (worker === instance)
+        fail('Python returned unreadable output. Run again to retry.')
+    }
+    instance.postMessage({ type: 'init' })
+  } catch (error) {
+    fail(error?.message || 'Python worker could not start. Run again to retry.')
   }
-  return readyPromise
+  return promise
 }
-
 async function runOne(code, timeoutMs) {
   await warmUp()
-  if (status === 'error') {
+  if (status !== 'ready' || !worker)
     return {
       output: [],
-      error: statusError || 'Python runtime is unavailable.',
+      error: statusError || 'Python runtime is unavailable. Run again to retry.',
       timedOut: false,
     }
-  }
   return new Promise((resolve) => {
     const id = ++seq
     const timer = setTimeout(() => {
-      if (!pending || pending.id !== id) return
+      if (pending?.id !== id) return
       pending = null
-      // Kill the runaway interpreter and start a fresh one for the next run.
-      try {
-        worker.terminate()
-      } catch {
-        /* already gone */
-      }
-      worker = null
-      readyPromise = null
-      readyResolve = null
+      stopWorker()
       setStatus('idle')
-      warmUp() // pre-warm the replacement so the next Run is snappy
       resolve({ output: [], error: null, timedOut: true })
     }, timeoutMs)
     pending = { id, resolve, timer }
-    worker.postMessage({ type: 'run', id, code })
+    try {
+      worker.postMessage({ type: 'run', id, code })
+    } catch (error) {
+      fail(error?.message || 'Python execution could not start. Run again to retry.')
+    }
   })
 }
-
-// Run `code` and resolve with { output: [{stream,text}], error, timedOut }.
-// Runs are queued so two snippets never share the interpreter mid-execution.
 export function runPython(code, { timeoutMs = 8000 } = {}) {
-  const result = queue.then(() => runOne(code, timeoutMs))
+  if (typeof code !== 'string' || code.length > MAX_CODE)
+    return Promise.resolve({
+      output: [],
+      error: 'Code must contain at most 20,000 characters.',
+      timedOut: false,
+    })
+  if (scheduled >= MAX_QUEUE)
+    return Promise.resolve({
+      output: [],
+      error: 'Python is busy. Wait for a run to finish, then retry.',
+      timedOut: false,
+    })
+  const timeout = Number.isFinite(timeoutMs)
+    ? Math.max(100, Math.min(timeoutMs, 8000))
+    : 8000
+  scheduled++
+  const result = queue
+    .then(() => runOne(code, timeout))
+    .finally(() => {
+      scheduled--
+    })
   queue = result.catch(() => {})
   return result
 }

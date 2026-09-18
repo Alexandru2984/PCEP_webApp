@@ -13,20 +13,40 @@ export default function CodeRunner({ code, className = '' }) {
   const [result, setResult] = useState(null) // { output, error, timedOut } | null
   const [status, setStatus] = useState('idle') // pyodide load state
   const textareaRef = useRef(null)
+  const runningRef = useRef(false)
+  const mounted = useRef(true)
 
   // State resets across questions via a `key` on the element (set by the parent),
   // so no effect is needed to sync `source` when `code` changes.
   useEffect(() => subscribeStatus((s) => setStatus(s)), [])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   const edited = source !== code
 
   const run = async () => {
-    if (running) return
+    if (runningRef.current) return
+    runningRef.current = true
     setRunning(true)
     setResult(null)
-    const res = await runPython(source)
-    setResult(res)
-    setRunning(false)
+    try {
+      const res = await runPython(source)
+      if (mounted.current) setResult(res)
+    } catch {
+      if (mounted.current)
+        setResult({
+          output: [],
+          error: 'Python could not run. Please retry.',
+          timedOut: false,
+        })
+    } finally {
+      runningRef.current = false
+      if (mounted.current) setRunning(false)
+    }
   }
 
   const reset = () => {
@@ -60,6 +80,7 @@ export default function CodeRunner({ code, className = '' }) {
             autoCapitalize="off"
             aria-label="Editable Python code"
             rows={Math.min(Math.max(lineCount, 2), 20)}
+            maxLength={20000}
             className="block w-full resize-y bg-transparent p-4 font-mono text-sm leading-relaxed text-slate-100 focus:outline-none"
           />
         </div>
@@ -123,7 +144,7 @@ export default function CodeRunner({ code, className = '' }) {
 }
 
 function OutputPanel({ result }) {
-  const { output, error, timedOut } = result
+  const { output, error, timedOut, truncated } = result
 
   if (timedOut) {
     return (
@@ -144,6 +165,11 @@ function OutputPanel({ result }) {
 
   return (
     <Panel tone={error ? 'error' : 'ok'} label="Output">
+      {truncated && (
+        <p className="mb-2 text-sm text-amber-200">
+          Output reached the 10,000-character limit.
+        </p>
+      )}
       {hasOutput && (
         <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed">
           {output.map((chunk, i) => (
@@ -179,7 +205,12 @@ function Panel({ tone, label, children }) {
         ? 'text-slate-500'
         : 'text-emerald-400'
   return (
-    <div className={`mt-2 rounded-lg bg-slate-900 p-3 ring-1 ${ring}`}>
+    <div
+      className={`mt-2 rounded-lg bg-slate-900 p-3 ring-1 ${ring}`}
+      role="region"
+      aria-label="Python output"
+      aria-live="polite"
+    >
       <div className={`mb-1 text-xs font-semibold uppercase tracking-wide ${labelColor}`}>
         {label}
       </div>

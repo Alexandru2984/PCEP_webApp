@@ -148,3 +148,11 @@ stale choice IDs after admin edits. Module/difficulty accuracy includes mixed
 sessions completed in this version. Flashcard self-ratings are excluded from
 graded accuracy. Older mixed attempts lack detailed breakdowns and remain visible
 in history without invented module performance.
+
+The Python runner limits source to 20,000 characters, output/tracebacks to
+10,000 characters, queued/running jobs to four, startup to 30 seconds and each
+execution to eight seconds. Timeout terminates the worker; later Run recreates
+it. Failed startup/crash also permits retry. These are responsiveness/resource
+protections, not a hardened sandbox: arbitrary Python can use the JavaScript
+bridge and can still exhaust browser memory before a timeout. Do not run
+untrusted snippets in an authenticated admin browser.
