@@ -3,6 +3,7 @@ import { apiErrorMessage, fetchQuizSet, gradeAnswers, submitAnswer } from './api
 import {
   appendAttempt,
   loadMistakes,
+  loadBookmarks,
   loadSettings,
   saveSettings,
   updateMistakes,
@@ -261,13 +262,20 @@ export default function useQuizSession() {
     request.current = null
     dispatch({ type: 'reset' })
   }
-  const startMistakesQuiz = () => {
-    const questions = loadMistakes().map(publicQuestion).filter(Boolean).slice(0, 50)
-    if (!questions.length) return
-    finished.current = false
-    const config = { mode: 'practice', module: '', difficulty: '', source: 'mistakes' }
-    dispatch({ type: 'start', config, questions, now: Date.now() })
+  const startSavedDrill = (list, source) => {
+    if (!list.length) return
+    // Fetch current public options so admin edits cannot leave a drill with stale choice IDs.
+    return startQuiz({
+      mode: 'practice',
+      module: '',
+      difficulty: '',
+      count: 50,
+      source,
+      ids: list.slice(0, 100).map((q) => q.id),
+    })
   }
+  const startMistakesQuiz = () => startSavedDrill(loadMistakes(), 'mistakes')
+  const startBookmarksQuiz = () => startSavedDrill(loadBookmarks(), 'bookmarks')
   return {
     ...state,
     startQuiz,
@@ -277,6 +285,7 @@ export default function useQuizSession() {
     finish,
     resetToSetup,
     startMistakesQuiz,
+    startBookmarksQuiz,
     startModuleDrill: (module) =>
       startQuiz({ mode: 'practice', module, difficulty: '', count: 20 }),
   }

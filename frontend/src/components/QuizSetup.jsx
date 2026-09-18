@@ -44,6 +44,8 @@ export default function QuizSetup({
   onStart,
   onPracticeMistakes,
   mistakesCount = 0,
+  bookmarksCount = 0,
+  onPracticeBookmarks,
   initial,
   stats,
   statsLoading,
@@ -93,6 +95,16 @@ export default function QuizSetup({
           <span className="shrink-0 rounded-full bg-amber-200 px-2.5 py-1 text-sm font-bold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
             {mistakesCount}
           </span>
+        </button>
+      )}
+
+      {bookmarksCount > 0 && onPracticeBookmarks && (
+        <button
+          type="button"
+          onClick={onPracticeBookmarks}
+          className="mb-5 w-full rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-left font-medium text-sky-900 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-200"
+        >
+          ★ Practice bookmarks ({bookmarksCount})
         </button>
       )}
 

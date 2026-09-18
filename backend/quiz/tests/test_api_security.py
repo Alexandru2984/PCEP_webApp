@@ -140,6 +140,22 @@ def test_invalid_json_has_no_feedback(api_client):
     assert response.status_code == 400
     assert 'results' not in response.json()
 
+
+def test_saved_drill_fetches_only_requested_public_questions(api_client, make_question):
+    q1, q2, q3 = make_question(), make_question(), make_question()
+    response = api_client.get(f'/api/quiz-set/?ids={q1.id},{q3.id}&count=50')
+    assert response.status_code == 200
+    assert {q['id'] for q in response.json()['questions']} == {q1.id, q3.id}
+    assert q2.id not in {q['id'] for q in response.json()['questions']}
+
+
+@pytest.mark.parametrize('ids', ['', '0', '-1', '1,1', 'true', '1.0', '9223372036854775808',
+                                     ','.join(str(i) for i in range(1, 102))])
+def test_saved_drill_rejects_invalid_id_filter(api_client, ids):
+    response = api_client.get('/api/quiz-set/', {'ids': ids})
+    assert response.status_code == 400
+    assert 'questions' not in response.json()
+
 @pytest.mark.parametrize('correct_count', [0, 2])
 def test_invalid_answer_key_fails_without_disclosing_feedback(api_client, make_question, correct_count):
     q = make_question()

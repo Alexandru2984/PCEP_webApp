@@ -131,3 +131,20 @@ Seed validation runs before any writes, including an explicitly requested reset.
 Migration `0003_label_empty_output_choice` changes only the empty wrong option
 for `print(0 or "" or "x" or "y")` to `(empty output)`, preserving all IDs and
 explanations. It is reversible and does not recreate the question bank.
+
+## Local progress and portability
+
+Progress now uses the versioned `pcep.progress` record. Valid legacy
+`pcep.history`/`pcep.mistakes` records are read and migrate only after a complete
+successful write. A failed import leaves the previous record intact. Each list
+is bounded to 100 records. The progress screen exports JSON, previews and merges
+strictly validated imports up to 8 MB, and resets history, mistakes or bookmarks
+individually. Backups contain public question options and aggregate performance,
+never answer keys or explanations. Keep backups private if you want to keep your
+study history private; nothing is uploaded by these features.
+Bookmarks are available on question cards. Bookmark and mistake drills fetch
+current public question data using the bounded `ids` quiz-set filter, avoiding
+stale choice IDs after admin edits. Module/difficulty accuracy includes mixed
+sessions completed in this version. Flashcard self-ratings are excluded from
+graded accuracy. Older mixed attempts lack detailed breakdowns and remain visible
+in history without invented module performance.

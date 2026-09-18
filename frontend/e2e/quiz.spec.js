@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { Buffer } from 'node:buffer'
 
 // --- Fixtures ---------------------------------------------------------------
 function q(id, module, difficulty) {
@@ -179,4 +180,56 @@ test('exam preserves answers through a throttled grading request and retries onc
   await expect(page.getByRole('heading', { name: 'Quiz complete' })).toBeVisible()
   expect(submissions).toHaveLength(2)
   expect(submissions[1]).toEqual(submissions[0])
+})
+
+test('bookmarks persist across reload and start a targeted drill', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Start practice/ }).click()
+  await page.getByRole('button', { name: '☆ Bookmark' }).click()
+  await page.reload()
+  const drill = page.getByRole('button', { name: /Practice bookmarks/ })
+  await expect(drill).toBeVisible()
+  await drill.click()
+  await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
+})
+
+test('progress backup exports and imports with a preview', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('tab', { name: /Progress/ }).click()
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export backup' }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/^pcep-progress-/)
+  const backup = {
+    type: 'pcep-progress',
+    version: 1,
+    mistakes: [],
+    bookmarks: [],
+    history: [
+      {
+        date: '2026-09-18T12:00:00Z',
+        mode: 'practice',
+        module: 'module2',
+        difficulty: 'easy',
+        score: 8,
+        total: 10,
+        pct: 80,
+        elapsedMs: 10000,
+        bestStreak: 2,
+      },
+    ],
+  }
+  await page.getByLabel('Progress backup file').setInputFiles({
+    name: 'backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup)),
+  })
+  await expect(page.getByText(/Merge 1 attempts/)).toBeVisible()
+  await page.getByRole('button', { name: 'Merge backup' }).click()
+  await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible()
+  await expect(
+    page.getByText('Backup merged. Existing progress was preserved.')
+  ).toBeVisible()
 })

@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { fetchQuestionStats, apiErrorMessage } from '../api'
-import { loadHistory, loadMistakes } from '../storage'
+import { loadHistory, loadMistakes, loadBookmarks } from '../storage'
 import useQuizSession from '../useQuizSession'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
 import { formatElapsed } from '../format'
@@ -47,6 +47,7 @@ export default function QuizContainer() {
     finish,
     resetToSetup,
     startMistakesQuiz,
+    startBookmarksQuiz,
     startModuleDrill,
   } = useQuizSession()
   const [view, setView] = useState('setup')
@@ -139,13 +140,19 @@ export default function QuizContainer() {
         </div>
         {view === 'progress' ? (
           <Suspense fallback={<LoadingCard />}>
-            <Dashboard onDrill={startModuleDrill} />
+            <Dashboard
+              onDrill={startModuleDrill}
+              onBookmarks={startBookmarksQuiz}
+              onMistakes={startMistakesQuiz}
+            />
           </Suspense>
         ) : (
           <QuizSetup
             onStart={startQuiz}
             onPracticeMistakes={startMistakesQuiz}
             mistakesCount={loadMistakes().length}
+            bookmarksCount={loadBookmarks().length}
+            onPracticeBookmarks={startBookmarksQuiz}
             initial={lastConfig}
             stats={questionStats}
             statsLoading={statsLoading}

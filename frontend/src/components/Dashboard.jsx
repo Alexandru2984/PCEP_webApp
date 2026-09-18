@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { loadHistory, clearHistory } from '../storage'
+import { loadHistory, loadBookmarks, loadMistakes } from '../storage'
 import { formatElapsed } from '../format'
+import ProgressTools from './ProgressTools'
 
 const MODULE_LABELS = {
   '': 'All modules',
@@ -49,47 +50,85 @@ function MasteryBar({ label, pct, onDrill }) {
   )
 }
 
-export default function Dashboard({ onDrill }) {
+export default function Dashboard({ onDrill, onBookmarks, onMistakes }) {
   const [attempts, setAttempts] = useState(loadHistory)
+  const refresh = () => setAttempts(loadHistory())
+  const tools = <ProgressTools key="progress-tools" onChange={refresh} />
+  const bookmarks = loadBookmarks().length
+  const mistakes = loadMistakes().length
 
   if (attempts.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
-        <p className="text-slate-600 dark:text-slate-400">
-          No attempts yet — finish a quiz and your progress shows up here.
-        </p>
+      <div className="space-y-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
+          <p className="text-slate-600 dark:text-slate-400">
+            No attempts yet — finish a quiz and your progress shows up here.
+          </p>
+        </div>
+        {tools}
       </div>
     )
   }
 
   const totalAttempts = attempts.length
-  const bestPct = Math.max(...attempts.map((a) => a.pct))
-  const avgPct = Math.round(attempts.reduce((s, a) => s + a.pct, 0) / totalAttempts)
-  const totalAnswered = attempts.reduce((s, a) => s + a.total, 0)
-  const bestStreak = Math.max(...attempts.map((a) => a.bestStreak ?? 0))
+  const graded = attempts.filter((a) => a.mode !== 'flashcards')
+  const bestPct = graded.length ? Math.max(...graded.map((a) => a.pct)) : 0
+  const totalAnswered = graded.reduce((s, a) => s + a.total, 0)
+  const avgPct = totalAnswered
+    ? Math.round((graded.reduce((s, a) => s + a.score, 0) / totalAnswered) * 100)
+    : 0
+  const bestStreak = graded.length ? Math.max(...graded.map((a) => a.bestStreak ?? 0)) : 0
 
-  // Per-module mastery across every attempt scoped to a single module.
+  // Include mixed sessions; self-rated flashcards are kept separate from graded accuracy.
   const byModule = {}
+  const byDifficulty = {}
   for (const a of attempts) {
-    if (!a.module) continue
-    const m = (byModule[a.module] ??= { score: 0, total: 0 })
-    m.score += a.score
-    m.total += a.total
+    if (a.mode === 'flashcards') continue
+    const groups =
+      a.byModule ?? (a.module ? { [a.module]: { score: a.score, total: a.total } } : {})
+    for (const [key, row] of Object.entries(groups)) {
+      const m = (byModule[key] ??= { score: 0, total: 0 })
+      m.score += row.score
+      m.total += row.total
+    }
+    const levels =
+      a.byDifficulty ??
+      (a.difficulty ? { [a.difficulty]: { score: a.score, total: a.total } } : {})
+    for (const [key, row] of Object.entries(levels)) {
+      const level = (byDifficulty[key] ??= { score: 0, total: 0 })
+      level.score += row.score
+      level.total += row.total
+    }
   }
   const modules = Object.entries(byModule).map(([key, v]) => ({
     key,
     pct: v.total > 0 ? Math.round((v.score / v.total) * 100) : 0,
   }))
 
-  const handleClear = () => {
-    if (window.confirm('Clear all saved progress? This cannot be undone.')) {
-      clearHistory()
-      setAttempts([])
-    }
-  }
-
   return (
     <div className="space-y-4">
+      {(bookmarks > 0 || mistakes > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {mistakes > 0 && onMistakes && (
+            <button
+              type="button"
+              onClick={onMistakes}
+              className="rounded-lg bg-amber-700 px-4 py-3 font-medium text-white"
+            >
+              Practice mistakes ({mistakes})
+            </button>
+          )}
+          {bookmarks > 0 && onBookmarks && (
+            <button
+              type="button"
+              onClick={onBookmarks}
+              className="rounded-lg bg-sky-700 px-4 py-3 font-medium text-white"
+            >
+              Practice bookmarks ({bookmarks})
+            </button>
+          )}
+        </div>
+      )}
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
           Your progress
@@ -101,19 +140,24 @@ export default function Dashboard({ onDrill }) {
             value={`${bestPct}%`}
             accent={bestPct >= 70 ? 'text-green-600 dark:text-green-400' : undefined}
           />
-          <Stat label="Average" value={`${avgPct}%`} />
-          <Stat label="Questions" value={totalAnswered} />
+          <Stat label="Graded accuracy" value={`${avgPct}%`} />
+          <Stat label="Graded questions" value={totalAnswered} />
           <Stat
             label="Best streak"
             value={bestStreak}
             accent={bestStreak >= 5 ? 'text-green-600 dark:text-green-400' : undefined}
           />
         </div>
+        <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
+          Flashcards are self-rated and excluded from graded accuracy. Breakdowns include
+          mixed quizzes completed with this version; older mixed sessions have no topic
+          detail.
+        </p>
 
         {modules.length > 0 && (
           <div className="mt-6 space-y-3">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              Module mastery
+              Module accuracy
             </h3>
             {modules.map((m) => (
               <MasteryBar
@@ -125,6 +169,20 @@ export default function Dashboard({ onDrill }) {
             ))}
           </div>
         )}
+        {Object.keys(byDifficulty).length > 0 && (
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Difficulty accuracy
+            </h3>
+            {Object.entries(byDifficulty).map(([key, row]) => (
+              <MasteryBar
+                key={key}
+                label={key[0].toUpperCase() + key.slice(1)}
+                pct={Math.round((row.score / row.total) * 100)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -132,13 +190,6 @@ export default function Dashboard({ onDrill }) {
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
             Recent attempts
           </h3>
-          <button
-            type="button"
-            onClick={handleClear}
-            className="text-xs text-slate-500 underline underline-offset-2 hover:text-red-500 dark:text-slate-400"
-          >
-            Clear history
-          </button>
         </div>
         <ul className="divide-y divide-slate-100 dark:divide-slate-700">
           {attempts.slice(0, 10).map((a, i) => (
@@ -185,6 +236,7 @@ export default function Dashboard({ onDrill }) {
           ))}
         </ul>
       </div>
+      {tools}
     </div>
   )
 }

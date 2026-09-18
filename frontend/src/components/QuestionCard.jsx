@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import CodeBlock from './CodeBlock'
+import BookmarkButton from './BookmarkButton'
 
 // CodeRunner pulls in the Pyodide worker manager — only practice/review need it,
 // so load it on demand and show the static (read-only) CodeBlock until it's ready.
@@ -64,6 +65,10 @@ export default function QuestionCard({
       <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-slate-100">
         {question.text}
       </h2>
+
+      <div className="mb-3">
+        <BookmarkButton key={question.id} question={question} />
+      </div>
 
       {question.code_snippet &&
         (runnable ? (

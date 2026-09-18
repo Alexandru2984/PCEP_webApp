@@ -41,4 +41,21 @@ describe('Dashboard', () => {
     render(<Dashboard />)
     expect(screen.queryByRole('button', { name: 'Drill' })).not.toBeInTheDocument()
   })
+
+  it('includes mixed quiz breakdowns and excludes self-rated flashcards', () => {
+    seedHistory([
+      attempt({
+        score: 2,
+        total: 4,
+        byModule: { module2: { score: 0, total: 2 }, module3: { score: 2, total: 2 } },
+        byDifficulty: { easy: { score: 2, total: 4 } },
+      }),
+      attempt({ mode: 'flashcards', module: 'module2', score: 4, total: 4 }),
+    ])
+    render(<Dashboard />)
+    expect(screen.getByText('Module accuracy')).toBeInTheDocument()
+    expect(screen.getByText('Difficulty accuracy')).toBeInTheDocument()
+    expect(screen.getByText('0%')).toBeInTheDocument()
+    expect(screen.getByText(/self-rated and excluded/)).toBeInTheDocument()
+  })
 })

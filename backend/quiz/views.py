@@ -111,6 +111,18 @@ def quiz_set(request):
 
     qs = Question.objects.all()
 
+    ids = request.query_params.get('ids')
+    if ids is not None:
+        parts = ids.split(',')
+        if len(parts) > 100 or any(not p.isascii() or not p.isdigit() or len(p) > 19 for p in parts):
+            return Response({'detail': 'ids must contain 1 to 100 positive integers.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        selected_ids = [int(p) for p in parts]
+        if any(i < 1 or i > 2**63 - 1 for i in selected_ids) or len(set(selected_ids)) != len(selected_ids):
+            return Response({'detail': 'ids must be unique positive 64-bit integers.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(id__in=selected_ids)
+
     difficulty = request.query_params.get('difficulty')
     if difficulty:
         if difficulty not in VALID_DIFFICULTIES:
