@@ -2903,7 +2903,7 @@ MODULE_2_EXTRA2 = [
              'explanation': 'Wrong. `or` short-circuits at the first truthy value ("x"), never reaching "y".'},
             {'text': 'True', 'is_correct': False,
              'explanation': 'Wrong. `or` returns one of the operands, not a boolean.'},
-            {'text': '', 'is_correct': False,
+            {'text': '(empty output)', 'is_correct': False,
              'explanation': 'Wrong. "" is falsy, so `or` keeps looking and returns "x".'},
         ],
     },

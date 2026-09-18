@@ -4,6 +4,7 @@ from quiz.question_bank import (
     VALID_DIFFICULTIES,
     VALID_MODULES,
     question_bank_summary,
+    database_questions,
 )
 
 
@@ -11,6 +12,8 @@ class Command(BaseCommand):
     help = 'Audit the seeded PCEP question bank for coverage and data integrity.'
 
     def add_arguments(self, parser):
+        parser.add_argument('--database', action='store_true',
+                            help='Audit the actual database instead of the seed source.')
         parser.add_argument(
             '--fail-on-warnings',
             action='store_true',
@@ -18,7 +21,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        summary = question_bank_summary()
+        if options['database']:
+            questions = database_questions()
+            if not questions:
+                raise CommandError('The database question bank is empty.')
+            self.stdout.write('Source: database (read-only)')
+            self.stdout.write('Question numbers below follow database ID order.')
+            summary = question_bank_summary(questions)
+        else:
+            summary = question_bank_summary()
 
         self.stdout.write(f'Total questions: {summary["total"]}')
         self.stdout.write('\nBy module:')

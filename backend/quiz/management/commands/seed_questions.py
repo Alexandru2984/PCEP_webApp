@@ -7,11 +7,12 @@ Usage (inside the backend container):
     python manage.py seed_questions --reset   # wipe all questions then seed
     python manage.py seed_questions --dry-run # report planned changes only
 """
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from quiz.models import Choice, Question
 from quiz.seed_data import ALL_QUESTIONS
+from quiz.question_bank import validation_errors
 
 
 class Command(BaseCommand):
@@ -35,6 +36,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        errors = validation_errors(ALL_QUESTIONS)
+        if errors:
+            raise CommandError('Refusing invalid seed data: ' + '; '.join(errors))
         reset = options['reset']
         update = options['update']
         dry_run = options['dry_run']

@@ -118,3 +118,16 @@ no answer feedback. Retrying the same valid submission is safe and stateless.
 An invalid answer key returns 503 instead of an ambiguous score.
 Django ignores X-Forwarded-Host; the origin proxy must overwrite Host and
 X-Forwarded-For and supply X-Forwarded-Proto. NUM_PROXIES remains exactly 1.
+
+## Question integrity
+
+Audit the seed with `python manage.py audit_questions --fail-on-warnings` and
+live data with `docker compose exec backend python manage.py audit_questions --database --fail-on-warnings`.
+The database audit is read-only and reports affected database IDs. Questions
+require four unique non-empty options, one boolean correct flag, an explanation
+per option, valid module/difficulty and a non-empty prompt. The question admin
+validates the complete inline set; the separate choice admin is view-only.
+Seed validation runs before any writes, including an explicitly requested reset.
+Migration `0003_label_empty_output_choice` changes only the empty wrong option
+for `print(0 or "" or "x" or "y")` to `(empty output)`, preserving all IDs and
+explanations. It is reversible and does not recreate the question bank.

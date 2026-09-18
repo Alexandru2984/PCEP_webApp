@@ -32,9 +32,13 @@ def validation_errors(questions=ALL_QUESTIONS):
 
     for index, question in enumerate(questions, start=1):
         label = f'question #{index}: {question.get("text", "")!r}'
+        if 'id' in question:
+            label = f'database question id={question["id"]}: {question.get("text", "")!r}'
         choices = question.get('choices', [])
         correct_count = sum(1 for c in choices if c.get('is_correct'))
 
+        if not question.get('text', '').strip():
+            errors.append(f'{label} has empty question text')
         if question.get('module') not in valid_modules:
             errors.append(f'{label} has invalid module {question.get("module")!r}')
         if question.get('difficulty') not in valid_difficulties:
@@ -45,7 +49,16 @@ def validation_errors(questions=ALL_QUESTIONS):
             errors.append(f'{label} has {len(choices)} choices, expected 4')
         if correct_count != 1:
             errors.append(f'{label} has {correct_count} correct choices, expected 1')
+        texts = [c.get('text', '').strip() for c in choices]
+        if len(texts) != len(set(texts)):
+            errors.append(f'{label} has duplicate option text')
         for choice_index, choice in enumerate(choices, start=1):
+            if not choice.get('text', '').strip():
+                errors.append(f'{label} choice #{choice_index} has empty text')
+            if len(choice.get('text', '')) > 500:
+                errors.append(f'{label} choice #{choice_index} exceeds 500 characters')
+            if type(choice.get('is_correct')) is not bool:
+                errors.append(f'{label} choice #{choice_index} has a non-boolean answer flag')
             if not choice.get('explanation', '').strip():
                 errors.append(f'{label} choice #{choice_index} has empty explanation')
 
@@ -90,3 +103,19 @@ def question_bank_summary(questions=ALL_QUESTIONS, include_warnings=True):
     if include_warnings:
         summary['warnings'] = coverage_warnings(questions)
     return summary
+
+
+def database_questions():
+    """Private audit representation; never use this for a public response."""
+    from .models import Question
+    return [
+        {
+            'id': q.id, 'text': q.text, 'code_snippet': q.code_snippet,
+            'module': q.module, 'difficulty': q.difficulty,
+            'choices': [
+                {'text': c.text, 'is_correct': c.is_correct, 'explanation': c.explanation}
+                for c in q.choices.all()
+            ],
+        }
+        for q in Question.objects.prefetch_related('choices').iterator(chunk_size=200)
+    ]
