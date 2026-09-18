@@ -1,4 +1,4 @@
-from django.db import connection
+from django.db import connection, DatabaseError
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -8,7 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
-from .models import Choice, Question
+from .models import Question
 from .serializers import (
     AnswerRequestSerializer,
     GradeRequestSerializer,
@@ -23,14 +23,22 @@ PASS_THRESHOLD = 70
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@throttle_classes([])
+def live(request):
+    """Process liveness, deliberately independent of database availability."""
+    return Response({'status': 'ok'})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 @throttle_classes([])  # liveness/readiness probes must not be rate-limited
 def health(request):
-    """Liveness/readiness probe: 200 only when the database is reachable."""
+    """Readiness probe, preserving the existing monitoring response contract."""
     try:
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
             cursor.fetchone()
-    except Exception:
+    except DatabaseError:
         return Response({'status': 'error', 'database': 'down'},
                         status=status.HTTP_503_SERVICE_UNAVAILABLE)
     return Response({'status': 'ok', 'database': 'up'})
@@ -48,18 +56,14 @@ def stats(request):
         for module in modules
     }
 
-    for row in Question.objects.values('module').annotate(total=Count('id')):
-        module_counts[row['module']] = row['total']
-
-    for row in Question.objects.values('difficulty').annotate(total=Count('id')):
-        difficulty_counts[row['difficulty']] = row['total']
-
     rows = (
         Question.objects.values('module', 'difficulty')
         .annotate(total=Count('id'))
         .order_by()
     )
     for row in rows:
+        module_counts[row['module']] += row['total']
+        difficulty_counts[row['difficulty']] += row['total']
         matrix[row['module']][row['difficulty']] = row['total']
 
     module_summaries = []
@@ -73,7 +77,7 @@ def stats(request):
         module_summaries.append(summary)
 
     return Response({
-        'total': Question.objects.count(),
+        'total': sum(module_counts.values()),
         'by_module': module_counts,
         'by_difficulty': difficulty_counts,
         'matrix': matrix,
@@ -146,16 +150,20 @@ def submit_answer(request, question_id):
     request_ser.is_valid(raise_exception=True)
     choice_id = request_ser.validated_data['choice_id']
 
-    question = get_object_or_404(Question, pk=question_id)
-    try:
-        picked = question.choices.get(pk=choice_id)
-    except Choice.DoesNotExist:
+    question = get_object_or_404(Question.objects.prefetch_related('choices'), pk=question_id)
+    choices = list(question.choices.all())
+    picked = next((c for c in choices if c.id == choice_id), None)
+    if picked is None:
         return Response(
             {'detail': 'This choice does not belong to the given question.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    correct_choice = question.choices.filter(is_correct=True).first()
+    correct_choices = [c for c in choices if c.is_correct]
+    if len(correct_choices) != 1:
+        return Response({'detail': 'This question is temporarily unavailable.'},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    correct_choice = correct_choices[0]
     return Response({
         'is_correct': picked.is_correct,
         'correct_choice_id': correct_choice.id if correct_choice else None,
@@ -174,7 +182,8 @@ def grade(request):
 
     Body: {"answers": [{"question_id": N, "choice_id": M | null}, ...]}
     Returns one result per answer with correctness, the correct choice id and
-    the picked choice's explanation. A null/foreign choice_id counts as wrong.
+    the picked choice's explanation. Null/omitted choices count as wrong;
+    duplicate questions, unknown questions and foreign choices are rejected.
     """
     request_ser = GradeRequestSerializer(data=request.data)
     request_ser.is_valid(raise_exception=True)
@@ -202,7 +211,11 @@ def grade(request):
                            f"question {question.id}."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        correct = next((c for c in choices.values() if c.is_correct), None)
+        correct_choices = [c for c in choices.values() if c.is_correct]
+        if len(correct_choices) != 1:
+            return Response({'detail': 'A question is temporarily unavailable.'},
+                            status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        correct = correct_choices[0]
         results.append({
             'question_id': question.id,
             'choice_id': answer['choice_id'],

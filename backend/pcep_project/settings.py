@@ -21,7 +21,7 @@ if not DEBUG:
         raise RuntimeError(
             'DJANGO_SECRET_KEY must be set to a non-default value when DEBUG=False.'
         )
-    if ALLOWED_HOSTS == ['*']:
+    if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
         raise RuntimeError(
             'DJANGO_ALLOWED_HOSTS must be restricted (not "*") when DEBUG=False.'
         )
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'quiz.middleware.APIResponseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -77,6 +78,9 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD', default=''),
         'HOST': env('POSTGRES_HOST', default='db'),
         'PORT': env('POSTGRES_PORT', default='5432'),
+        'CONN_MAX_AGE': env.int('POSTGRES_CONN_MAX_AGE', default=60),
+        'CONN_HEALTH_CHECKS': True,
+        'OPTIONS': {'connect_timeout': 5},
     }
 }
 
@@ -107,7 +111,11 @@ CSRF_TRUSTED_ORIGINS = env.list(
 
 # Trust X-Forwarded-Proto from system nginx so Django sees HTTPS requests correctly.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_HOST = False
+
+# API bodies are small (at most 100 answer pairs). Bound direct origin requests
+# too; Nginx applies the same limit before proxying.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 64 * 1024
 
 # Hardened headers in production only (dev over plain HTTP must keep working).
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -129,7 +137,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ],
-    # This API is fully public and read-only. Disabling authentication removes
+    # This API is public and never persists user submissions. Disabling authentication removes
     # DRF's default BasicAuthentication, so the endpoints can't be abused as a
     # credential-guessing oracle against the Django user database.
     'DEFAULT_AUTHENTICATION_CLASSES': [],
@@ -146,7 +154,7 @@ REST_FRAMEWORK = {
         'submit_answer': '120/min',
     },
     # Behind Cloudflare -> nginx (which restores the real client IP via
-    # CF-Connecting-IP and appends it to X-Forwarded-For), trust exactly one
+    # CF-Connecting-IP and overwrites X-Forwarded-For), trust exactly one
     # proxy hop so throttling keys on the real visitor IP and can't be evaded
     # by spoofing an X-Forwarded-For prefix.
     'NUM_PROXIES': 1,

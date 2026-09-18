@@ -105,3 +105,16 @@ and `sudo /usr/local/sbin/pcep-seo-pages`. No service restart is necessary.
 The 2026-09-18 security remediation backed up the previous generator and pages
 under `/home/micu/backups/pcep/security-20260918`. Do not restore the vulnerable
 pages. Search engines or third-party caches may retain historical answer content.
+
+## API contracts and probes
+
+`GET /api/live/` checks process liveness without accessing PostgreSQL.
+`GET /api/health/` remains database readiness (200/up or 503/down); existing
+container/monitor checks keep using it. All API responses carry `no-store`.
+Grading accepts at most 100 unique question IDs and preserves submitted order.
+IDs must be positive JSON integers within signed 64-bit range. Omitted/null
+choices count as wrong; foreign choices and duplicate questions return 400 with
+no answer feedback. Retrying the same valid submission is safe and stateless.
+An invalid answer key returns 503 instead of an ambiguous score.
+Django ignores X-Forwarded-Host; the origin proxy must overwrite Host and
+X-Forwarded-For and supply X-Forwarded-Proto. NUM_PROXIES remains exactly 1.
