@@ -156,3 +156,34 @@ it. Failed startup/crash also permits retry. These are responsiveness/resource
 protections, not a hardened sandbox: arbitrary Python can use the JavaScript
 bridge and can still exhaust browser memory before a timeout. Do not run
 untrusted snippets in an authenticated admin browser.
+
+## Nginx production topology and hardening
+
+The tracked vhost now matches the existing TLS deployment, including SEO,
+ACME, sitemap and robots routes. It requires the installed Let's Encrypt
+certificate, shared `block-dotfiles.conf`, and host Cloudflare real-IP and
+`$from_cloudflare_origin` definitions. The shared tunnel connects to HTTPS
+loopback; Nginx restores CF-Connecting-IP only for trusted peers and overwrites
+X-Forwarded-For with that verified address. Django still trusts one proxy hop.
+No shared tunnel/firewall configuration was changed.
+
+Install `nginx/snippets/pcep-*.conf` into `/etc/nginx/snippets/` before installing
+the vhost. Back up outside sites-enabled, run `sudo nginx -t`, then use
+`sudo systemctl reload nginx` (graceful). The 2026-09-18 vhost backup is in
+`/home/micu/backups/pcep/security-20260918/nginx.before`.
+The API has a shared 3 requests/second IP limit with a burst of 30, 64 KB body
+limit, short connection timeout and JSON 413/429 errors. Admin retains its
+20/minute limit and Django CSRF behavior. The analytics proxy exposes only
+GET tracker script and POST event collection; its dashboard is not routed.
+Hashed assets get immutable caching and real 404s for missing files; shell,
+worker, Pyodide and study pages send no-cache/no-store/must-revalidate.
+Cloudflare initially imposed its four-hour default TTL on plain no-cache
+JavaScript responses. Public GET/HEAD requests now report BYPASS with the stronger
+policy; verify both origin and public cache headers after each deployment. Common headers cover worker, SEO,
+API and errors. CSP retains WASM compilation and the already enabled
+Cloudflare beacon origins, removes the obsolete external Umami origin and
+never grants unsafe-eval. COEP is deliberately not added: runner operation does
+not require shared memory or cross-origin isolation.
+Structured PCEP Nginx logs at `/var/log/nginx/pcep_access.log` carry generated
+request IDs, path, status and timing, without client IPs, query strings,
+cookies or authorization headers. Existing Nginx log rotation covers them.
