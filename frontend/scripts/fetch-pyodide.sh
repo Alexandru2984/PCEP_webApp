@@ -1,36 +1,31 @@
-#!/usr/bin/env bash
-# Download the minimal Pyodide runtime used by the in-browser code runner.
-#
-# Pyodide is ~12 MB and is NOT committed to git (see .gitignore). Run this once
-# before `npm run build` (or `npm run dev`) so the files land in
-# frontend/public/pyodide/ and get served same-origin at /pyodide/*.
-#
-#   npm run fetch-pyodide
-#
-# Only the core interpreter + stdlib are fetched — no scientific packages — which
-# is all the PCEP snippets need. Pin the version here so builds are reproducible.
+#!/bin/bash
+# Download the pinned core runtime into a complete staging directory first.
 set -euo pipefail
-
 VERSION="0.29.4"
 BASE="https://cdn.jsdelivr.net/npm/pyodide@${VERSION}"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/public/pyodide"
-
-# Runtime files needed by a classic worker that importScripts('pyodide.js').
-FILES=(
-  pyodide.js
-  pyodide.asm.js
-  pyodide.asm.wasm
-  pyodide-lock.json
-  python_stdlib.zip
-)
-
-mkdir -p "$DEST"
-echo "Fetching Pyodide ${VERSION} -> ${DEST}"
-for f in "${FILES[@]}"; do
-  echo "  - ${f}"
-  curl -fsSL "${BASE}/${f}" -o "${DEST}/${f}"
+FILES=(pyodide.js pyodide.asm.js pyodide.asm.wasm pyodide-lock.json python_stdlib.zip)
+if [ -f "$DEST/VERSION" ] && [ "$(cat "$DEST/VERSION")" = "$VERSION" ]; then
+    complete=true
+    for file in "${FILES[@]}"; do [ -s "$DEST/$file" ] || complete=false; done
+    if $complete; then echo "Pyodide $VERSION is already complete."; exit 0; fi
+fi
+mkdir -p "$(dirname "$DEST")"
+stage=$(mktemp -d "${DEST}.fetch.XXXXXX")
+trap 'rm -rf "$stage"' EXIT
+for file in "${FILES[@]}"; do
+    echo "Fetching Pyodide $VERSION: $file"
+    curl --fail --silent --show-error --location --retry 2 --connect-timeout 10 --max-time 120 "${BASE}/${file}" -o "$stage/$file"
+    test -s "$stage/$file"
 done
-
-# Record the pinned version so the app can sanity-check / cache-bust if needed.
-printf '%s\n' "${VERSION}" > "${DEST}/VERSION"
-echo "Done. Pyodide ${VERSION} is ready at /pyodide/."
+printf '%s\n' "$VERSION" > "$stage/VERSION"
+# Build inputs only; frontend publication handles the live atomic swap.
+if [ -d "$DEST" ]; then
+    previous="${DEST}.previous.$(date +%s%N)"
+    mv "$DEST" "$previous"
+    if ! mv "$stage" "$DEST"; then mv "$previous" "$DEST"; exit 1; fi
+    echo "Previous runtime retained at $previous"
+else
+    mv "$stage" "$DEST"
+fi
+echo "Pyodide $VERSION is ready."

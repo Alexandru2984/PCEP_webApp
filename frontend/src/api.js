@@ -36,13 +36,13 @@ export function apiErrorMessage(error, fallback = 'The request failed. Please re
     return `Too many requests. ${wait > 0 ? `Try again in ${Math.ceil(wait)} seconds.` : 'Please wait a moment and retry.'}`
   }
   if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT')
-    return 'The request timed out. Your answers are kept; please retry.'
+    return 'The request timed out. Please retry.'
   if (typeof navigator !== 'undefined' && navigator.onLine === false)
-    return 'You are offline. Your answers are kept; reconnect and retry.'
+    return 'You are offline. Reconnect and retry.'
   const detail = error?.response?.data?.detail
   if (typeof detail === 'string') return detail
   if (error?.response?.status >= 500)
-    return 'The server is temporarily unavailable. Your answers are kept; please retry.'
+    return 'The server is temporarily unavailable. Please retry.'
   return error?.message || fallback
 }
 

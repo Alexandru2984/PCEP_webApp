@@ -204,3 +204,18 @@ A failed screen/chunk load offers reload and states the unsubmitted-session risk
 Axe and overflow checks run through the study screens in both themes at
 360/390/430/768/1024/1280/1440 px; they supplement manual inspection, not a claim
 of complete accessibility certification.
+
+## PWA update and cache policy
+
+`frontend/pwa.config.js` contains the tested cache policy. Only the public shell
+is precached. Runtime caching accepts HTTP 200 same-origin `/pyodide/` files in
+`pyodide-runtime-0.29.4`; opaque responses and API feedback are excluded.
+API/admin/static/media, study pages, analytics, asset/runtime paths and
+robots/sitemap are exempt from offline SPA navigation fallback. A controller
+update shows a notice; reload is the user's action after finishing the session.
+Active tabs are not automatically reloaded. The download script validates every
+pinned core file and stages downloads before replacing build inputs, preserving
+an older runtime on failure. No answer database is downloaded for offline use.
+Existing Umami tracking respects Do Not Track and excludes URL query/hash data
+([tracker configuration](https://docs.umami.is/docs/tracker-configuration));
+no new analytics service or user identifier was added.
