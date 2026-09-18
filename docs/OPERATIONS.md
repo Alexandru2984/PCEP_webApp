@@ -26,22 +26,37 @@ lint/format/build checks. CI runs the backend suite against PostgreSQL.
 ## Backend Deploy
 
 ```bash
+set -euo pipefail
+umask 077
 stamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p /home/micu/backups/pcep
+chmod 700 /home/micu/backups/pcep
+docker tag "$(docker inspect pcep_backend --format '{{.Image}}')" "pcep-backend-rollback:${stamp}"
 docker exec pcep_db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
   | gzip > "/home/micu/backups/pcep/pcep_db_${stamp}.sql.gz"
+gzip -t "/home/micu/backups/pcep/pcep_db_${stamp}.sql.gz"
 
 docker compose build backend
-docker compose up -d backend
-curl -fsS -H 'X-Forwarded-Proto: https' http://127.0.0.1:8001/api/health/
-docker compose exec backend python manage.py audit_questions --fail-on-warnings
-docker compose exec backend python manage.py seed_questions --dry-run
-docker compose exec backend python manage.py seed_questions --reset
+# Check the candidate/migration plan before this controlled single-service replacement.
+docker compose up -d --no-deps backend
+curl -fsS https://pcep.micutu.com/api/health/
+docker compose exec backend python manage.py check --deploy --fail-level WARNING
+docker compose exec backend python manage.py audit_questions --database --fail-on-warnings
 ```
 
-The direct loopback health probe includes `X-Forwarded-Proto: https` because
-production Django redirects plain HTTP when called without the nginx proxy
-headers.
+Never reset/reseed the live bank during routine deployment: question IDs are
+referenced by local progress. Startup runs pending migrations and collectstatic.
+The API has three workers, 30-second request/graceful timeouts, a 45-second
+container shutdown grace period, and a bounded 60-second database startup probe
+(`DB_STARTUP_TIMEOUT_SECONDS`, 1..300). Failed migrations stop startup.
+The non-root backend filesystem is read-only except the existing static/media
+volumes and a 64 MB temporary filesystem. Capabilities are dropped, privilege
+escalation is disabled, and the backend is capped at 512 MB and 128 processes.
+PostgreSQL volumes, privilege requirements and binding are unchanged.
+Healthchecks use the first configured allowed hostname and forwarded HTTPS;
+local hostnames are not required in production ALLOWED_HOSTS. `/api/health/`
+remains readiness. Gunicorn logs request ID, method, path, status and duration,
+without bodies, cookies, authorization or query strings.
 
 ## Frontend Deploy
 
@@ -83,15 +98,15 @@ rm -rf /var/www/pcep/frontend
 cp -a /var/www/pcep/frontend.bak.<timestamp> /var/www/pcep/frontend
 ```
 
-Database rollback:
-
-```bash
-gunzip -c /home/micu/backups/pcep/pcep_db_<timestamp>.sql.gz \
-  | docker exec -i pcep_db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
-```
-
-For a full rollback, restore the DB backup first, then redeploy the matching
-frontend build and backend image.
+Backend rollback uses the retained image: tag the chosen
+`pcep-backend-rollback:<timestamp>` as `pcep_webapp-backend:latest`, then
+`docker compose up -d --no-deps --no-build backend` and verify readiness/public
+API. The 2026-09-18 pre-change image is `pcep-backend-rollback:20260918`.
+It contains old vulnerable dependencies, so use only for an emergency rollback.
+Migration 0003 only labels an existing option; it needs no database restore for
+an application rollback. Database restoration is a separate planned maintenance
+operation into a suitable database, never an automatic pipe into the running
+production database.
 
 ## Public study pages
 

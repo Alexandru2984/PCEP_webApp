@@ -1,28 +1,23 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS dependencies
+ENV PIP_NO_CACHE_DIR=1
+WORKDIR /build
+COPY requirements.txt .
+RUN pip wheel --only-binary=:all: --wheel-dir /wheels -r requirements.txt
 
+FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
-
 WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+COPY --from=dependencies /wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-RUN chmod +x /app/entrypoint.sh && \
-    adduser --disabled-password --gecos "" appuser && \
-    mkdir -p /app/staticfiles /app/media && \
-    chown -R appuser:appuser /app
-
+RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels \
+    && adduser --disabled-password --gecos "" appuser \
+    && mkdir -p /app/staticfiles /app/media \
+    && chown appuser:appuser /app /app/staticfiles /app/media
+COPY --chown=appuser:appuser . .
+RUN chmod +x /app/entrypoint.sh
 USER appuser
-
 EXPOSE 8000
-
 ENTRYPOINT ["/app/entrypoint.sh"]

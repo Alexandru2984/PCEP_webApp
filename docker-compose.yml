@@ -21,6 +21,14 @@ services:
       dockerfile: Dockerfile
     container_name: pcep_backend
     restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 512m
+    stop_grace_period: 45s
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
     env_file:
       # Optional so `docker compose config` (CI) works without a .env on disk;
       # in real deploys the file is present and supplies the backend secrets.
@@ -39,7 +47,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "python - <<'PY'\nfrom urllib.request import Request, urlopen\nreq = Request('http://127.0.0.1:8000/api/health/', headers={'X-Forwarded-Proto': 'https'})\nwith urlopen(req, timeout=3) as response:\n    raise SystemExit(0 if response.status == 200 else 1)\nPY",
+          "python - <<'PY'\nimport os\nfrom urllib.request import Request, urlopen\nhost = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')[0].strip()\nreq = Request('http://127.0.0.1:8000/api/health/', headers={'Host': host, 'X-Forwarded-Proto': 'https'})\nwith urlopen(req, timeout=3) as response:\n    raise SystemExit(0 if response.status == 200 else 1)\nPY",
         ]
       interval: 10s
       timeout: 5s
