@@ -21,6 +21,8 @@ def test_publish_swaps_complete_directory_and_retains_previous(tmp_path):
     target = static_release(tmp_path / 'live', 'old')
     previous = release.publish(source, target, tmp_path / 'backup', kind='static')
     assert (target / 'admin/css/base.css').read_text() == 'new'
+    assert target.stat().st_mode & 0o005 == 0o005
+    assert (target / 'admin/css/base.css').stat().st_mode & 0o004
     assert (previous / 'admin/css/base.css').read_text() == 'old'
     assert next((tmp_path / 'backup').glob('*/admin/js/core.js')).read_text() == 'old'
     release.exchange_directories(previous, target)

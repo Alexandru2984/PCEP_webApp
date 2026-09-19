@@ -83,6 +83,14 @@ def publish(source, target, backup_root=None, kind='frontend'):
     swapped = False
     try:
         shutil.copytree(source, stage, dirs_exist_ok=True)
+        # Public release roots copied from mktemp/container staging may be 0700.
+        # Preserve existing modes while ensuring Nginx can traverse/read them.
+        stage.chmod(stage.stat().st_mode | 0o555)
+        for published in stage.rglob('*'):
+            if published.is_dir():
+                published.chmod(published.stat().st_mode | 0o555)
+            elif published.is_file():
+                published.chmod(published.stat().st_mode | 0o444)
         # Old tabs can still import their original lazy chunks after an update.
         if kind == 'frontend' and (target / 'assets').is_dir():
             for asset in (target / 'assets').rglob('*'):
