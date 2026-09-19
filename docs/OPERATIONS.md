@@ -205,6 +205,10 @@ limit, short connection timeout and JSON 413/429 errors. Admin retains its
 GET tracker script and POST event collection; its dashboard is not routed.
 Hashed assets get immutable caching and real 404s for missing files; shell,
 worker, Pyodide and study pages send no-cache/no-store/must-revalidate.
+The exact `/manifest.webmanifest` location supplies
+`application/manifest+json`; the stock Nginx MIME table otherwise serves that
+extension as `application/octet-stream` and browsers may ignore installation
+metadata.
 Cloudflare initially imposed its four-hour default TTL on plain no-cache
 JavaScript responses. Public GET/HEAD requests now report BYPASS with the stronger
 policy; verify both origin and public cache headers after each deployment. Common headers cover worker, SEO,
@@ -212,6 +216,11 @@ API and errors. CSP retains WASM compilation and the already enabled
 Cloudflare beacon origins, removes the obsolete external Umami origin and
 never grants unsafe-eval. COEP is deliberately not added: runner operation does
 not require shared memory or cross-origin isolation.
+Cloudflare currently injects a dynamic inline JavaScript-detection challenge at
+the edge. The strict CSP blocks it and Chromium reports the expected violation;
+the origin response does not contain that script. Disable the corresponding
+Cloudflare bot/JavaScript-detection feature if it is unnecessary. Do not add
+`unsafe-inline` or per-response dynamic hashes to accommodate it.
 Structured PCEP Nginx logs at `/var/log/nginx/pcep_access.log` carry generated
 request IDs, path, status and timing, without client IPs, query strings,
 cookies or authorization headers. Existing Nginx log rotation covers them.
@@ -255,8 +264,9 @@ After upgrading Django, publish fresh collectstatic output to the host static
 root: Nginx serves a host copy, not the Docker volume directly. Copy the
 container's `/app/staticfiles/.` to a staging source, then run
 `python scripts/publish_release.py <source> /var/www/pcep/static --kind static --backup-root /home/micu/backups/pcep`.
-The same atomic swap keeps the old admin assets available for rollback.
-Admin URLs are unversioned, so a browser may need a hard refresh after upgrades.
+The publisher makes staged directories traversable and files readable by Nginx,
+even when a source created with `mktemp` starts at mode 0700. The same atomic
+swap keeps the old fingerprinted admin assets available for rollback.
 Do not run the destructive `seed-reset` target as deployment; it now requires
 explicit `ALLOW_QUESTION_RESET=yes`.
 CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright

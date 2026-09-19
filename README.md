@@ -3,7 +3,7 @@
 [![CI](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml/badge.svg)](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
-[![Django](https://img.shields.io/badge/Django-5.1-092E20.svg)](https://www.djangoproject.com/)
+[![Django](https://img.shields.io/badge/Django-5.2_LTS-092E20.svg)](https://www.djangoproject.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://react.dev/)
 
 A practice-quiz web app for the **PCEP™ — Certified Entry-Level Python Programmer**
@@ -39,41 +39,50 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🐍 **Run the code, don't just read it** — every snippet has a built-in Python
   interpreter (Pyodide on WebAssembly). Edit it, hit **Run**, and see real
   `stdout`/tracebacks **entirely in your browser** — no backend, no server cost.
-  Runaway loops are sandboxed in a Web Worker and killed on a timeout.
+  Each run is isolated in a replaceable Web Worker with startup, execution,
+  source, queue and output limits. This protects responsiveness; it is not a
+  security sandbox for hostile code.
 - 🎯 **Per-option explanations** — a wrong pick explains the exact misconception
   _and_ why the correct answer is right (skipped exam questions included)
 - ⏱️ **Three study modes** — Practice (instant feedback), a timed **Exam
   simulation** (question navigator, flagging, auto-submit), and **Flashcards**
   (flip to reveal the answer, self-mark what you know)
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
-- 📊 **Progress dashboard** — attempt history and per-module mastery (local-first)
+- 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
+  accuracy, strongest/weakest modules and separate flashcard self-ratings (local-first)
 - 📈 **End-of-quiz report** — per-module and per-difficulty breakdown with a
   "focus area" recommendation you can drill in one click, plus a question-by-question
   review filtered to misses
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused drill; answer one correctly and it drops off the list (local-first)
+- 🔖 **Bookmarks and portable progress** — bookmark drills plus validated,
+  versioned JSON export/import and selective history/mistake/bookmark resets
 - ⌨️ **Keyboard shortcuts** and full dark mode
-- 📱 **Installable, offline-capable PWA** — a service worker precaches the app
-  shell and caches the Pyodide runtime, so it loads instantly on repeat visits and
-  the shell works offline; Open Graph share cards too
+- 📱 **Installable, offline-capable PWA** — a service worker precaches the public
+  shell and caches the Pyodide runtime. API answers and study pages are excluded;
+  offline mode never downloads the answer bank.
 - ✅ Scored against the official **70% pass threshold**
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
-- 🛡️ Rate-limited API, hardened production settings, DB-backed health probe
+- 🛡️ Rate-limited API, hardened production settings, separate process liveness
+  and database readiness probes
 
 ## Tech stack
 
 | Layer    | Tech                                                      |
 | -------- | --------------------------------------------------------- |
-| Backend  | Django 5 · Django REST Framework · PostgreSQL · Gunicorn  |
+| Backend  | Django 5.2 LTS · Django REST Framework · PostgreSQL · Gunicorn |
 | Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM) |
 | Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI   |
-| Deploy   | Docker Compose · system Nginx · Let's Encrypt             |
+| Deploy   | Docker Compose · system Nginx · Cloudflare Tunnel · Let's Encrypt |
 
 ## Architecture
 
 ```
-Internet → system nginx (80/443) ──┬── /admin/, /api/ → 127.0.0.1:8001 (Docker: gunicorn)
-                                   └── /               → /var/www/pcep/frontend (React build)
+Internet → Cloudflare → cloudflared → HTTPS loopback Nginx
+                                      ├── /admin/, /api/ → 127.0.0.1:8001
+                                      │                   → Docker: Gunicorn → PostgreSQL
+                                      ├── /practice/      → generated public study pages
+                                      └── /               → /var/www/pcep/frontend
 ```
 
 ## Local development
@@ -97,7 +106,7 @@ python manage.py runserver
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run fetch-pyodide   # one-time: downloads the self-hosted Python runtime (~12 MB,
                         # git-ignored) used by the in-browser code runner
 npm run dev             # Vite dev server, proxies /api to Django (see vite.config.js)
@@ -117,27 +126,25 @@ docker compose --profile build run --rm frontend-builder   # build the React app
 
 ## Testing & quality
 
-Lighthouse on the live site (desktop): **Performance 99 · Accessibility 100 ·
-SEO 100 · Best Practices 92**. Accessibility is verified with axe-core (zero
-violations across setup, quiz, and dashboard). The Best-Practices gap is entirely
-Cloudflare-injected scripts (the Web Analytics beacon and Rocket Loader) that the
-strict CSP intentionally blocks — turning those two off in the Cloudflare dashboard
-takes it to 100 without weakening the policy.
+The browser suite checks setup, practice, exam, review, progress, flashcards,
+offline recovery and the real Pyodide runtime. Axe and horizontal-overflow checks
+cover both themes at 1440, 1280, 1024, 768, 430, 390 and 360 px. These automated
+checks supplement manual review; they are not a blanket accessibility certification.
 
 ```bash
 make test
 make audit
 make django-check
 
-# Backend — 31 tests (API behaviour + seed-data integrity)
-# Uses SQLite test settings locally; CI runs the same suite against PostgreSQL.
+# Backend — 103 tests (API/security, integrity, startup, release and SEO behavior)
+# Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
-DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions
+DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 
-# Frontend — 36 Vitest unit tests (scoring/streak/storage/stats logic plus
-# component tests for the feedback box, score summary and the end-of-quiz
-# report), then lint, format check, and the production build.
+# Frontend — 90 Vitest tests, then static checks, the production build and
+# 12 Playwright flows (including axe, PWA and real Pyodide recovery).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
+cd frontend && npm run e2e
 ```
 
 CI runs all of the above on every push and pull request, plus
@@ -149,18 +156,21 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 
 | Method | Endpoint                      | Description                                                                          |
 | ------ | ----------------------------- | ------------------------------------------------------------------------------------ |
-| `GET`  | `/api/health/`                | Liveness probe (200 only if the DB is reachable)                                     |
-| `GET`  | `/api/quiz-set/`              | Random question set. Params: `count`, `module`, `difficulty`                         |
+| `GET`  | `/api/live/`                  | Process liveness; deliberately independent of PostgreSQL                              |
+| `GET`  | `/api/health/`                | Readiness; returns 200 only if PostgreSQL is reachable                                |
+| `GET`  | `/api/stats/`                 | Aggregate question coverage, without question or answer data                          |
+| `GET`  | `/api/quiz-set/`              | Random public question set. Params: `count`, `module`, `difficulty`, bounded `ids`    |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
-| `POST` | `/api/grade/`                 | Grade a batch: `{ "answers": [{ "question_id": N, "choice_id": M }] }` (exam mode)   |
+| `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                        |
 
 ## Project layout
 
 ```
 backend/     Django project + DRF quiz app, management commands, tests
 frontend/    React + Vite + Tailwind app
-nginx/       Template config for system nginx
+nginx/       Production vhost and security/proxy header snippets
+scripts/     Atomic publishers, Nginx validation and public study-page generator
 .github/     CI workflow
 docker-compose.yml
 ```
