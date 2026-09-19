@@ -12,3 +12,5 @@ Dockerfile
 .idea
 coverage
 .DS_Store
+playwright-report
+test-results

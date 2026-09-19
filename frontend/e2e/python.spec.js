@@ -4,6 +4,7 @@ import { mockApi } from './fixtures'
 
 test('real Python handles errors bounded output and timeout recovery', async ({
   page,
+  context,
 }) => {
   test.setTimeout(60_000)
   await mockApi(page)
@@ -41,4 +42,12 @@ test('real Python handles errors bounded output and timeout recovery', async ({
   expect(
     violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) }))
   ).toEqual([])
+  await page.evaluate(() => navigator.serviceWorker.ready)
+  await context.setOffline(true)
+  await editor.fill('while True: pass')
+  await run.click()
+  await expect(output).toContainText('Execution timed out', { timeout: 12_000 })
+  await editor.fill('print("offline recovery")')
+  await run.click()
+  await expect(output).toContainText('offline recovery', { timeout: 35_000 })
 })

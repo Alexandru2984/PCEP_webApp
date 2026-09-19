@@ -1,5 +1,7 @@
 PYTHON ?= backend/.venv/bin/python
 PIP ?= backend/.venv/bin/pip
+PYTHON_BIN := $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
+PIP_BIN := $(if $(findstring /,$(PIP)),$(abspath $(PIP)),$(PIP))
 NPM ?= npm
 COMPOSE ?= docker compose
 FRONTEND_ROOT ?= /var/www/pcep/frontend
@@ -24,7 +26,7 @@ help:
 install: install-backend install-frontend
 
 install-backend:
-	cd backend && ../$(PIP) install -r requirements-dev.txt
+	cd backend && "$(PIP_BIN)" install -r requirements-dev.txt
 
 install-frontend:
 	cd frontend && $(NPM) ci
@@ -32,17 +34,17 @@ install-frontend:
 test: test-backend test-frontend
 
 test-backend:
-	cd backend && ../$(PYTHON) -m pytest -q
+	cd backend && "$(PYTHON_BIN)" -m pytest -q
 
-test-frontend:
-	cd frontend && $(NPM) run lint && $(NPM) run format:check && $(NPM) run build
+test-frontend: fetch-pyodide
+	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && $(NPM) run build
 
 audit: audit-backend audit-frontend
 
 audit-backend:
-	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.test_settings ../$(PYTHON) manage.py audit_questions --fail-on-warnings
-	cd backend && ../$(PYTHON) -m pip_audit -r requirements.txt
-	cd backend && ../$(PYTHON) -m pip_audit -r requirements-dev.txt
+	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.test_settings "$(PYTHON_BIN)" manage.py audit_questions --fail-on-warnings
+	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements.txt
+	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements-dev.txt
 
 audit-frontend:
 	cd frontend && $(NPM) audit --audit-level=moderate
@@ -55,10 +57,10 @@ build-frontend: fetch-pyodide
 # Self-hosted Python runtime for the in-browser code runner (git-ignored, ~12 MB).
 # Fetched only when missing so repeat builds stay fast.
 fetch-pyodide:
-	cd frontend && [ -d public/pyodide ] || $(NPM) run fetch-pyodide
+	cd frontend && $(NPM) run fetch-pyodide
 
 django-check:
-	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.settings DJANGO_DEBUG=False DJANGO_SECRET_KEY=a-sufficiently-long-production-secret-key-for-local-check DJANGO_ALLOWED_HOSTS=pcep.micutu.com POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=dummy POSTGRES_HOST=localhost POSTGRES_PORT=5432 ../$(PYTHON) manage.py check --deploy --fail-level WARNING
+	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.settings DJANGO_DEBUG=False DJANGO_SECRET_KEY=a-sufficiently-long-production-secret-key-for-local-check DJANGO_ALLOWED_HOSTS=pcep.micutu.com POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=dummy POSTGRES_HOST=localhost POSTGRES_PORT=5432 "$(PYTHON_BIN)" manage.py check --deploy --fail-level WARNING
 
 compose-build:
 	$(COMPOSE) build
@@ -67,16 +69,12 @@ compose-up:
 	$(COMPOSE) up -d
 
 seed-reset:
+	@test "$(ALLOW_QUESTION_RESET)" = "yes" || { printf "%s\n" "Reset changes live question IDs. Explicitly set ALLOW_QUESTION_RESET=yes to proceed."; exit 1; }
 	$(COMPOSE) exec backend python manage.py audit_questions --fail-on-warnings
 	$(COMPOSE) exec backend python manage.py seed_questions --reset
 
 deploy-frontend: build-frontend
-	@stamp=$$(date +%Y%m%d-%H%M%S); \
-	mkdir -p "$(BACKUP_ROOT)"; \
-	if [ -d "$(FRONTEND_ROOT)" ]; then cp -a "$(FRONTEND_ROOT)" "$(FRONTEND_ROOT).bak.$$stamp"; fi; \
-	rm -rf "$(FRONTEND_ROOT)"/*; \
-	cp -a frontend/dist/. "$(FRONTEND_ROOT)"/; \
-	printf 'Published frontend to %s\n' "$(FRONTEND_ROOT)"
+	"$(PYTHON_BIN)" scripts/publish_release.py frontend/dist "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)"
 
 status:
 	git status --short --branch

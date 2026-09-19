@@ -21,7 +21,7 @@ make django-check
 ```
 
 `make test` runs the local SQLite-backed backend test suite plus the frontend
-lint/format/build checks. CI runs the backend suite against PostgreSQL.
+unit/lint/format/build checks. CI runs the backend suite against PostgreSQL.
 
 ## Backend Deploy
 
@@ -65,8 +65,20 @@ make deploy-frontend
 curl -fsS https://pcep.micutu.com/ >/dev/null
 ```
 
-The deploy target backs up the existing static directory as
-`/var/www/pcep/frontend.bak.<timestamp>` before publishing `frontend/dist`.
+The target checks the pinned runtime, completes the build and validates required
+files and referenced HTML assets. It copies to a staging directory on the live
+filesystem, backs up the current root under BACKUP_ROOT, retains older hashed
+assets for open tabs, then uses Linux renameat2 directory exchange. Copy,
+validation and exchange failures leave the live root intact. The previous root
+is retained beside it as `.frontend.previous-<timestamp>-<id>`.
+`FRONTEND_ROOT`, `BACKUP_ROOT` and `PYTHON` can be overridden. Python accepts
+relative paths, absolute paths or executables from PATH. Linux atomic exchange
+support is required; the script refuses to fall back to delete-then-copy.
+Monitor backup/retained-chunk disk usage; no automatic deletion is performed.
+The prior stale backend virtualenv was archived under security-20260918; local
+checks now use a separate Python 3.12.14 environment without changing host Python.
+Node 24 LTS is used in CI and the non-root frontend builder because Node 20 is EOL
+([Node release status](https://nodejs.org/en/about/previous-releases)).
 
 ### In-browser Python runner (Pyodide)
 
@@ -94,8 +106,9 @@ curl -fsS https://pcep.micutu.com/pyodide/pyodide.asm.wasm -o /dev/null   # ~8 M
 Frontend rollback:
 
 ```bash
-rm -rf /var/www/pcep/frontend
-cp -a /var/www/pcep/frontend.bak.<timestamp> /var/www/pcep/frontend
+backend/.venv/bin/python scripts/publish_release.py \
+  /var/www/pcep/.frontend.previous-<timestamp>-<id> /var/www/pcep/frontend \
+  --backup-root /home/micu/backups/pcep
 ```
 
 Backend rollback uses the retained image: tag the chosen
@@ -234,3 +247,20 @@ an older runtime on failure. No answer database is downloaded for offline use.
 Existing Umami tracking respects Do Not Track and excludes URL query/hash data
 ([tracker configuration](https://docs.umami.is/docs/tracker-configuration));
 no new analytics service or user identifier was added.
+
+
+## Static assets and CI
+
+After upgrading Django, publish fresh collectstatic output to the host static
+root: Nginx serves a host copy, not the Docker volume directly. Copy the
+container's `/app/staticfiles/.` to a staging source, then run
+`python scripts/publish_release.py <source> /var/www/pcep/static --kind static --backup-root /home/micu/backups/pcep`.
+The same atomic swap keeps the old admin assets available for rollback.
+Admin URLs are unversioned, so a browser may need a hard refresh after upgrades.
+Do not run the destructive `seed-reset` target as deployment; it now requires
+explicit `ALLOW_QUESTION_RESET=yes`.
+CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright
+to two workers, uploads HTML reports/traces, validates the vhost with disposable
+certificates in an isolated Nginx container, and builds the hardened backend.
+Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.
+They never call production from CI.
