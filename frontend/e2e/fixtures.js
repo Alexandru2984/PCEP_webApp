@@ -1,9 +1,9 @@
 // --- Fixtures ---------------------------------------------------------------
-function q(id, module, difficulty) {
+function q(id, module, difficulty, code = 'print(1)') {
   return {
     id,
     text: 'What is the output?',
-    code_snippet: 'print(1)',
+    code_snippet: code,
     module,
     difficulty,
     choices: [1, 2, 3, 4].map((n) => ({ id: id * 10 + n, text: `option ${n}` })),
@@ -12,7 +12,7 @@ function q(id, module, difficulty) {
 
 export const QUESTIONS = [
   q(1, 'module1', 'easy'),
-  q(2, 'module1', 'hard'),
+  q(2, 'module1', 'hard', 'print(bool(0), bool(-1), bool(""), bool(" "))'),
   q(3, 'module2', 'medium'),
   q(4, 'module3', 'medium'),
 ]

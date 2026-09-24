@@ -159,7 +159,7 @@ export default function QuestionSearch({ module = '', difficulty = '', onStart }
                 : 'Select all results'}
             </button>
           </div>
-          <fieldset className="space-y-2">
+          <fieldset className="min-w-0 space-y-2">
             <legend className="sr-only">Question search results</legend>
             {results.map((result) => (
               <label
@@ -180,7 +180,11 @@ export default function QuestionSearch({ module = '', difficulty = '', onStart }
                     {result.text}
                   </span>
                   {result.code_snippet && (
-                    <code className="mt-2 block max-h-24 overflow-auto whitespace-pre rounded bg-slate-100 p-2 text-xs text-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                    <code
+                      tabIndex={0}
+                      aria-label="Question code preview"
+                      className="mt-2 block max-h-24 overflow-auto whitespace-pre rounded bg-slate-100 p-2 text-xs text-slate-800 dark:bg-slate-950 dark:text-slate-200"
+                    >
                       {result.code_snippet}
                     </code>
                   )}

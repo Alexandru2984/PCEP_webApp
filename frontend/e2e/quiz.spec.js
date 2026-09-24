@@ -30,6 +30,11 @@ test('search builds an answer-safe custom drill on mobile', async ({ page }) => 
   const checkboxes = page.getByRole('checkbox')
   await checkboxes.nth(0).check()
   await checkboxes.nth(1).check()
+  let analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
   const requestPromise = page.waitForRequest((request) => {
     const url = new URL(request.url())
     return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
@@ -39,8 +44,8 @@ test('search builds an answer-safe custom drill on mobile', async ({ page }) => 
   expect(new URL(request.url()).searchParams.get('ids')).toBe('1,2')
   await expect(page.getByText(/Tip: press/)).toBeVisible()
 
-  const { violations } = await new AxeBuilder({ page }).analyze()
-  expect(violations.map((violation) => violation.id)).toEqual([])
+  analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   ).toBe(true)
