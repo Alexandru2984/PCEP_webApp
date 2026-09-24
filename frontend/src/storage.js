@@ -1,6 +1,14 @@
 import { DIFFICULTIES, MODULES, publicQuestion } from './questionData'
+import {
+  STUDY_LIMIT,
+  normalizeStudyRecord,
+  normalizeStudyRecords,
+  studySummary,
+  updateStudyRecords,
+} from './study'
 
 const VERSION = 1
+const BACKUP_VERSION = 2
 const LIMIT = 100
 const PROGRESS_KEY = 'pcep.progress'
 const ACTIVE_EXAM_KEY = 'pcep.activeExam'
@@ -117,6 +125,7 @@ function loadProgress() {
     history: records(data.history, validAttempt),
     mistakes: questions(data.mistakes),
     bookmarks: questions(data.bookmarks),
+    study: normalizeStudyRecords(data.study),
   }
   if (raw) {
     cachedRaw = raw
@@ -173,6 +182,13 @@ export const saveTheme = (theme) => write('pcep.theme', theme)
 export const loadHistory = () => loadProgress().history
 export const loadMistakes = () => loadProgress().mistakes
 export const loadBookmarks = () => loadProgress().bookmarks
+export const loadStudyProgress = () => loadProgress().study
+export const loadDueReviews = (now = Date.now()) =>
+  loadStudyProgress()
+    .filter((record) => Date.parse(record.nextReview) <= now)
+    .sort((a, b) => Date.parse(a.nextReview) - Date.parse(b.nextReview))
+export const loadStudySummary = (now = Date.now()) =>
+  studySummary(loadStudyProgress(), now)
 
 function normalizeActiveExam(value, now = Date.now()) {
   const allowed = new Set([
@@ -282,6 +298,7 @@ export function appendAttempt(attempt) {
 export const clearHistory = () => saveProgress({ ...loadProgress(), history: [] })
 export const clearMistakes = () => saveProgress({ ...loadProgress(), mistakes: [] })
 export const clearBookmarks = () => saveProgress({ ...loadProgress(), bookmarks: [] })
+export const clearStudyProgress = () => saveProgress({ ...loadProgress(), study: [] })
 
 export function updateMistakes(items) {
   const progress = loadProgress()
@@ -296,6 +313,12 @@ export function updateMistakes(items) {
   const mistakes = [...byId.values()].reverse().slice(0, LIMIT)
   saveProgress({ ...progress, mistakes })
   return mistakes
+}
+export function updateStudyProgress(items, now = Date.now()) {
+  const progress = loadProgress()
+  const study = updateStudyRecords(progress.study, items, now)
+  saveProgress({ ...progress, study })
+  return study
 }
 export function toggleBookmark(question) {
   const q = publicQuestion(question)
@@ -316,7 +339,7 @@ export function exportProgress() {
   return JSON.stringify(
     {
       type: 'pcep-progress',
-      version: VERSION,
+      version: BACKUP_VERSION,
       exportedAt: new Date().toISOString(),
       ...loadProgress(),
     },
@@ -333,7 +356,11 @@ export function parseProgressBackup(raw) {
   } catch {
     throw new Error('This file is not valid JSON.')
   }
-  if (!object(data) || data.type !== 'pcep-progress' || data.version !== VERSION)
+  if (
+    !object(data) ||
+    data.type !== 'pcep-progress' ||
+    ![1, BACKUP_VERSION].includes(data.version)
+  )
     throw new Error('Unsupported progress backup format or version.')
   const out = {}
   for (const [key, normalize] of [
@@ -348,6 +375,17 @@ export function parseProgressBackup(raw) {
       throw new Error(`Backup contains invalid ${key} records.`)
     out[key] = normalized
   }
+  if (data.version === BACKUP_VERSION) {
+    if (!Array.isArray(data.study) || data.study.length > STUDY_LIMIT)
+      throw new Error(`Backup study must contain at most ${STUDY_LIMIT} records.`)
+    const normalized = data.study.map(normalizeStudyRecord)
+    if (
+      normalized.some((record) => !record) ||
+      new Set(normalized.map((record) => record.questionId)).size !== normalized.length
+    )
+      throw new Error('Backup contains invalid or duplicate study records.')
+    out.study = normalized
+  } else out.study = []
   // Reject answer metadata outright rather than importing a portable answer bank.
   const forbidden = new Set([
     'is_correct',
@@ -358,9 +396,15 @@ export function parseProgressBackup(raw) {
   if (
     Object.keys(data).some(
       (key) =>
-        !['type', 'version', 'exportedAt', 'history', 'mistakes', 'bookmarks'].includes(
-          key
-        )
+        ![
+          'type',
+          'version',
+          'exportedAt',
+          'history',
+          'mistakes',
+          'bookmarks',
+          ...(data.version === BACKUP_VERSION ? ['study'] : []),
+        ].includes(key)
     )
   )
     throw new Error('Backup contains unsupported fields.')
@@ -379,7 +423,12 @@ export function parseProgressBackup(raw) {
 export function importProgress(backup) {
   // Revalidate even when the caller bypasses the file preview UI.
   const incoming = parseProgressBackup(
-    JSON.stringify({ type: 'pcep-progress', version: VERSION, ...backup })
+    JSON.stringify({
+      type: 'pcep-progress',
+      version: BACKUP_VERSION,
+      ...backup,
+      study: backup.study ?? [],
+    })
   )
   const progress = loadProgress()
   const attemptKey = (a) =>
@@ -400,6 +449,18 @@ export function importProgress(backup) {
     history,
     mistakes: mergeQuestions('mistakes'),
     bookmarks: mergeQuestions('bookmarks'),
+    study: [
+      ...new Map(
+        [...progress.study, ...incoming.study]
+          .sort((a, b) => {
+            const time = Date.parse(a.lastAttempted) - Date.parse(b.lastAttempted)
+            return time || a.attempts - b.attempts
+          })
+          .map((record) => [record.questionId, record])
+      ).values(),
+    ]
+      .sort((a, b) => Date.parse(b.lastAttempted) - Date.parse(a.lastAttempted))
+      .slice(0, STUDY_LIMIT),
   }
   if (!saveProgress(merged))
     throw new Error(

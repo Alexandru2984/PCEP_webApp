@@ -46,6 +46,8 @@ export default function QuizSetup({
   mistakesCount = 0,
   bookmarksCount = 0,
   onPracticeBookmarks,
+  dueReviewCount = 0,
+  onPracticeDueReviews,
   initial,
   stats,
   statsLoading,
@@ -76,6 +78,26 @@ export default function QuizSetup({
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
         Pick a mode and scope. Leave filters on defaults for a full mixed-bag PCEP run.
       </p>
+
+      {dueReviewCount > 0 && onPracticeDueReviews && (
+        <button
+          type="button"
+          onClick={onPracticeDueReviews}
+          className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-left transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60"
+        >
+          <span>
+            <span className="block font-semibold text-emerald-900 dark:text-emerald-200">
+              Review what is due
+            </span>
+            <span className="mt-0.5 block text-xs text-emerald-800 dark:text-emerald-300/90">
+              A focused drill of up to 20 questions from your review schedule.
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-emerald-200 px-2.5 py-1 text-sm font-bold text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
+            {dueReviewCount}
+          </span>
+        </button>
+      )}
 
       {mistakesCount > 0 && onPracticeMistakes && (
         <button

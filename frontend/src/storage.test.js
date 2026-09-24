@@ -16,6 +16,11 @@ import {
   loadActiveExam,
   saveActiveExam,
   clearActiveExam,
+  clearStudyProgress,
+  loadDueReviews,
+  loadStudyProgress,
+  loadStudySummary,
+  updateStudyProgress,
 } from './storage'
 
 const question = (id) => ({
@@ -225,6 +230,28 @@ describe('mistakes', () => {
   })
 })
 
+describe('study progress', () => {
+  it('persists a bounded review schedule without choices or answer keys', () => {
+    const now = Date.UTC(2026, 8, 20, 12)
+    updateStudyProgress([right(1), wrong(2)], now)
+    expect(loadStudyProgress()).toHaveLength(2)
+    expect(loadDueReviews(now).map((record) => record.questionId)).toEqual([2])
+    expect(loadStudySummary(now)).toMatchObject({ tracked: 2, due: 1 })
+    const raw = localStorage.getItem('pcep.progress')
+    expect(raw).not.toContain('choice')
+    expect(raw).not.toContain('is_correct')
+    expect(raw).not.toContain('explanation')
+  })
+
+  it('clears only the review schedule', () => {
+    appendAttempt(attempt('kept'))
+    updateStudyProgress([wrong(1)])
+    expect(clearStudyProgress()).toBe(true)
+    expect(loadStudyProgress()).toEqual([])
+    expect(loadHistory()).toHaveLength(1)
+  })
+})
+
 describe('schema migration and portability', () => {
   it.each([null, {}, 'text', 3])('ignores invalid legacy shapes: %j', (value) => {
     localStorage.setItem('pcep.history', JSON.stringify(value))
@@ -263,12 +290,28 @@ describe('schema migration and portability', () => {
   it('merges and deduplicates a valid backup without losing existing progress', () => {
     appendAttempt(attempt('existing'))
     toggleBookmark(question(1))
+    updateStudyProgress([wrong(1)], Date.UTC(2026, 8, 20))
     const backup = parseProgressBackup(exportProgress())
+    expect(backup.study).toHaveLength(1)
     backup.history.push(attempt('imported'))
     importProgress(backup)
     importProgress(backup)
     expect(loadHistory()).toHaveLength(2)
     expect(loadBookmarks()).toHaveLength(1)
+    expect(loadStudyProgress()).toHaveLength(1)
+  })
+
+  it('imports legacy version 1 backups with an empty review schedule', () => {
+    const backup = parseProgressBackup(
+      JSON.stringify({
+        type: 'pcep-progress',
+        version: 1,
+        history: [],
+        mistakes: [],
+        bookmarks: [],
+      })
+    )
+    expect(backup.study).toEqual([])
   })
 
   it.each([{ version: 2 }, { history: {} }, { mistakes: [{ id: 1 }] }, { extra: true }])(

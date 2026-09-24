@@ -1,7 +1,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchQuizSet, gradeAnswers, submitAnswer } from './api'
-import { loadActiveExam, loadHistory, saveActiveExam } from './storage'
+import {
+  loadActiveExam,
+  loadHistory,
+  loadStudyProgress,
+  saveActiveExam,
+  updateStudyProgress,
+} from './storage'
 import useQuizSession from './useQuizSession'
 
 vi.mock('./api', async (original) => ({
@@ -75,6 +81,9 @@ describe('quiz session requests', () => {
     })
     expect(result.current.phase).toBe('done')
     expect(loadHistory()).toHaveLength(1)
+    expect(loadStudyProgress()).toMatchObject([
+      { questionId: 1, attempts: 1, correct: 1, intervalDays: 1 },
+    ])
   })
 
   it('cancels loading on reset and ignores stale responses', async () => {
@@ -189,5 +198,24 @@ describe('quiz session requests', () => {
     await act(async () => result.current.handleExamSubmit({ 1: 11 }))
     expect(result.current.phase).toBe('done')
     expect(loadActiveExam()).toBeNull()
+  })
+
+  it('starts a due-review drill from current public question ids', async () => {
+    updateStudyProgress(
+      [{ question, feedback: { is_correct: false } }],
+      Date.now() - 1000
+    )
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startDueReviewsQuiz())
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'practice',
+        source: 'due-reviews',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('answering')
   })
 })

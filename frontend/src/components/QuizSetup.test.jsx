@@ -31,4 +31,19 @@ describe('QuizSetup — practice your mistakes', () => {
       screen.queryByRole('button', { name: /Practice your mistakes/i })
     ).not.toBeInTheDocument()
   })
+
+  it('starts a due-review drill with a visible count', () => {
+    const onPracticeDueReviews = vi.fn()
+    render(
+      <QuizSetup
+        {...baseProps}
+        dueReviewCount={7}
+        onPracticeDueReviews={onPracticeDueReviews}
+      />
+    )
+    const button = screen.getByRole('button', { name: /Review what is due/i })
+    expect(button).toHaveTextContent('7')
+    fireEvent.click(button)
+    expect(onPracticeDueReviews).toHaveBeenCalledOnce()
+  })
 })

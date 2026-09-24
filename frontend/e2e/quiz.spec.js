@@ -110,6 +110,51 @@ test('bookmarks persist across reload and start a targeted drill', async ({ page
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
 })
 
+test('missed questions become due reviews and launch a fresh targeted drill', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Start practice/ }).click()
+  for (let i = 0; i < QUESTIONS.length; i++) {
+    await page.getByRole('button', { name: /option 2/ }).click()
+    await page.getByRole('button', { name: /Next Question|See Results/ }).click()
+  }
+  await expect(page.getByRole('heading', { name: 'Quiz complete' })).toBeVisible()
+  const study = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.progress')).data.study
+  )
+  expect(study).toHaveLength(QUESTIONS.length)
+  expect(JSON.stringify(study)).not.toContain('choice')
+  expect(JSON.stringify(study)).not.toContain('is_correct')
+
+  await page.reload()
+  await page.setViewportSize({ width: 390, height: 844 })
+  const due = page.getByRole('button', { name: /Review what is due/ })
+  await expect(due).toContainText(String(QUESTIONS.length))
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
+  })
+  await due.click()
+  const request = await requestPromise
+  const params = new URL(request.url()).searchParams
+  expect(params.get('count')).toBe(String(QUESTIONS.length))
+  expect(
+    params
+      .get('ids')
+      .split(',')
+      .map(Number)
+      .sort((a, b) => a - b)
+  ).toEqual(QUESTIONS.map((question) => question.id))
+  await expect(page.getByText(/Tip: press/)).toBeVisible()
+})
+
 test('an interrupted exam restores answers, flags, position and deadline', async ({
   page,
 }) => {

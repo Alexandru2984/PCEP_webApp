@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { loadHistory, loadBookmarks, loadMistakes } from '../storage'
+import { loadBookmarks, loadHistory, loadMistakes, loadStudySummary } from '../storage'
 import { formatElapsed } from '../format'
 import ProgressTools from './ProgressTools'
 
@@ -50,16 +50,57 @@ function MasteryBar({ label, pct, onDrill }) {
   )
 }
 
-export default function Dashboard({ onDrill, onBookmarks, onMistakes }) {
+function StudyPlan({ summary, onDueReviews }) {
+  if (!summary.tracked) return null
+  return (
+    <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Review plan
+          </h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Correct reviews move through 1, 3, 7 and longer day intervals. A miss is due
+            again immediately.
+          </p>
+        </div>
+        {summary.due > 0 && onDueReviews && (
+          <button
+            type="button"
+            onClick={onDueReviews}
+            className="shrink-0 rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white hover:bg-emerald-800"
+          >
+            Review due ({summary.due})
+          </button>
+        )}
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Due now" value={summary.due} />
+        <Stat label="Questions tracked" value={summary.tracked} />
+        <Stat label="Strong" value={summary.strong} />
+        <Stat label="Average mastery" value={`${summary.averageMastery}%`} />
+      </div>
+      {summary.due === 0 && summary.nextReview && (
+        <p className="mt-3 text-sm text-emerald-900 dark:text-emerald-200">
+          Next review: {new Date(summary.nextReview).toLocaleDateString()}.
+        </p>
+      )}
+    </section>
+  )
+}
+
+export default function Dashboard({ onDrill, onBookmarks, onMistakes, onDueReviews }) {
   const [attempts, setAttempts] = useState(loadHistory)
   const refresh = () => setAttempts(loadHistory())
   const tools = <ProgressTools key="progress-tools" onChange={refresh} />
   const bookmarks = loadBookmarks().length
   const mistakes = loadMistakes().length
+  const study = loadStudySummary()
 
   if (attempts.length === 0) {
     return (
       <div className="space-y-4">
+        <StudyPlan summary={study} onDueReviews={onDueReviews} />
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
           <p className="text-slate-600 dark:text-slate-400">
             No attempts yet — finish a quiz and your progress shows up here.
@@ -107,6 +148,7 @@ export default function Dashboard({ onDrill, onBookmarks, onMistakes }) {
 
   return (
     <div className="space-y-4">
+      <StudyPlan summary={study} onDueReviews={onDueReviews} />
       {(bookmarks > 0 || mistakes > 0) && (
         <div className="flex flex-wrap gap-2">
           {mistakes > 0 && onMistakes && (

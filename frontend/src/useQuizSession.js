@@ -4,12 +4,14 @@ import {
   appendAttempt,
   clearActiveExam,
   loadActiveExam,
-  loadMistakes,
   loadBookmarks,
+  loadDueReviews,
+  loadMistakes,
   loadSettings,
   saveActiveExam,
   saveSettings,
   updateMistakes,
+  updateStudyProgress,
 } from './storage'
 import { publicQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
@@ -250,6 +252,7 @@ export default function useQuizSession() {
       byDifficulty: breakdown('difficulty'),
     })
     updateMistakes(items)
+    updateStudyProgress(items)
     dispatch({ type: 'done', items, elapsed })
   }
 
@@ -332,17 +335,24 @@ export default function useQuizSession() {
   const startSavedDrill = (list, source) => {
     if (!list.length) return
     // Fetch current public options so admin edits cannot leave a drill with stale choice IDs.
+    const ids = list
+      .slice(0, 100)
+      .map((item) => item.id ?? item.questionId)
+      .filter((id) => Number.isSafeInteger(id) && id > 0)
+    if (!ids.length) return
     return startQuiz({
       mode: 'practice',
       module: '',
       difficulty: '',
-      count: 50,
+      count: Math.min(50, ids.length),
       source,
-      ids: list.slice(0, 100).map((q) => q.id),
+      ids,
     })
   }
   const startMistakesQuiz = () => startSavedDrill(loadMistakes(), 'mistakes')
   const startBookmarksQuiz = () => startSavedDrill(loadBookmarks(), 'bookmarks')
+  const startDueReviewsQuiz = () =>
+    startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews')
   return {
     ...state,
     startQuiz,
@@ -356,6 +366,7 @@ export default function useQuizSession() {
     saveExamProgress,
     startMistakesQuiz,
     startBookmarksQuiz,
+    startDueReviewsQuiz,
     startModuleDrill: (module) =>
       startQuiz({ mode: 'practice', module, difficulty: '', count: 20 }),
   }

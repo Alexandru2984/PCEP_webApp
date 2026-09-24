@@ -281,9 +281,9 @@ added.
 2. Disable or correctly scope Cloudflare JavaScript detection, then repeat the
    public console/CSP check. Review the dashboard's cache rules and tunnel
    hostname ownership directly.
-3. Add session resume before more advanced study scheduling. Then introduce a
-   small, explainable spaced-repetition model using attempts, confidence and due
-   date; avoid opaque personalization.
+3. Extend the local review schedule with an optional confidence signal and
+   confidence-vs-correctness insight after enough real usage data exists; keep the
+   weighting visible and avoid opaque personalization.
 4. Add concept tags only with a curated taxonomy and coverage audit; use them to
    drive search, weak-topic reports and adaptive sampling.
 5. Add external uptime/error monitoring for liveness, readiness and release

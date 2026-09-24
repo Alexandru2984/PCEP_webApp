@@ -165,17 +165,29 @@ explanations. It is reversible and does not recreate the question bank.
 Progress now uses the versioned `pcep.progress` record. Valid legacy
 `pcep.history`/`pcep.mistakes` records are read and migrate only after a complete
 successful write. A failed import leaves the previous record intact. Each list
-is bounded to 100 records. The progress screen exports JSON, previews and merges
-strictly validated imports up to 8 MB, and resets history, mistakes or bookmarks
-individually. Backups contain public question options and aggregate performance,
-never answer keys or explanations. Keep backups private if you want to keep your
-study history private; nothing is uploaded by these features.
+for history, mistakes and bookmarks is bounded to 100 records. The per-question
+review schedule is bounded to 1,000 compact records. The progress screen exports
+backup format v2, previews and merges strictly validated imports up to 8 MB, and
+still accepts existing v1 backups. History, mistakes, bookmarks and the review
+schedule can be reset independently. Backups contain public question options,
+aggregate performance and review dates, never answer keys or explanations. Keep
+backups private if you want to keep your study history private; nothing is
+uploaded by these features.
 Bookmarks are available on question cards. Bookmark and mistake drills fetch
 current public question data using the bounded `ids` quiz-set filter, avoiding
 stale choice IDs after admin edits. Module/difficulty accuracy includes mixed
 sessions completed in this version. Flashcard self-ratings are excluded from
 graded accuracy. Older mixed attempts lack detailed breakdowns and remain visible
 in history without invented module performance.
+
+Completed practice, exam and flashcard sessions update an explainable local review
+schedule. Consecutive successful reviews use 1, 3, 7 days and then double up to a
+60-day cap. A missed or skipped question becomes due immediately. Due drills send
+at most 20 question IDs to the existing quiz-set endpoint and receive fresh public
+question data; the schedule stores no choices, selected choice IDs, explanations
+or correctness key. Dashboard mastery combines observed accuracy, repetition and
+the achieved interval, and should be treated as a study signal rather than an exam
+credential.
 
 ## Active exam recovery
 

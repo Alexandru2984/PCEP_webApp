@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import Dashboard from './Dashboard'
+import { updateStudyProgress } from '../storage'
 
 // Dashboard reads attempt history straight from localStorage on mount.
 function seedHistory(attempts) {
@@ -57,5 +58,29 @@ describe('Dashboard', () => {
     expect(screen.getByText('Difficulty accuracy')).toBeInTheDocument()
     expect(screen.getByText('0%')).toBeInTheDocument()
     expect(screen.getByText(/self-rated and excluded/)).toBeInTheDocument()
+  })
+
+  it('shows due review metrics and starts the scheduled drill', () => {
+    const onDueReviews = vi.fn()
+    updateStudyProgress([
+      {
+        question: {
+          id: 42,
+          text: 'Question?',
+          code_snippet: '',
+          module: 'module2',
+          difficulty: 'medium',
+          choices: [
+            { id: 421, text: 'One' },
+            { id: 422, text: 'Two' },
+          ],
+        },
+        feedback: { is_correct: false },
+      },
+    ])
+    render(<Dashboard onDueReviews={onDueReviews} />)
+    expect(screen.getByRole('heading', { name: 'Review plan' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Review due (1)' }))
+    expect(onDueReviews).toHaveBeenCalledOnce()
   })
 })
