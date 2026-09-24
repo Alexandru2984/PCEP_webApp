@@ -43,10 +43,31 @@ export const correctId = (questionId) => questionId * 10 + 1
 export async function mockApi(page) {
   await page.route('**/api/**', async (route) => {
     const req = route.request()
-    const path = new URL(req.url()).pathname
+    const url = new URL(req.url())
+    const path = url.pathname
     if (path.endsWith('/api/stats/')) return route.fulfill({ json: STATS })
-    if (path.includes('/api/quiz-set'))
-      return route.fulfill({ json: { count: QUESTIONS.length, questions: QUESTIONS } })
+    if (path.endsWith('/api/search/')) {
+      const query = url.searchParams.get('q')?.toLowerCase() ?? ''
+      const results = QUESTIONS.filter(
+        (question) =>
+          question.text.toLowerCase().includes(query) ||
+          question.code_snippet.toLowerCase().includes(query)
+      ).map(({ id, text, code_snippet, module, difficulty }) => ({
+        id,
+        text,
+        code_snippet,
+        module,
+        difficulty,
+      }))
+      return route.fulfill({ json: { count: results.length, results } })
+    }
+    if (path.includes('/api/quiz-set')) {
+      const ids = url.searchParams.get('ids')
+      const questions = ids
+        ? QUESTIONS.filter((question) => ids.split(',').map(Number).includes(question.id))
+        : QUESTIONS
+      return route.fulfill({ json: { count: questions.length, questions } })
+    }
 
     const answer = path.match(/\/api\/questions\/(\d+)\/answer\/$/)
     if (answer) {

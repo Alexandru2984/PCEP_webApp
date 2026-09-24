@@ -144,6 +144,12 @@ IDs must be positive JSON integers within signed 64-bit range. Omitted/null
 choices count as wrong; foreign choices and duplicate questions return 400 with
 no answer feedback. Retrying the same valid submission is safe and stateless.
 An invalid answer key returns 503 instead of an ambiguous score.
+`GET /api/search/` accepts a required 2–80 character `q`, optional valid module
+and difficulty filters, and a `limit` from 1 to 20. It performs one bounded query
+and returns only question ID, text, code, module and difficulty. Choices,
+explanations and answer metadata are deliberately absent. A selected drill sends
+only unique IDs to `quiz-set`, which returns fresh public choices under the
+existing answer-leakage contract.
 Django ignores X-Forwarded-Host; the origin proxy must overwrite Host and
 X-Forwarded-For and supply X-Forwarded-Proto. NUM_PROXIES remains exactly 1.
 

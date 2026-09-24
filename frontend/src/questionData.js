@@ -30,6 +30,27 @@ export function publicQuestion(q) {
   }
 }
 
+export function publicQuestionSummary(q) {
+  const allowed = new Set(['id', 'text', 'code_snippet', 'module', 'difficulty'])
+  if (
+    !q ||
+    Object.keys(q).some((key) => !allowed.has(key)) ||
+    !validId(q.id) ||
+    !text(q.text, 5000) ||
+    !text(q.code_snippet ?? '', 20_000, true) ||
+    !MODULES.includes(q.module) ||
+    !DIFFICULTIES.includes(q.difficulty)
+  )
+    return null
+  return {
+    id: q.id,
+    text: q.text,
+    code_snippet: q.code_snippet ?? '',
+    module: q.module,
+    difficulty: q.difficulty,
+  }
+}
+
 export function validateFeedback(data, question) {
   if (
     !data ||

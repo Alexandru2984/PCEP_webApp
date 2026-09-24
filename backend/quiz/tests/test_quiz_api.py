@@ -90,6 +90,81 @@ def test_quiz_set_rejects_bogus_module(api_client, question_bank):
     assert resp.status_code == 400
 
 
+def test_search_matches_text_and_code_without_fetching_choices(
+    api_client, make_question, django_assert_num_queries
+):
+    text_match = make_question(text='Which slice returns a copy?', code_snippet='')
+    code_match = make_question(text='What is printed?', code_snippet='items[slice(1, 3)]')
+    make_question(text='Unrelated loop?', code_snippet='for item in items: pass')
+
+    with django_assert_num_queries(1):
+        resp = api_client.get('/api/search/', {'q': 'slice'})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['count'] == 2
+    assert [result['id'] for result in body['results']] == [
+        text_match.id,
+        code_match.id,
+    ]
+    assert all(
+        set(result) == {'id', 'text', 'code_snippet', 'difficulty', 'module'}
+        for result in body['results']
+    )
+
+
+def test_search_applies_scope_and_result_limit(api_client, make_question):
+    wanted = make_question(
+        module=Question.MODULE_2,
+        difficulty=Question.DIFFICULTY_HARD,
+        text='Needle alpha',
+    )
+    make_question(
+        module=Question.MODULE_2,
+        difficulty=Question.DIFFICULTY_HARD,
+        text='Needle beta',
+    )
+    make_question(module=Question.MODULE_1, text='Needle outside scope')
+
+    resp = api_client.get(
+        '/api/search/',
+        {'q': 'NEEDLE', 'module': 'module2', 'difficulty': 'hard', 'limit': 1},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        'count': 1,
+        'results': [{
+            'id': wanted.id,
+            'text': wanted.text,
+            'code_snippet': wanted.code_snippet,
+            'difficulty': wanted.difficulty,
+            'module': wanted.module,
+        }],
+    }
+
+
+@pytest.mark.parametrize(
+    'params',
+    [
+        {},
+        {'q': ' '},
+        {'q': 'x'},
+        {'q': 'x' * 81},
+        {'q': 'ab\x00cd'},
+        {'q': 'valid', 'limit': 'nope'},
+        {'q': 'valid', 'limit': 0},
+        {'q': 'valid', 'limit': 21},
+        {'q': 'valid', 'module': 'module99'},
+        {'q': 'valid', 'difficulty': 'extreme'},
+    ],
+)
+def test_search_rejects_invalid_parameters(api_client, params):
+    resp = api_client.get('/api/search/', params)
+    assert resp.status_code == 400
+    assert set(resp.json()) == {'detail'}
+
+
 def test_submit_correct_answer(api_client, make_question):
     q = make_question(correct_index=2)
     correct = q.choices.get(is_correct=True)

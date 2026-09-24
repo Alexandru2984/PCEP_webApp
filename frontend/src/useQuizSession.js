@@ -336,10 +336,16 @@ export default function useQuizSession() {
   const startSavedDrill = (list, source) => {
     if (!list.length) return
     // Fetch current public options so admin edits cannot leave a drill with stale choice IDs.
-    const ids = list
-      .slice(0, 100)
-      .map((item) => (Number.isSafeInteger(item) ? item : (item.id ?? item.questionId)))
-      .filter((id) => Number.isSafeInteger(id) && id > 0)
+    const ids = [
+      ...new Set(
+        list
+          .slice(0, 100)
+          .map((item) =>
+            Number.isSafeInteger(item) ? item : (item?.id ?? item?.questionId)
+          )
+          .filter((id) => Number.isSafeInteger(id) && id > 0)
+      ),
+    ]
     if (!ids.length) return
     return startQuiz({
       mode: 'practice',
@@ -355,6 +361,7 @@ export default function useQuizSession() {
   const startDueReviewsQuiz = () =>
     startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews')
   const startAdaptiveQuiz = () => startSavedDrill(loadAdaptivePlan().ids, 'adaptive')
+  const startSearchDrill = (ids) => startSavedDrill(ids, 'search')
   return {
     ...state,
     startQuiz,
@@ -370,6 +377,7 @@ export default function useQuizSession() {
     startBookmarksQuiz,
     startDueReviewsQuiz,
     startAdaptiveQuiz,
+    startSearchDrill,
     startModuleDrill: (module) =>
       startQuiz({ mode: 'practice', module, difficulty: '', count: 20 }),
   }

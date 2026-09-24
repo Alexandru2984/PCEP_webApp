@@ -31,6 +31,14 @@ class QuestionSerializer(serializers.ModelSerializer):
         fields = ['id', 'text', 'code_snippet', 'difficulty', 'module', 'choices']
 
 
+class QuestionSearchSerializer(serializers.ModelSerializer):
+    """Search preview without choices or answer-related fields."""
+
+    class Meta:
+        model = Question
+        fields = ['id', 'text', 'code_snippet', 'difficulty', 'module']
+
+
 class AnswerRequestSerializer(serializers.Serializer):
     choice_id = DatabaseIDField()
 

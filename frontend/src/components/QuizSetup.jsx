@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getScopeTotal } from '../questionStats'
 import QuestionBankStats from './QuestionBankStats'
+import QuestionSearch from './QuestionSearch'
 
 const MODULES = [
   { value: '', label: 'All modules' },
@@ -50,6 +51,7 @@ export default function QuizSetup({
   onPracticeDueReviews,
   adaptivePlan,
   onAdaptivePractice,
+  onSearchDrill,
   initial,
   stats,
   statsLoading,
@@ -268,6 +270,15 @@ export default function QuizSetup({
         selectedModule={module}
         selectedDifficulty={difficulty}
       />
+
+      {onSearchDrill && (
+        <QuestionSearch
+          key={`${module}:${difficulty}`}
+          module={module}
+          difficulty={difficulty}
+          onStart={onSearchDrill}
+        />
+      )}
     </div>
   )
 }

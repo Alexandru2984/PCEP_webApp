@@ -12,6 +12,40 @@ test('setup screen loads and shows the question-bank snapshot', async ({ page })
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
 })
 
+test('search builds an answer-safe custom drill on mobile', async ({ page }) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByLabel('Search question text or code').fill('output')
+  const searchResponsePromise = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('/api/search/')
+  )
+  await page.getByRole('button', { name: 'Search' }).click()
+  const searchPayload = await (await searchResponsePromise).json()
+
+  await expect(page.getByText('4 results · 0 selected')).toBeVisible()
+  expect(JSON.stringify(searchPayload)).not.toMatch(
+    /is_correct|correct_choice|explanation|choices/
+  )
+  const checkboxes = page.getByRole('checkbox')
+  await checkboxes.nth(0).check()
+  await checkboxes.nth(1).check()
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
+  })
+  await page.getByRole('button', { name: 'Start selected (2)' }).click()
+  const request = await requestPromise
+  expect(new URL(request.url()).searchParams.get('ids')).toBe('1,2')
+  await expect(page.getByText(/Tip: press/)).toBeVisible()
+
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+})
+
 test('practice run produces a report with a one-click module drill', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')

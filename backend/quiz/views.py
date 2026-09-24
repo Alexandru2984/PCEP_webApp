@@ -1,5 +1,5 @@
 from django.db import connection, DatabaseError
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -12,6 +12,7 @@ from .models import Question
 from .serializers import (
     AnswerRequestSerializer,
     GradeRequestSerializer,
+    QuestionSearchSerializer,
     QuestionSerializer,
 )
 
@@ -19,6 +20,9 @@ from .serializers import (
 VALID_DIFFICULTIES = {d for d, _ in Question.DIFFICULTY_CHOICES}
 VALID_MODULES = {m for m, _ in Question.MODULE_CHOICES}
 PASS_THRESHOLD = 70
+SEARCH_QUERY_MIN_LENGTH = 2
+SEARCH_QUERY_MAX_LENGTH = 80
+SEARCH_RESULT_LIMIT = 20
 
 
 @api_view(['GET'])
@@ -84,6 +88,59 @@ def stats(request):
         'modules': module_summaries,
         'pass_threshold': PASS_THRESHOLD,
     })
+
+
+@api_view(['GET'])
+def search_questions(request):
+    """Find question previews without exposing choices or answer metadata."""
+    query = request.query_params.get('q', '').strip()
+    if not SEARCH_QUERY_MIN_LENGTH <= len(query) <= SEARCH_QUERY_MAX_LENGTH:
+        return Response(
+            {'detail': 'q must contain 2 to 80 characters.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if any(ord(character) < 32 or ord(character) == 127 for character in query):
+        return Response(
+            {'detail': 'q must not contain control characters.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    raw_limit = request.query_params.get('limit', SEARCH_RESULT_LIMIT)
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return Response(
+            {'detail': 'limit must be an integer.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not 1 <= limit <= SEARCH_RESULT_LIMIT:
+        return Response(
+            {'detail': f'limit must be between 1 and {SEARCH_RESULT_LIMIT}.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    questions = Question.objects.filter(
+        Q(text__icontains=query) | Q(code_snippet__icontains=query)
+    )
+    module = request.query_params.get('module')
+    if module:
+        if module not in VALID_MODULES:
+            return Response(
+                {'detail': f'module must be one of {sorted(VALID_MODULES)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        questions = questions.filter(module=module)
+    difficulty = request.query_params.get('difficulty')
+    if difficulty:
+        if difficulty not in VALID_DIFFICULTIES:
+            return Response(
+                {'detail': f'difficulty must be one of {sorted(VALID_DIFFICULTIES)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        questions = questions.filter(difficulty=difficulty)
+
+    data = QuestionSearchSerializer(questions.order_by('id')[:limit], many=True).data
+    return Response({'count': len(data), 'results': data})
 
 
 class SubmitAnswerThrottle(AnonRateThrottle):

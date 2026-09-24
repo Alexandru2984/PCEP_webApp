@@ -12,10 +12,16 @@ def api_client():
 @pytest.fixture
 def make_question(db):
     """Factory: create a Question with four choices (exactly one correct)."""
-    def _make(module=Question.MODULE_1, difficulty=Question.DIFFICULTY_EASY, correct_index=0):
+    def _make(
+        module=Question.MODULE_1,
+        difficulty=Question.DIFFICULTY_EASY,
+        correct_index=0,
+        text='Sample question?',
+        code_snippet='print(1)',
+    ):
         q = Question.objects.create(
-            text='Sample question?',
-            code_snippet='print(1)',
+            text=text,
+            code_snippet=code_snippet,
             module=module,
             difficulty=difficulty,
         )

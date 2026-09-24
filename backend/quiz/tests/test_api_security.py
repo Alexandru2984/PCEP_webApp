@@ -91,7 +91,7 @@ def test_read_endpoints_never_leak_answers(api_client, question_bank):
             for child in value:
                 inspect(child)
 
-    for path in ['/api/quiz-set/?count=100', '/api/stats/'] + [
+    for path in ['/api/quiz-set/?count=100', '/api/search/?q=sample', '/api/stats/'] + [
         f'/api/questions/{q.id}/' for q in Question.objects.all()
     ]:
         response = api_client.get(path)

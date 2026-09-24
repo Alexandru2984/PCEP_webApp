@@ -21,6 +21,16 @@ export const fetchQuizSet = (
 export const fetchQuestionStats = (options = {}) =>
   api.get('/stats/', options).then((r) => r.data)
 
+export const searchQuestions = (
+  { query, module = '', difficulty = '', limit = 20 },
+  options = {}
+) => {
+  const params = new URLSearchParams({ q: query, limit: String(limit) })
+  if (module) params.set('module', module)
+  if (difficulty) params.set('difficulty', difficulty)
+  return api.get(`/search/?${params.toString()}`, options).then((r) => r.data)
+}
+
 export const submitAnswer = (questionId, choiceId, options = {}) =>
   api
     .post(`/questions/${questionId}/answer/`, { choice_id: choiceId }, options)

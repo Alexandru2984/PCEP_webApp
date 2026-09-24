@@ -108,6 +108,7 @@ export default function QuizContainer() {
     startBookmarksQuiz,
     startDueReviewsQuiz,
     startAdaptiveQuiz,
+    startSearchDrill,
     startModuleDrill,
   } = useQuizSession()
   const [view, setView] = useState('setup')
@@ -229,6 +230,7 @@ export default function QuizContainer() {
             onPracticeDueReviews={startDueReviewsQuiz}
             adaptivePlan={loadAdaptivePlan()}
             onAdaptivePractice={startAdaptiveQuiz}
+            onSearchDrill={startSearchDrill}
             initial={lastConfig}
             stats={questionStats}
             statsLoading={statsLoading}

@@ -237,4 +237,19 @@ describe('quiz session requests', () => {
     )
     expect(result.current.phase).toBe('answering')
   })
+
+  it('starts a search drill from unique valid IDs', async () => {
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startSearchDrill([1, 1, 0, null]))
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'practice',
+        source: 'search',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('answering')
+  })
 })
