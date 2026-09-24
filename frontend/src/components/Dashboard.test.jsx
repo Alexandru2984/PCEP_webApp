@@ -60,6 +60,25 @@ describe('Dashboard', () => {
     expect(screen.getByText(/self-rated and excluded/)).toBeInTheDocument()
   })
 
+  it('shows accessible study momentum from graded history', () => {
+    seedHistory([
+      attempt({ date: '2026-09-24T10:00:00.000Z', score: 9, pct: 90 }),
+      attempt({ date: '2026-09-23T10:00:00.000Z', score: 8, pct: 80 }),
+      attempt({ date: '2026-09-22T10:00:00.000Z', score: 6, pct: 60 }),
+      attempt({ date: '2026-09-21T10:00:00.000Z', score: 5, pct: 50 }),
+    ])
+    render(<Dashboard />)
+
+    expect(screen.getByRole('heading', { name: 'Study momentum' })).toBeInTheDocument()
+    expect(screen.getByText('+30 pts')).toBeInTheDocument()
+    expect(
+      screen.getByRole('list', {
+        name: 'Graded scores from oldest to newest: 50%, 60%, 80%, 90%',
+      })
+    ).toBeInTheDocument()
+    expect(screen.getByText(/latest 2 graded sessions average 85%/i)).toBeInTheDocument()
+  })
+
   it('shows due review metrics and starts the scheduled drill', () => {
     const onDueReviews = vi.fn()
     const onAdaptivePractice = vi.fn()

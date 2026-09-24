@@ -7,6 +7,7 @@ import {
   loadStudySummary,
 } from '../storage'
 import { formatElapsed } from '../format'
+import { performanceInsights } from '../progressInsights'
 import ProgressTools from './ProgressTools'
 
 const MODULE_LABELS = {
@@ -53,6 +54,103 @@ function MasteryBar({ label, pct, onDrill }) {
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
+  )
+}
+
+function ScoreTrend({ scores }) {
+  if (scores.length < 2) return null
+  const description = scores.map(({ score }) => `${score}%`).join(', ')
+  return (
+    <figure className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-700">
+      <figcaption className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        Last {scores.length} graded scores
+      </figcaption>
+      <div className="flex gap-3">
+        <div
+          aria-hidden="true"
+          className="flex h-32 flex-col justify-between text-xs text-slate-500 dark:text-slate-400"
+        >
+          <span>100%</span>
+          <span>50%</span>
+          <span>0%</span>
+        </div>
+        <ol
+          aria-label={`Graded scores from oldest to newest: ${description}`}
+          className="flex h-32 min-w-0 flex-1 items-end gap-1 border-b border-l border-slate-300 px-2 pt-2 dark:border-slate-600 sm:gap-2"
+        >
+          {scores.map(({ date, score }, index) => (
+            <li
+              key={`${date}-${index}`}
+              className="flex h-full min-w-0 flex-1 items-end"
+              aria-label={`${new Date(date).toLocaleDateString()}: ${score}%`}
+              title={`${new Date(date).toLocaleDateString()}: ${score}%`}
+            >
+              <span
+                aria-hidden="true"
+                className={`w-full rounded-t ${
+                  score >= 70
+                    ? 'bg-emerald-500 dark:bg-emerald-400'
+                    : 'bg-amber-500 dark:bg-amber-400'
+                }`}
+                style={{ height: `${Math.max(score, 3)}%` }}
+              />
+            </li>
+          ))}
+        </ol>
+      </div>
+    </figure>
+  )
+}
+
+function StudyMomentum({ attempts }) {
+  const insights = performanceInsights(attempts)
+  const trend = insights.trend
+  const trendValue = trend
+    ? trend.delta === 0
+      ? '0 pts'
+      : `${trend.delta > 0 ? '+' : ''}${trend.delta} pts`
+    : '—'
+  const trendAccent =
+    trend?.direction === 'improving'
+      ? 'text-green-700 dark:text-green-400'
+      : trend?.direction === 'declining'
+        ? 'text-amber-700 dark:text-amber-400'
+        : undefined
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        Study momentum
+      </h2>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Current study streak" value={`${insights.current}d`} />
+        <Stat label="Longest study streak" value={`${insights.longest}d`} />
+        <Stat
+          label="Average time / question"
+          value={
+            insights.averageMsPerQuestion === null
+              ? '—'
+              : formatElapsed(insights.averageMsPerQuestion)
+          }
+        />
+        <Stat label="Recent score trend" value={trendValue} accent={trendAccent} />
+      </div>
+      {trend ? (
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          Your latest {trend.windowSize} graded sessions average {trend.recent}%, compared
+          with {trend.previous}% in the previous {trend.windowSize}.
+        </p>
+      ) : (
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          Complete at least four graded sessions to compare recent performance.
+        </p>
+      )}
+      <ScoreTrend scores={insights.scores} />
+      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        Study streaks use local calendar days and stay active until the end of the day
+        after your last session. Score trends and pace exclude self-rated flashcards.
+      </p>
+    </section>
   )
 }
 
@@ -261,6 +359,8 @@ export default function Dashboard({
           </div>
         )}
       </div>
+
+      <StudyMomentum attempts={attempts} />
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-3 flex items-center justify-between">

@@ -198,6 +198,14 @@ question, then its numeric ID, so the plan is deterministic and testable. Only
 the selected IDs are sent to `quiz-set`; fresh public questions come back without
 answer metadata.
 
+Dashboard momentum is derived only from the bounded local attempt history. Study
+streaks count unique local calendar days and remain current through the day after
+the latest session. Score trends compare up to five recent graded sessions with
+an equally sized preceding window using question-weighted accuracy. Average pace
+is total elapsed time divided by timed graded questions. Flashcards count as study
+activity but are excluded from performance and pace because their result is
+self-rated.
+
 ## Active exam recovery
 
 An in-progress exam is stored separately under the versioned

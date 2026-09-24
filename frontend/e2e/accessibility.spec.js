@@ -105,6 +105,38 @@ for (const theme of ['light', 'dark']) {
   })
 }
 
+test('populated study momentum is accessible and responsive', async ({ page }) => {
+  await mockApi(page)
+  await page.addInitScript(() => {
+    const scores = [9, 8, 6, 5]
+    const history = scores.map((score, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - index)
+      date.setHours(12, 0, 0, 0)
+      return {
+        date: date.toISOString(),
+        mode: 'practice',
+        module: '',
+        difficulty: '',
+        score,
+        total: 10,
+        pct: score * 10,
+        elapsedMs: 100_000,
+        bestStreak: score,
+      }
+    })
+    localStorage.setItem('pcep.history', JSON.stringify(history))
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Progress/ }).click()
+
+  await expect(page.getByRole('heading', { name: 'Study momentum' })).toBeVisible()
+  await expect(page.getByText('+30 pts')).toBeVisible()
+  await expect(page.getByText('4d')).toHaveCount(2)
+  await fitsEveryWidth(page)
+  await accessible(page)
+})
+
 test('offline and failed storage warnings explain recovery', async ({
   page,
   context,
