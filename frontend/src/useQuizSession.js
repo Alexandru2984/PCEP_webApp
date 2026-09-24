@@ -4,6 +4,7 @@ import {
   appendAttempt,
   clearActiveExam,
   loadActiveExam,
+  loadAdaptivePlan,
   loadBookmarks,
   loadDueReviews,
   loadMistakes,
@@ -337,7 +338,7 @@ export default function useQuizSession() {
     // Fetch current public options so admin edits cannot leave a drill with stale choice IDs.
     const ids = list
       .slice(0, 100)
-      .map((item) => item.id ?? item.questionId)
+      .map((item) => (Number.isSafeInteger(item) ? item : (item.id ?? item.questionId)))
       .filter((id) => Number.isSafeInteger(id) && id > 0)
     if (!ids.length) return
     return startQuiz({
@@ -353,6 +354,7 @@ export default function useQuizSession() {
   const startBookmarksQuiz = () => startSavedDrill(loadBookmarks(), 'bookmarks')
   const startDueReviewsQuiz = () =>
     startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews')
+  const startAdaptiveQuiz = () => startSavedDrill(loadAdaptivePlan().ids, 'adaptive')
   return {
     ...state,
     startQuiz,
@@ -367,6 +369,7 @@ export default function useQuizSession() {
     startMistakesQuiz,
     startBookmarksQuiz,
     startDueReviewsQuiz,
+    startAdaptiveQuiz,
     startModuleDrill: (module) =>
       startQuiz({ mode: 'practice', module, difficulty: '', count: 20 }),
   }

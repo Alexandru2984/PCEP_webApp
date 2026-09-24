@@ -153,3 +153,67 @@ export function studySummary(records, now = Date.now()) {
         .sort((a, b) => a - b)[0] ?? null,
   }
 }
+
+export function adaptivePracticePlan(
+  records,
+  mistakes = [],
+  now = Date.now(),
+  limit = 20
+) {
+  const timestamp = Number.isFinite(now) ? now : Date.now()
+  const size = Number.isSafeInteger(limit) ? Math.max(1, Math.min(limit, 50)) : 20
+  const normalized = normalizeStudyRecords(records)
+  const byId = new Map(normalized.map((record) => [record.questionId, record]))
+  const mistakeQuestions = new Map()
+  for (const raw of Array.isArray(mistakes) ? mistakes : []) {
+    const question = publicQuestion(raw)
+    if (question) mistakeQuestions.set(question.id, question)
+  }
+  const ids = new Set([...byId.keys(), ...mistakeQuestions.keys()])
+
+  // This is intentionally a visible rule, not opaque personalization. Due work
+  // dominates, current mistakes come next, and accuracy/mastery/difficulty break ties.
+  const ranked = [...ids].map((questionId) => {
+    const record = byId.get(questionId)
+    const question = mistakeQuestions.get(questionId)
+    const due = record ? Date.parse(record.nextReview) <= timestamp : true
+    const mistake = mistakeQuestions.has(questionId)
+    const errorRate = record ? (record.attempts - record.correct) / record.attempts : 1
+    const mastery = record ? masteryPercent(record) : 0
+    const difficulty = record?.difficulty ?? question?.difficulty
+    const difficultyBonus = difficulty === 'hard' ? 10 : difficulty === 'medium' ? 5 : 0
+    const priority =
+      (due ? 100 : 0) +
+      (mistake ? 60 : 0) +
+      errorRate * 40 +
+      ((100 - mastery) / 100) * 30 +
+      difficultyBonus
+    return {
+      questionId,
+      due,
+      mistake,
+      weak: mastery < 80,
+      priority,
+      lastAttempted: record ? Date.parse(record.lastAttempted) : 0,
+    }
+  })
+
+  const selected = ranked
+    .filter((item) => item.due || item.mistake || item.weak)
+    .sort(
+      (a, b) =>
+        b.priority - a.priority ||
+        a.lastAttempted - b.lastAttempted ||
+        a.questionId - b.questionId
+    )
+    .slice(0, size)
+  return {
+    ids: selected.map((item) => item.questionId),
+    count: selected.length,
+    signals: {
+      due: selected.filter((item) => item.due).length,
+      mistakes: selected.filter((item) => item.mistake).length,
+      weak: selected.filter((item) => item.weak).length,
+    },
+  }
+}

@@ -50,7 +50,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 💾 **Crash-safe exam recovery** — an interrupted exam restores its deadline,
   current question, selected answers and flags from a validated local-only copy
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
-  due-review drills and per-question mastery signals without accounts or tracking
+  due-review drills, per-question mastery and transparent adaptive practice without
+  accounts or tracking
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
 - 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
   accuracy, strongest/weakest modules and separate flashcard self-ratings (local-first)
@@ -145,7 +146,7 @@ make django-check
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 
-# Frontend — 111 Vitest tests, then static checks, the production build and
+# Frontend — 117 Vitest tests, then static checks, the production build and
 # 14 Playwright flows (including axe, PWA, scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e

@@ -18,6 +18,7 @@ import {
   clearActiveExam,
   clearStudyProgress,
   loadDueReviews,
+  loadAdaptivePlan,
   loadStudyProgress,
   loadStudySummary,
   updateStudyProgress,
@@ -249,6 +250,13 @@ describe('study progress', () => {
     expect(clearStudyProgress()).toBe(true)
     expect(loadStudyProgress()).toEqual([])
     expect(loadHistory()).toHaveLength(1)
+  })
+
+  it('builds an adaptive queue from validated local progress', () => {
+    updateStudyProgress([right(1), wrong(2)], Date.now() - 1000)
+    updateMistakes([wrong(2)])
+    expect(loadAdaptivePlan().ids).toEqual([2, 1])
+    expect(loadAdaptivePlan().signals).toMatchObject({ due: 1, mistakes: 1 })
   })
 })
 

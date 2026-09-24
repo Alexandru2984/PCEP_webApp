@@ -48,6 +48,8 @@ export default function QuizSetup({
   onPracticeBookmarks,
   dueReviewCount = 0,
   onPracticeDueReviews,
+  adaptivePlan,
+  onAdaptivePractice,
   initial,
   stats,
   statsLoading,
@@ -78,6 +80,30 @@ export default function QuizSetup({
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
         Pick a mode and scope. Leave filters on defaults for a full mixed-bag PCEP run.
       </p>
+
+      {adaptivePlan?.count > 0 && onAdaptivePractice && (
+        <button
+          type="button"
+          onClick={onAdaptivePractice}
+          className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-left transition-colors hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:hover:bg-violet-950/60"
+        >
+          <span>
+            <span className="block text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+              Recommended next
+            </span>
+            <span className="mt-0.5 block font-semibold text-violet-950 dark:text-violet-100">
+              Adaptive practice
+            </span>
+            <span className="mt-1 block text-xs text-violet-800 dark:text-violet-300/90">
+              {adaptivePlan.signals.due} due · {adaptivePlan.signals.mistakes} mistakes ·{' '}
+              {adaptivePlan.signals.weak} below-target mastery
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-violet-200 px-2.5 py-1 text-sm font-bold text-violet-950 dark:bg-violet-800 dark:text-violet-100">
+            {adaptivePlan.count}
+          </span>
+        </button>
+      )}
 
       {dueReviewCount > 0 && onPracticeDueReviews && (
         <button

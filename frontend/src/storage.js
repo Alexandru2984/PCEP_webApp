@@ -1,6 +1,7 @@
 import { DIFFICULTIES, MODULES, publicQuestion } from './questionData'
 import {
   STUDY_LIMIT,
+  adaptivePracticePlan,
   normalizeStudyRecord,
   normalizeStudyRecords,
   studySummary,
@@ -189,6 +190,8 @@ export const loadDueReviews = (now = Date.now()) =>
     .sort((a, b) => Date.parse(a.nextReview) - Date.parse(b.nextReview))
 export const loadStudySummary = (now = Date.now()) =>
   studySummary(loadStudyProgress(), now)
+export const loadAdaptivePlan = (now = Date.now(), limit = 20) =>
+  adaptivePracticePlan(loadStudyProgress(), loadMistakes(), now, limit)
 
 function normalizeActiveExam(value, now = Date.now()) {
   const allowed = new Set([

@@ -218,4 +218,23 @@ describe('quiz session requests', () => {
     )
     expect(result.current.phase).toBe('answering')
   })
+
+  it('starts a transparent adaptive drill from the ranked local plan', async () => {
+    updateStudyProgress(
+      [{ question, feedback: { is_correct: false } }],
+      Date.now() - 1000
+    )
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startAdaptiveQuiz())
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'practice',
+        source: 'adaptive',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('answering')
+  })
 })

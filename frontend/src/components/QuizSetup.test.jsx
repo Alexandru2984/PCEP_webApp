@@ -46,4 +46,22 @@ describe('QuizSetup — practice your mistakes', () => {
     fireEvent.click(button)
     expect(onPracticeDueReviews).toHaveBeenCalledOnce()
   })
+
+  it('shows why an adaptive set was recommended and starts it', () => {
+    const onAdaptivePractice = vi.fn()
+    render(
+      <QuizSetup
+        {...baseProps}
+        adaptivePlan={{
+          count: 12,
+          signals: { due: 4, mistakes: 6, weak: 9 },
+        }}
+        onAdaptivePractice={onAdaptivePractice}
+      />
+    )
+    const button = screen.getByRole('button', { name: /Adaptive practice/i })
+    expect(button).toHaveTextContent('4 due · 6 mistakes · 9 below-target mastery')
+    fireEvent.click(button)
+    expect(onAdaptivePractice).toHaveBeenCalledOnce()
+  })
 })

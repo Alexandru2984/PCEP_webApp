@@ -110,7 +110,7 @@ test('bookmarks persist across reload and start a targeted drill', async ({ page
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
 })
 
-test('missed questions become due reviews and launch a fresh targeted drill', async ({
+test('missed questions become due reviews and launch adaptive practice', async ({
   page,
 }) => {
   await mockApi(page)
@@ -132,6 +132,8 @@ test('missed questions become due reviews and launch a fresh targeted drill', as
   await page.setViewportSize({ width: 390, height: 844 })
   const due = page.getByRole('button', { name: /Review what is due/ })
   await expect(due).toContainText(String(QUESTIONS.length))
+  const recommended = page.getByRole('button', { name: /Adaptive practice/ })
+  await expect(recommended).toContainText(String(QUESTIONS.length))
   const { violations } = await new AxeBuilder({ page }).analyze()
   expect(violations.map((violation) => violation.id)).toEqual([])
   expect(
@@ -141,7 +143,7 @@ test('missed questions become due reviews and launch a fresh targeted drill', as
     const url = new URL(request.url())
     return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
   })
-  await due.click()
+  await recommended.click()
   const request = await requestPromise
   const params = new URL(request.url()).searchParams
   expect(params.get('count')).toBe(String(QUESTIONS.length))

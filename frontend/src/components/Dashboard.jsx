@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { loadBookmarks, loadHistory, loadMistakes, loadStudySummary } from '../storage'
+import {
+  loadAdaptivePlan,
+  loadBookmarks,
+  loadHistory,
+  loadMistakes,
+  loadStudySummary,
+} from '../storage'
 import { formatElapsed } from '../format'
 import ProgressTools from './ProgressTools'
 
@@ -50,8 +56,8 @@ function MasteryBar({ label, pct, onDrill }) {
   )
 }
 
-function StudyPlan({ summary, onDueReviews }) {
-  if (!summary.tracked) return null
+function StudyPlan({ summary, onDueReviews, adaptivePlan, onAdaptivePractice }) {
+  if (!summary.tracked && !adaptivePlan?.count) return null
   return (
     <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -61,18 +67,30 @@ function StudyPlan({ summary, onDueReviews }) {
           </h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Correct reviews move through 1, 3, 7 and longer day intervals. A miss is due
-            again immediately.
+            again immediately. The recommended set ranks due work, mistakes, low mastery
+            and tougher questions locally in your browser.
           </p>
         </div>
-        {summary.due > 0 && onDueReviews && (
-          <button
-            type="button"
-            onClick={onDueReviews}
-            className="shrink-0 rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white hover:bg-emerald-800"
-          >
-            Review due ({summary.due})
-          </button>
-        )}
+        <div className="flex shrink-0 flex-col gap-2">
+          {adaptivePlan?.count > 0 && onAdaptivePractice && (
+            <button
+              type="button"
+              onClick={onAdaptivePractice}
+              className="rounded-lg bg-violet-700 px-4 py-3 font-medium text-white hover:bg-violet-800"
+            >
+              Start recommended ({adaptivePlan.count})
+            </button>
+          )}
+          {summary.due > 0 && onDueReviews && (
+            <button
+              type="button"
+              onClick={onDueReviews}
+              className="rounded-lg border border-emerald-600 bg-white px-4 py-2.5 font-medium text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300"
+            >
+              Review due ({summary.due})
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Due now" value={summary.due} />
@@ -89,18 +107,30 @@ function StudyPlan({ summary, onDueReviews }) {
   )
 }
 
-export default function Dashboard({ onDrill, onBookmarks, onMistakes, onDueReviews }) {
+export default function Dashboard({
+  onDrill,
+  onBookmarks,
+  onMistakes,
+  onDueReviews,
+  onAdaptivePractice,
+}) {
   const [attempts, setAttempts] = useState(loadHistory)
   const refresh = () => setAttempts(loadHistory())
   const tools = <ProgressTools key="progress-tools" onChange={refresh} />
   const bookmarks = loadBookmarks().length
   const mistakes = loadMistakes().length
   const study = loadStudySummary()
+  const adaptivePlan = loadAdaptivePlan()
 
   if (attempts.length === 0) {
     return (
       <div className="space-y-4">
-        <StudyPlan summary={study} onDueReviews={onDueReviews} />
+        <StudyPlan
+          summary={study}
+          onDueReviews={onDueReviews}
+          adaptivePlan={adaptivePlan}
+          onAdaptivePractice={onAdaptivePractice}
+        />
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
           <p className="text-slate-600 dark:text-slate-400">
             No attempts yet — finish a quiz and your progress shows up here.
@@ -148,7 +178,12 @@ export default function Dashboard({ onDrill, onBookmarks, onMistakes, onDueRevie
 
   return (
     <div className="space-y-4">
-      <StudyPlan summary={study} onDueReviews={onDueReviews} />
+      <StudyPlan
+        summary={study}
+        onDueReviews={onDueReviews}
+        adaptivePlan={adaptivePlan}
+        onAdaptivePractice={onAdaptivePractice}
+      />
       {(bookmarks > 0 || mistakes > 0) && (
         <div className="flex flex-wrap gap-2">
           {mistakes > 0 && onMistakes && (

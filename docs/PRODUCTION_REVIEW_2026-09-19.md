@@ -285,7 +285,8 @@ added.
    confidence-vs-correctness insight after enough real usage data exists; keep the
    weighting visible and avoid opaque personalization.
 4. Add concept tags only with a curated taxonomy and coverage audit; use them to
-   drive search, weak-topic reports and adaptive sampling.
+   drive search and weak-topic reports. Current adaptive practice deliberately
+   uses only validated performance, due-date and difficulty signals.
 5. Add external uptime/error monitoring for liveness, readiness and release
    version, without collecting learner behavior or personal data.
 6. Re-evaluate PostgreSQL random ordering only when bank size or measured query

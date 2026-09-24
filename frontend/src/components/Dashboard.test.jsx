@@ -62,6 +62,7 @@ describe('Dashboard', () => {
 
   it('shows due review metrics and starts the scheduled drill', () => {
     const onDueReviews = vi.fn()
+    const onAdaptivePractice = vi.fn()
     updateStudyProgress([
       {
         question: {
@@ -78,9 +79,19 @@ describe('Dashboard', () => {
         feedback: { is_correct: false },
       },
     ])
-    render(<Dashboard onDueReviews={onDueReviews} />)
+    render(
+      <Dashboard onDueReviews={onDueReviews} onAdaptivePractice={onAdaptivePractice} />
+    )
     expect(screen.getByRole('heading', { name: 'Review plan' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Start recommended (1)' }))
+    expect(onAdaptivePractice).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Review due (1)' }))
     expect(onDueReviews).toHaveBeenCalledOnce()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear review schedule' }))
+    expect(
+      screen.queryByRole('button', { name: /Start recommended/ })
+    ).not.toBeInTheDocument()
+    confirm.mockRestore()
   })
 })
