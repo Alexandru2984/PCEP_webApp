@@ -111,6 +111,10 @@ export default function QuizContainer() {
     startModuleDrill,
   } = useQuizSession()
   const [view, setView] = useState('setup')
+  const returnToSetup = () => {
+    setView('setup')
+    resetToSetup()
+  }
   const [questionStats, setQuestionStats] = useState(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [statsError, setStatsError] = useState(null)
@@ -259,7 +263,7 @@ export default function QuizContainer() {
         <p className="mb-4 text-slate-700 dark:text-slate-300">{error}</p>
         <button
           type="button"
-          onClick={resetToSetup}
+          onClick={returnToSetup}
           className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
         >
           Back to setup
@@ -274,7 +278,7 @@ export default function QuizContainer() {
         <ExamView
           questions={questions}
           onSubmit={handleExamSubmit}
-          onQuit={resetToSetup}
+          onQuit={returnToSetup}
           onProgress={saveExamProgress}
           initialProgress={examProgress}
           submitting={submitting}
@@ -290,7 +294,7 @@ export default function QuizContainer() {
         <FlashcardView
           questions={questions}
           onFinish={(items) => finish(items, questions.length)}
-          onQuit={resetToSetup}
+          onQuit={returnToSetup}
         />
       </Suspense>
     )
@@ -303,7 +307,7 @@ export default function QuizContainer() {
           items={history}
           score={score}
           total={questions.length}
-          onRestart={resetToSetup}
+          onRestart={returnToSetup}
           onDrillModule={startModuleDrill}
           elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
           streakStats={getStreakStats(history)}
@@ -354,7 +358,7 @@ export default function QuizContainer() {
         </div>
         <button
           type="button"
-          onClick={resetToSetup}
+          onClick={returnToSetup}
           className="text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         >
           Quit

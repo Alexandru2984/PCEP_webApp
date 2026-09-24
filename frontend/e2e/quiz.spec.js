@@ -37,6 +37,42 @@ test('practice run produces a report with a one-click module drill', async ({ pa
   await expect(page.getByText(/Tip: press/)).toBeVisible()
 })
 
+test('new quiz returns to setup after a drill launched from progress', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'pcep.history',
+      JSON.stringify([
+        {
+          date: new Date().toISOString(),
+          mode: 'practice',
+          module: 'module1',
+          difficulty: '',
+          score: 5,
+          total: 10,
+          pct: 50,
+          elapsedMs: 100_000,
+          bestStreak: 2,
+        },
+      ])
+    )
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Progress/ }).click()
+  await page.getByRole('button', { name: 'Drill' }).click()
+
+  for (let i = 0; i < QUESTIONS.length; i++) {
+    await page.getByRole('button', { name: /option 1/ }).click()
+    await page.getByRole('button', { name: /Next Question|See Results/ }).click()
+  }
+  await page.getByRole('button', { name: 'New quiz' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your progress' })).toHaveCount(0)
+})
+
 test('flashcards reveal shows the answer and self-marking advances the deck', async ({
   page,
 }) => {

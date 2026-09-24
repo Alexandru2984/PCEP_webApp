@@ -148,7 +148,7 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 
 # Frontend — 126 Vitest tests, then static checks, the production build and
-# 15 Playwright flows (including axe, PWA, scheduled review, exam resume and Pyodide).
+# 16 Playwright flows (including axe, PWA, scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```
