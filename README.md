@@ -64,7 +64,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused drill; answer one correctly and it drops off the list (local-first)
 - 🔖 **Bookmarks and portable progress** — bookmark drills plus validated,
-  versioned JSON export/import and selective history, review, mistake and bookmark resets
+  versioned JSON export/import and selective history, review, mistake, note and bookmark resets
+- 📝 **Private personal notes** — keep bounded local notes beside practice questions and
+  review them after a session; notes are included in validated progress backups
 - ⌨️ **Keyboard shortcuts** and full dark mode
 - 📱 **Installable, offline-capable PWA** — a service worker precaches the public
   shell and caches the Pyodide runtime. API answers and study pages are excluded;
@@ -150,8 +152,8 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 131 Vitest tests, then static checks, the production build and
-# 17 Playwright flows (including axe, PWA, search, scheduled review, exam resume and Pyodide).
+# Frontend — 140 Vitest tests, then static checks, the production build and
+# 18 Playwright flows (including axe, PWA, notes, search, scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```

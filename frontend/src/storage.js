@@ -1,4 +1,4 @@
-import { DIFFICULTIES, MODULES, publicQuestion } from './questionData'
+import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
 import {
   STUDY_LIMIT,
   adaptivePracticePlan,
@@ -9,8 +9,9 @@ import {
 } from './study'
 
 const VERSION = 1
-const BACKUP_VERSION = 2
+const BACKUP_VERSION = 3
 const LIMIT = 100
+const NOTE_MAX_LENGTH = 2000
 const PROGRESS_KEY = 'pcep.progress'
 const ACTIVE_EXAM_KEY = 'pcep.activeExam'
 const BACKUP_MAX_BYTES = 8 * 1024 * 1024
@@ -100,6 +101,34 @@ function questions(value) {
     return true
   })
 }
+function normalizeNote(value) {
+  const allowed = new Set(['questionId', 'text', 'updatedAt'])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    !validId(value.questionId) ||
+    typeof value.text !== 'string' ||
+    value.text.length > NOTE_MAX_LENGTH ||
+    !value.text.trim() ||
+    typeof value.updatedAt !== 'string' ||
+    value.updatedAt.length > 40 ||
+    !Number.isFinite(Date.parse(value.updatedAt))
+  )
+    return null
+  return {
+    questionId: value.questionId,
+    text: value.text.trim(),
+    updatedAt: new Date(value.updatedAt).toISOString(),
+  }
+}
+function notes(value) {
+  const seen = new Set()
+  return records(value, normalizeNote).filter((note) => {
+    if (seen.has(note.questionId)) return false
+    seen.add(note.questionId)
+    return true
+  })
+}
 function loadProgress() {
   let raw
   try {
@@ -127,6 +156,7 @@ function loadProgress() {
     mistakes: questions(data.mistakes),
     bookmarks: questions(data.bookmarks),
     study: normalizeStudyRecords(data.study),
+    notes: notes(data.notes),
   }
   if (raw) {
     cachedRaw = raw
@@ -184,6 +214,11 @@ export const loadHistory = () => loadProgress().history
 export const loadMistakes = () => loadProgress().mistakes
 export const loadBookmarks = () => loadProgress().bookmarks
 export const loadStudyProgress = () => loadProgress().study
+export const loadNotes = () => loadProgress().notes
+export const loadNote = (questionId) =>
+  validId(questionId)
+    ? (loadNotes().find((note) => note.questionId === questionId) ?? null)
+    : null
 export const loadDueReviews = (now = Date.now()) =>
   loadStudyProgress()
     .filter((record) => Date.parse(record.nextReview) <= now)
@@ -302,6 +337,24 @@ export const clearHistory = () => saveProgress({ ...loadProgress(), history: [] 
 export const clearMistakes = () => saveProgress({ ...loadProgress(), mistakes: [] })
 export const clearBookmarks = () => saveProgress({ ...loadProgress(), bookmarks: [] })
 export const clearStudyProgress = () => saveProgress({ ...loadProgress(), study: [] })
+export const clearNotes = () => saveProgress({ ...loadProgress(), notes: [] })
+
+export function saveNote(questionId, text, now = Date.now()) {
+  if (!validId(questionId) || typeof text !== 'string' || text.length > NOTE_MAX_LENGTH)
+    throw new Error('Notes must contain 2,000 characters or fewer.')
+  const progress = loadProgress()
+  const remaining = progress.notes.filter((note) => note.questionId !== questionId)
+  const value = text.trim()
+  const notes = value
+    ? [{ questionId, text: value, updatedAt: new Date(now).toISOString() }, ...remaining]
+        .map(normalizeNote)
+        .filter(Boolean)
+        .slice(0, LIMIT)
+    : remaining
+  if (!saveProgress({ ...progress, notes }))
+    throw new Error('Could not save the note. Browser storage is unavailable or full.')
+  return notes.find((note) => note.questionId === questionId) ?? null
+}
 
 export function updateMistakes(items) {
   const progress = loadProgress()
@@ -362,7 +415,7 @@ export function parseProgressBackup(raw) {
   if (
     !object(data) ||
     data.type !== 'pcep-progress' ||
-    ![1, BACKUP_VERSION].includes(data.version)
+    ![1, 2, BACKUP_VERSION].includes(data.version)
   )
     throw new Error('Unsupported progress backup format or version.')
   const out = {}
@@ -378,7 +431,7 @@ export function parseProgressBackup(raw) {
       throw new Error(`Backup contains invalid ${key} records.`)
     out[key] = normalized
   }
-  if (data.version === BACKUP_VERSION) {
+  if (data.version >= 2) {
     if (!Array.isArray(data.study) || data.study.length > STUDY_LIMIT)
       throw new Error(`Backup study must contain at most ${STUDY_LIMIT} records.`)
     const normalized = data.study.map(normalizeStudyRecord)
@@ -389,6 +442,17 @@ export function parseProgressBackup(raw) {
       throw new Error('Backup contains invalid or duplicate study records.')
     out.study = normalized
   } else out.study = []
+  if (data.version >= 3) {
+    if (!Array.isArray(data.notes) || data.notes.length > LIMIT)
+      throw new Error('Backup notes must contain at most 100 records.')
+    const normalized = data.notes.map(normalizeNote)
+    if (
+      normalized.some((record) => !record) ||
+      new Set(normalized.map((record) => record.questionId)).size !== normalized.length
+    )
+      throw new Error('Backup contains invalid or duplicate note records.')
+    out.notes = normalized
+  } else out.notes = []
   // Reject answer metadata outright rather than importing a portable answer bank.
   const forbidden = new Set([
     'is_correct',
@@ -406,7 +470,8 @@ export function parseProgressBackup(raw) {
           'history',
           'mistakes',
           'bookmarks',
-          ...(data.version === BACKUP_VERSION ? ['study'] : []),
+          ...(data.version >= 2 ? ['study'] : []),
+          ...(data.version >= 3 ? ['notes'] : []),
         ].includes(key)
     )
   )
@@ -428,9 +493,10 @@ export function importProgress(backup) {
   const incoming = parseProgressBackup(
     JSON.stringify({
       type: 'pcep-progress',
-      version: BACKUP_VERSION,
       ...backup,
+      version: BACKUP_VERSION,
       study: backup.study ?? [],
+      notes: backup.notes ?? [],
     })
   )
   const progress = loadProgress()
@@ -464,6 +530,13 @@ export function importProgress(backup) {
     ]
       .sort((a, b) => Date.parse(b.lastAttempted) - Date.parse(a.lastAttempted))
       .slice(0, STUDY_LIMIT),
+    notes: [...progress.notes, ...incoming.notes]
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .filter(
+        (note, index, all) =>
+          all.findIndex((candidate) => candidate.questionId === note.questionId) === index
+      )
+      .slice(0, LIMIT),
   }
   if (!saveProgress(merged))
     throw new Error(

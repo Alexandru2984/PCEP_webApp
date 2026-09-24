@@ -45,7 +45,7 @@
 | P2 | Frontend deploy deletes live files before copy and ignores failures; Make test omits Vitest; runtime fetch boolean precedence uses wrong cwd. | Build before publish, copy into complete release directory, retain hashed assets for active tabs, atomic publication and backup/rollback. Fix Make paths and add frontend unit tests. Validate release before swapping. |
 | P2 | CI lacks concurrency cancellation, useful Playwright report config and Docker build smoke. | Add cancellation, bounded workers, report artifacts and backend image/build/config checks; avoid production tests in CI. Keep PostgreSQL API checks and audits. |
 | P2 | Stats perform four queries; health combines liveness/readiness and unthrottled DB endpoint. | Derive totals from one bounded grouped query; add pure `/api/live/`, preserve `/api/health/` readiness compatibility, cap DB connect/startup waits. Verify query budget and outage behavior. |
-| P3 | Personal notes, confidence, spaced repetition, daily challenge, tags/search and richer response timing. | Defer until session/persistence reliability is verified; avoid speculative schema migrations and tracking/accounts. |
+| P3 | Confidence, daily challenge, concept tags and richer response timing. Search and bounded personal notes are now implemented locally. | Continue only where the learning value justifies added state; avoid speculative schema migrations and tracking/accounts. |
 
 ## Deployment and rollback strategy
 

@@ -3,6 +3,7 @@ import CodeBlock from './CodeBlock'
 import PerformanceReport from './PerformanceReport'
 import { celebrate } from '../confetti'
 import { useCountUp } from '../useCountUp'
+import QuestionNote from './QuestionNote'
 
 // Same dynamic specifier as QuestionCard, so the runner ships as one shared
 // chunk. The static CodeBlock stands in until it loads.
@@ -75,7 +76,7 @@ function ReviewItem({ index, item }) {
               key={c.id}
               className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${cls}`}
             >
-              <span className="font-mono text-slate-500 dark:text-slate-400">
+              <span className="font-mono text-slate-700 dark:text-slate-300">
                 {String.fromCharCode(65 + i)}.
               </span>
               <span className="flex-1">{c.text}</span>
@@ -109,6 +110,8 @@ function ReviewItem({ index, item }) {
           {correctExplanation}
         </div>
       )}
+
+      <QuestionNote questionId={question.id} className="mt-3" />
     </li>
   )
 }

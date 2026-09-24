@@ -22,6 +22,10 @@ import {
   loadStudyProgress,
   loadStudySummary,
   updateStudyProgress,
+  loadNotes,
+  loadNote,
+  saveNote,
+  clearNotes,
 } from './storage'
 
 const question = (id) => ({
@@ -117,6 +121,40 @@ describe('settings', () => {
     }
     saveSettings(settings)
     expect(loadSettings()).toEqual(settings)
+  })
+})
+
+describe('personal notes', () => {
+  it('creates, updates and removes a trimmed note by question ID', () => {
+    expect(
+      saveNote(1, '  Remember operator precedence.  ', Date.UTC(2026, 8, 20))
+    ).toEqual({
+      questionId: 1,
+      text: 'Remember operator precedence.',
+      updatedAt: '2026-09-20T00:00:00.000Z',
+    })
+    expect(loadNote(1)?.text).toBe('Remember operator precedence.')
+    saveNote(1, 'Updated', Date.UTC(2026, 8, 21))
+    expect(loadNotes()).toHaveLength(1)
+    expect(loadNote(1)?.text).toBe('Updated')
+    expect(saveNote(1, '   ')).toBeNull()
+    expect(loadNotes()).toEqual([])
+  })
+
+  it('bounds note size and total records', () => {
+    expect(() => saveNote(1, 'x'.repeat(2001))).toThrow(/2,000/)
+    for (let id = 1; id <= 105; id++) saveNote(id, `Note ${id}`, id)
+    expect(loadNotes()).toHaveLength(100)
+    expect(loadNote(105)?.text).toBe('Note 105')
+    expect(loadNote(1)).toBeNull()
+  })
+
+  it('clears notes without clearing attempts', () => {
+    appendAttempt(attempt('kept'))
+    saveNote(1, 'Temporary')
+    expect(clearNotes()).toBe(true)
+    expect(loadNotes()).toEqual([])
+    expect(loadHistory()).toHaveLength(1)
   })
 })
 
@@ -307,6 +345,76 @@ describe('schema migration and portability', () => {
     expect(loadHistory()).toHaveLength(2)
     expect(loadBookmarks()).toHaveLength(1)
     expect(loadStudyProgress()).toHaveLength(1)
+  })
+
+  it('exports notes and keeps the newest note when backups merge', () => {
+    saveNote(1, 'Local is newer', Date.UTC(2026, 8, 22))
+    const exported = parseProgressBackup(exportProgress())
+    expect(exported.notes).toEqual([
+      {
+        questionId: 1,
+        text: 'Local is newer',
+        updatedAt: '2026-09-22T00:00:00.000Z',
+      },
+    ])
+    importProgress({
+      history: [],
+      mistakes: [],
+      bookmarks: [],
+      study: [],
+      notes: [
+        {
+          questionId: 1,
+          text: 'Imported is older',
+          updatedAt: '2026-09-21T00:00:00.000Z',
+        },
+      ],
+    })
+    expect(loadNote(1)?.text).toBe('Local is newer')
+  })
+
+  it('accepts version 2 backups without inventing notes', () => {
+    const backup = parseProgressBackup(
+      JSON.stringify({
+        type: 'pcep-progress',
+        version: 2,
+        history: [],
+        mistakes: [],
+        bookmarks: [],
+        study: [],
+      })
+    )
+    expect(backup.notes).toEqual([])
+  })
+
+  it('rejects duplicate or malformed notes in version 3 backups', () => {
+    const base = {
+      type: 'pcep-progress',
+      version: 3,
+      history: [],
+      mistakes: [],
+      bookmarks: [],
+      study: [],
+    }
+    expect(() =>
+      parseProgressBackup(
+        JSON.stringify({
+          ...base,
+          notes: [
+            { questionId: 1, text: 'A', updatedAt: '2026-09-20T00:00:00Z' },
+            { questionId: 1, text: 'B', updatedAt: '2026-09-21T00:00:00Z' },
+          ],
+        })
+      )
+    ).toThrow(/duplicate note/)
+    expect(() =>
+      parseProgressBackup(
+        JSON.stringify({
+          ...base,
+          notes: [{ questionId: 1, text: 'x'.repeat(2001), updatedAt: 'bad' }],
+        })
+      )
+    ).toThrow(/invalid or duplicate note/)
   })
 
   it('imports legacy version 1 backups with an empty review schedule', () => {

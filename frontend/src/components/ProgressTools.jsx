@@ -3,6 +3,7 @@ import {
   clearBookmarks,
   clearHistory,
   clearMistakes,
+  clearNotes,
   clearStudyProgress,
   exportProgress,
   importProgress,
@@ -121,13 +122,21 @@ export default function ProgressTools({ onChange }) {
         >
           Clear review schedule
         </button>
+        <button
+          type="button"
+          onClick={() => reset('personal notes', clearNotes)}
+          className={buttonClass}
+        >
+          Clear notes
+        </button>
       </div>
       {preview && (
         <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-800 dark:bg-sky-950/40">
           <p>
             Merge {preview.history.length} attempts, {preview.mistakes.length} mistakes
             and {preview.bookmarks.length} bookmarks, plus {preview.study.length} study
-            records? Duplicates are merged; review history keeps up to 1,000 questions.
+            records and {preview.notes.length} personal notes? Duplicates are merged;
+            review history keeps up to 1,000 questions.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} onClick={mergeBackup}>

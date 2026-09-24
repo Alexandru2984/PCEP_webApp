@@ -185,6 +185,47 @@ test('bookmarks persist across reload and start a targeted drill', async ({ page
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
 })
 
+test('personal notes persist into review without storing answer data', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Start practice/ }).click()
+  await page.getByRole('button', { name: 'Add note' }).click()
+  await page
+    .getByLabel('Personal note')
+    .fill('Remember that floor division rounds toward negative infinity.')
+  await page.getByRole('button', { name: 'Save note' }).click()
+  await expect(page.getByRole('status')).toContainText('Note saved')
+
+  const stored = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.progress')).data.notes
+  )
+  expect(stored).toHaveLength(1)
+  expect(stored[0]).toMatchObject({ questionId: 1 })
+  expect(JSON.stringify(stored)).not.toMatch(/choice|answer|is_correct|explanation/)
+
+  for (let index = 0; index < QUESTIONS.length; index++) {
+    await page.getByRole('button', { name: /option 2/ }).click()
+    await page.getByRole('button', { name: /Next Question|See Results/ }).click()
+  }
+  await expect(page.getByRole('heading', { name: 'Quiz complete' })).toBeVisible()
+  await expect(
+    page.getByText('Remember that floor division rounds toward negative infinity.')
+  ).toBeVisible()
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(
+    violations.map((violation) => ({
+      id: violation.id,
+      nodes: violation.nodes.map((node) => node.target),
+    }))
+  ).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+})
+
 test('missed questions become due reviews and launch adaptive practice', async ({
   page,
 }) => {
