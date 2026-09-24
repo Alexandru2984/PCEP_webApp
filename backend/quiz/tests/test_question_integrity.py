@@ -8,7 +8,7 @@ from django.forms.models import inlineformset_factory
 
 from quiz.admin import ChoiceFormSet
 from quiz.models import Question, Choice
-from quiz.question_bank import validation_errors
+from quiz.question_bank import duplicate_questions, validation_errors
 
 
 def question(**overrides):
@@ -33,6 +33,12 @@ def test_python_option_case_is_semantically_significant():
     q['choices'][0]['text'] = 'True'
     q['choices'][1]['text'] = 'true'
     assert not validation_errors([q])
+
+
+def test_duplicate_audit_ignores_python_quote_and_whitespace_style():
+    first = question(text='What is the output?', code_snippet='print("same")')
+    second = question(text='  What  is the output? ', code_snippet="print( 'same' )")
+    assert [index for index, _ in duplicate_questions([first, second])] == [1, 2]
 
 
 @pytest.mark.django_db
@@ -95,3 +101,30 @@ def test_empty_output_migration_preserves_question_and_choice_ids(make_question)
     migration.restore_empty_output(apps, editor)
     choice.refresh_from_db()
     assert choice.text == ''
+
+
+@pytest.mark.django_db
+def test_duplicate_replacement_migration_preserves_all_ids(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+    migration = importlib.import_module(
+        'quiz.migrations.0004_replace_duplicate_exception_question'
+    )
+    q = make_question(module='module4', difficulty='easy')
+    q.text = migration.QUESTION_TEXT
+    q.code_snippet = migration.OLD_SNIPPET
+    q.save()
+    choice_ids = list(q.choices.values_list('id', flat=True))
+    editor = connection.schema_editor()
+
+    migration.replace_duplicate(apps, editor)
+    q.refresh_from_db()
+    assert q.code_snippet == migration.NEW_SNIPPET
+    assert list(q.choices.values_list('id', flat=True)) == choice_ids
+    assert q.choices.get(is_correct=True).text == '4'
+
+    migration.restore_duplicate(apps, editor)
+    q.refresh_from_db()
+    assert q.code_snippet == migration.OLD_SNIPPET
+    assert list(q.choices.values_list('id', flat=True)) == choice_ids

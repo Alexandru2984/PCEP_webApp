@@ -1,3 +1,4 @@
+import ast
 from collections import Counter
 
 from .seed_data import ALL_QUESTIONS
@@ -9,9 +10,19 @@ MIN_HARD_PER_MODULE = 8
 
 
 def question_key(question):
+    text = ' '.join(question.get('text', '').casefold().split())
+    snippet = question.get('code_snippet', '').strip()
+    if snippet:
+        try:
+            # Ignore quote style and harmless formatting when the snippet is valid
+            # Python. Invalid snippets are sometimes intentional teaching examples,
+            # so they fall back to normalized source instead of becoming audit errors.
+            snippet = ast.dump(ast.parse(snippet), include_attributes=False)
+        except (SyntaxError, ValueError):
+            snippet = ' '.join(snippet.split())
     return (
-        question.get('text', '').strip().casefold(),
-        question.get('code_snippet', '').strip().casefold(),
+        text,
+        snippet,
     )
 
 

@@ -232,6 +232,17 @@ protections, not a hardened sandbox: arbitrary Python can use the JavaScript
 bridge and can still exhaust browser memory before a timeout. Do not run
 untrusted snippets in an authenticated admin browser.
 
+The question audit canonicalizes valid Python snippets through the standard AST
+before duplicate comparison. This catches semantically identical questions that
+differ only in quote style or harmless formatting. Intentionally invalid teaching
+snippets fall back to normalized source comparison and are not rejected merely for
+being invalid Python.
+
+Migration `0004_replace_duplicate_exception_question` replaces one duplicate
+exception question with a distinct `try/except/else` exercise. It updates the
+existing question and its four choices in place, preserving every database ID and
+avoiding stale local bookmarks or interrupted exam selections.
+
 ## Nginx production topology and hardening
 
 The tracked vhost now matches the existing TLS deployment, including SEO,
