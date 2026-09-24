@@ -2,6 +2,8 @@
 // review list uses — no extra API calls. Breaks the result down by module and
 // by difficulty and points the learner at their weakest area.
 
+import { formatElapsed } from '../format'
+
 const MODULE_LABELS = {
   module1: 'M1 · Fundamentals',
   module2: 'M2 · Control Flow',
@@ -12,12 +14,15 @@ const MODULE_LABELS = {
 const MODULE_ORDER = ['module1', 'module2', 'module3', 'module4']
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard']
 const DIFFICULTY_LABELS = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
+const CONFIDENCE_ORDER = ['low', 'medium', 'high']
+const CONFIDENCE_LABELS = { low: 'Low', medium: 'Medium', high: 'High' }
 const PASS_THRESHOLD = 70
 
 function tally(items, keyFn) {
   const groups = {}
   for (const item of items) {
     const key = keyFn(item)
+    if (!key) continue
     const g = (groups[key] ??= { correct: 0, total: 0 })
     g.total += 1
     if (item.feedback?.is_correct) g.correct += 1
@@ -92,6 +97,24 @@ export default function PerformanceReport({ items, onDrillModule }) {
     DIFFICULTY_ORDER,
     DIFFICULTY_LABELS
   )
+  const confidenceRows = toRows(
+    tally(items, (item) => item.confidence),
+    CONFIDENCE_ORDER,
+    CONFIDENCE_LABELS
+  )
+  const timed = items
+    .map((item, index) => ({ index, responseMs: item.responseMs }))
+    .filter(({ responseMs }) => Number.isSafeInteger(responseMs) && responseMs >= 0)
+  const averageResponseMs = timed.length
+    ? Math.round(timed.reduce((sum, item) => sum + item.responseMs, 0) / timed.length)
+    : null
+  const slowest = [...timed].sort((a, b) => b.responseMs - a.responseMs).slice(0, 3)
+  const confidentMisses = items.filter(
+    (item) => item.confidence === 'high' && !item.feedback?.is_correct
+  ).length
+  const uncertainWins = items.filter(
+    (item) => item.confidence === 'low' && item.feedback?.is_correct
+  ).length
 
   // Weakest module worth calling out: lowest pct, tie broken by the larger
   // sample so a 0/1 fluke doesn't outrank a 2/6 genuine weak spot.
@@ -99,15 +122,49 @@ export default function PerformanceReport({ items, onDrillModule }) {
   const hasGap = weakest && weakest.pct < PASS_THRESHOLD
 
   return (
-    <section className="mb-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+    <section
+      aria-labelledby="performance-breakdown-heading"
+      className="mb-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+    >
+      <h3
+        id="performance-breakdown-heading"
+        className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300"
+      >
         Performance breakdown
       </h3>
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Breakdown title="By module" rows={moduleRows} />
         <Breakdown title="By difficulty" rows={difficultyRows} />
+        <Breakdown title="By confidence" rows={confidenceRows} />
       </div>
+
+      {(confidenceRows.length > 0 || averageResponseMs !== null) && (
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {confidenceRows.length > 0 && (
+            <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-100">
+              <span className="font-semibold">Confidence calibration: </span>
+              {confidentMisses > 0
+                ? `${confidentMisses} high-confidence miss${confidentMisses === 1 ? '' : 'es'} to revisit.`
+                : 'No high-confidence misses in this session.'}{' '}
+              {uncertainWins > 0
+                ? `${uncertainWins} low-confidence answer${uncertainWins === 1 ? ' was' : 's were'} correct.`
+                : ''}
+            </div>
+          )}
+          {averageResponseMs !== null && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100">
+              <span className="font-semibold">Decision timing: </span>
+              {formatElapsed(averageResponseMs)} average. Slowest:{' '}
+              {slowest
+                .map(
+                  ({ index, responseMs }) => `Q${index + 1} ${formatElapsed(responseMs)}`
+                )
+                .join(' · ')}
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         className={`mt-5 rounded-lg border p-3 text-sm ${

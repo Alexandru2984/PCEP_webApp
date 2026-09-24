@@ -50,17 +50,17 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 💾 **Crash-safe exam recovery** — an interrupted exam restores its deadline,
   current question, selected answers and flags from a validated local-only copy
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
-  due-review drills, per-question mastery and transparent adaptive practice without
-  accounts or tracking
+  due-review drills, per-question mastery and transparent adaptive practice that also
+  prioritizes low-confidence answers, without accounts or tracking
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
 - 🔎 **Search question text or Python code** and build a focused practice drill from
   up to 20 matches; search previews deliberately exclude choices and answer metadata
 - 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
-  accuracy, local-day study streaks, score trends, average response pace and separate
-  flashcard self-ratings (local-first)
-- 📈 **End-of-quiz report** — per-module and per-difficulty breakdown with a
-  "focus area" recommendation you can drill in one click, plus a question-by-question
-  review filtered to misses
+  accuracy, confidence calibration, local-day study streaks, score trends, measured
+  response pace and separate flashcard self-ratings (local-first)
+- 📈 **End-of-quiz report** — per-module, per-difficulty and optional confidence
+  breakdowns, decision timing and a "focus area" recommendation you can drill in one
+  click, plus a question-by-question review filtered to misses
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused drill; answer one correctly and it drops off the list (local-first)
 - 🔖 **Bookmarks and portable progress** — bookmark drills plus validated,
@@ -152,8 +152,9 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 140 Vitest tests, then static checks, the production build and
-# 18 Playwright flows (including axe, PWA, notes, search, scheduled review, exam resume and Pyodide).
+# Frontend — 155 Vitest tests, then static checks, the production build and
+# 19 Playwright flows (including axe, confidence, PWA, notes, search, scheduled review,
+# exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```

@@ -16,6 +16,7 @@ import {
 } from './storage'
 import { publicQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
+import { MAX_RESPONSE_MS, validConfidence } from './confidence'
 
 const EXAM_SECONDS_PER_QUESTION = 80
 
@@ -25,6 +26,7 @@ function emptyState(lastConfig = null, resumableExam = null) {
     questions: [],
     index: 0,
     selectedChoiceId: null,
+    confidence: null,
     feedback: null,
     history: [],
     lastConfig,
@@ -68,6 +70,8 @@ export function sessionReducer(state, event) {
           answers: event.exam.answers,
           flagged: event.exam.flagged,
           deadline: event.exam.deadline,
+          confidences: event.exam.confidences ?? {},
+          responseMs: event.exam.responseMs ?? {},
         },
       }
     case 'discard-resume':
@@ -82,6 +86,11 @@ export function sessionReducer(state, event) {
             selectedChoiceId: event.choiceId,
             error: null,
           }
+        : state
+    case 'set-confidence':
+      return state.phase === 'answering' &&
+        (event.confidence === null || validConfidence(event.confidence))
+        ? { ...state, confidence: event.confidence }
         : state
     case 'feedback':
       return state.phase === 'submitting-answer'
@@ -102,6 +111,7 @@ export function sessionReducer(state, event) {
             index: state.index + 1,
             feedback: null,
             selectedChoiceId: null,
+            confidence: null,
           }
         : state
     case 'grading':
@@ -130,6 +140,7 @@ export default function useQuizSession() {
   const mounted = useRef(true)
   const finished = useRef(false)
   const advancing = useRef(false)
+  const questionStartedAt = useRef(0)
 
   useEffect(() => {
     mounted.current = true
@@ -141,6 +152,9 @@ export default function useQuizSession() {
   }, [])
   useEffect(() => {
     advancing.current = false
+  }, [state.index, state.phase])
+  useEffect(() => {
+    if (state.phase === 'answering') questionStartedAt.current = Date.now()
   }, [state.index, state.phase])
 
   const begin = () => {
@@ -181,6 +195,8 @@ export default function useQuizSession() {
               index: 0,
               answers: {},
               flagged: [],
+              confidences: {},
+              responseMs: {},
               deadline: now + questions.length * EXAM_SECONDS_PER_QUESTION * 1000,
             }
           : null
@@ -206,6 +222,11 @@ export default function useQuizSession() {
     if (!question.choices.some((c) => c.id === choiceId)) return
     const controller = begin()
     if (!controller) return
+    const confidence = state.confidence
+    const responseMs = Math.min(
+      MAX_RESPONSE_MS,
+      Math.max(0, Date.now() - questionStartedAt.current)
+    )
     dispatch({ type: 'answering', choiceId })
     try {
       const data = await submitAnswer(question.id, choiceId, {
@@ -216,7 +237,13 @@ export default function useQuizSession() {
       dispatch({
         type: 'feedback',
         feedback: data,
-        item: { question, pickedChoiceId: choiceId, feedback: data },
+        item: {
+          question,
+          pickedChoiceId: choiceId,
+          feedback: data,
+          confidence,
+          responseMs,
+        },
       })
     } catch (error) {
       if (current(controller))
@@ -239,6 +266,19 @@ export default function useQuizSession() {
         if (item.feedback?.is_correct) group.score++
         return groups
       }, {})
+    const byConfidence = items.reduce((groups, item) => {
+      if (!validConfidence(item.confidence)) return groups
+      const group = (groups[item.confidence] ??= { score: 0, total: 0 })
+      group.total++
+      if (item.feedback?.is_correct) group.score++
+      return groups
+    }, {})
+    const timedItems = items.filter(
+      (item) =>
+        Number.isSafeInteger(item.responseMs) &&
+        item.responseMs >= 0 &&
+        item.responseMs <= MAX_RESPONSE_MS
+    )
     appendAttempt({
       date: new Date().toISOString(),
       mode: state.lastConfig?.mode ?? 'practice',
@@ -251,6 +291,13 @@ export default function useQuizSession() {
       bestStreak: getStreakStats(items).best,
       byModule: breakdown('module'),
       byDifficulty: breakdown('difficulty'),
+      ...(Object.keys(byConfidence).length ? { byConfidence } : {}),
+      ...(timedItems.length
+        ? {
+            responseMsTotal: timedItems.reduce((sum, item) => sum + item.responseMs, 0),
+            responseCount: timedItems.length,
+          }
+        : {}),
     })
     updateMistakes(items)
     updateStudyProgress(items)
@@ -265,7 +312,7 @@ export default function useQuizSession() {
     else dispatch({ type: 'next' })
   }
 
-  const handleExamSubmit = async (answers) => {
+  const handleExamSubmit = async (answers, metadata = {}) => {
     if (state.phase !== 'exam') return false
     const controller = begin()
     if (!controller) return false
@@ -292,7 +339,20 @@ export default function useQuizSession() {
           throw new Error(
             'The server returned invalid grading. Your answers are kept; please retry.'
           )
-        return { question, pickedChoiceId: feedback.choice_id, feedback }
+        const confidence = metadata.confidences?.[question.id]
+        const responseMs = metadata.responseMs?.[question.id]
+        return {
+          question,
+          pickedChoiceId: feedback.choice_id,
+          feedback,
+          confidence: validConfidence(confidence) ? confidence : null,
+          responseMs:
+            Number.isSafeInteger(responseMs) &&
+            responseMs >= 0 &&
+            responseMs <= MAX_RESPONSE_MS
+              ? responseMs
+              : null,
+        }
       })
       finish(items, state.questions.length)
       return true
@@ -366,6 +426,7 @@ export default function useQuizSession() {
     ...state,
     startQuiz,
     handleSelect,
+    handleConfidence: (confidence) => dispatch({ type: 'set-confidence', confidence }),
     handleNext,
     handleExamSubmit,
     finish,

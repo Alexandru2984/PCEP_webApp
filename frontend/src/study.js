@@ -1,4 +1,5 @@
 import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
+import { validConfidence } from './confidence'
 
 export const STUDY_LIMIT = 1000
 export const DAY_MS = 24 * 60 * 60 * 1000
@@ -19,6 +20,7 @@ export function normalizeStudyRecord(record) {
     'intervalDays',
     'lastAttempted',
     'nextReview',
+    'lastConfidence',
   ])
   if (
     !object(record) ||
@@ -33,7 +35,8 @@ export function normalizeStudyRecord(record) {
     typeof record.lastAttempted !== 'string' ||
     record.lastAttempted.length > 40 ||
     typeof record.nextReview !== 'string' ||
-    record.nextReview.length > 40
+    record.nextReview.length > 40 ||
+    (record.lastConfidence !== undefined && !validConfidence(record.lastConfidence))
   )
     return null
 
@@ -57,6 +60,7 @@ export function normalizeStudyRecord(record) {
     intervalDays: record.intervalDays,
     lastAttempted: new Date(lastAttempted).toISOString(),
     nextReview: new Date(nextReview).toISOString(),
+    ...(record.lastConfidence ? { lastConfidence: record.lastConfidence } : {}),
   }
 }
 
@@ -116,6 +120,11 @@ export function updateStudyRecords(records, items, now = Date.now()) {
       intervalDays,
       lastAttempted: timestamp,
       nextReview: new Date(now + intervalDays * DAY_MS).toISOString(),
+      ...(validConfidence(item.confidence)
+        ? { lastConfidence: item.confidence }
+        : previous.lastConfidence
+          ? { lastConfidence: previous.lastConfidence }
+          : {}),
     })
   }
 
@@ -143,6 +152,7 @@ export function studySummary(records, now = Date.now()) {
     strong: normalized.filter(
       (record) => masteryPercent(record) >= 80 && Date.parse(record.nextReview) > now
     ).length,
+    uncertain: normalized.filter((record) => record.lastConfidence === 'low').length,
     averageMastery: mastery.length
       ? Math.round(mastery.reduce((sum, value) => sum + value, 0) / mastery.length)
       : 0,
@@ -178,6 +188,7 @@ export function adaptivePracticePlan(
     const question = mistakeQuestions.get(questionId)
     const due = record ? Date.parse(record.nextReview) <= timestamp : true
     const mistake = mistakeQuestions.has(questionId)
+    const uncertain = record?.lastConfidence === 'low'
     const errorRate = record ? (record.attempts - record.correct) / record.attempts : 1
     const mastery = record ? masteryPercent(record) : 0
     const difficulty = record?.difficulty ?? question?.difficulty
@@ -187,19 +198,21 @@ export function adaptivePracticePlan(
       (mistake ? 60 : 0) +
       errorRate * 40 +
       ((100 - mastery) / 100) * 30 +
-      difficultyBonus
+      difficultyBonus +
+      (uncertain ? 20 : 0)
     return {
       questionId,
       due,
       mistake,
       weak: mastery < 80,
+      uncertain,
       priority,
       lastAttempted: record ? Date.parse(record.lastAttempted) : 0,
     }
   })
 
   const selected = ranked
-    .filter((item) => item.due || item.mistake || item.weak)
+    .filter((item) => item.due || item.mistake || item.weak || item.uncertain)
     .sort(
       (a, b) =>
         b.priority - a.priority ||
@@ -214,6 +227,7 @@ export function adaptivePracticePlan(
       due: selected.filter((item) => item.due).length,
       mistakes: selected.filter((item) => item.mistake).length,
       weak: selected.filter((item) => item.weak).length,
+      lowConfidence: selected.filter((item) => item.uncertain).length,
     },
   }
 }

@@ -65,13 +65,36 @@ export function performanceInsights(attempts, now = Date.now()) {
     .map(({ attempt }) => attempt)
     .filter((attempt) => attempt.mode !== 'flashcards')
 
+  const measured = graded.filter(
+    (attempt) => attempt.responseCount > 0 && attempt.responseMsTotal >= 0
+  )
   const timed = graded.filter((attempt) => attempt.elapsedMs > 0 && attempt.total > 0)
-  const timedQuestions = timed.reduce((sum, attempt) => sum + attempt.total, 0)
+  const timedQuestions = measured.length
+    ? measured.reduce((sum, attempt) => sum + attempt.responseCount, 0)
+    : timed.reduce((sum, attempt) => sum + attempt.total, 0)
   const averageMsPerQuestion = timedQuestions
     ? Math.round(
-        timed.reduce((sum, attempt) => sum + attempt.elapsedMs, 0) / timedQuestions
+        (measured.length
+          ? measured.reduce((sum, attempt) => sum + attempt.responseMsTotal, 0)
+          : timed.reduce((sum, attempt) => sum + attempt.elapsedMs, 0)) / timedQuestions
       )
     : null
+
+  const confidence = graded.reduce(
+    (summary, attempt) => {
+      for (const [level, row] of Object.entries(attempt.byConfidence ?? {})) {
+        summary.rated += row.total
+        if (level === 'high') {
+          summary.highTotal += row.total
+          summary.highCorrect += row.score
+          summary.highMisses += row.total - row.score
+        }
+        if (level === 'low') summary.lowCorrect += row.score
+      }
+      return summary
+    },
+    { rated: 0, highTotal: 0, highCorrect: 0, highMisses: 0, lowCorrect: 0 }
+  )
 
   let trend = null
   if (graded.length >= 4) {
@@ -98,5 +121,12 @@ export function performanceInsights(attempts, now = Date.now()) {
     .reverse()
     .map((attempt) => ({ date: attempt.date, score: attempt.pct }))
 
-  return { ...streak, averageMsPerQuestion, trend, scores }
+  return {
+    ...streak,
+    averageMsPerQuestion,
+    measuredResponseTime: measured.length > 0,
+    confidence,
+    trend,
+    scores,
+  }
 }

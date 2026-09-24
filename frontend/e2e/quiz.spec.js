@@ -76,6 +76,61 @@ test('practice run produces a report with a one-click module drill', async ({ pa
   await expect(page.getByText(/Tip: press/)).toBeVisible()
 })
 
+test('confidence and response timing produce actionable local insights', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Start practice/ }).click()
+
+  await page.getByRole('button', { name: 'High' }).click()
+  await page.getByRole('button', { name: /option 2/ }).click()
+  await page.getByRole('button', { name: /Next Question/ }).click()
+  await page.getByRole('button', { name: 'Low' }).click()
+  await page.getByRole('button', { name: /option 1/ }).click()
+  await page.getByRole('button', { name: /Next Question/ }).click()
+  await page.getByRole('button', { name: /option 1/ }).click()
+  await page.getByRole('button', { name: /Next Question/ }).click()
+  await page.getByRole('button', { name: 'High' }).click()
+  await page.getByRole('button', { name: /option 1/ }).click()
+  await page.getByRole('button', { name: /See Results/ }).click()
+
+  await expect(page.getByText('By confidence')).toBeVisible()
+  await expect(page.getByText(/1 high-confidence miss to revisit/)).toBeVisible()
+  await expect(page.getByText(/1 low-confidence answer was correct/)).toBeVisible()
+  await expect(page.getByText(/Decision timing:/)).toBeVisible()
+  const progress = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.progress')).data
+  )
+  expect(progress.history[0]).toMatchObject({
+    byConfidence: {
+      low: { score: 1, total: 1 },
+      high: { score: 1, total: 2 },
+    },
+    responseCount: 4,
+  })
+  expect(progress.study.find((record) => record.questionId === 1)).toMatchObject({
+    lastConfidence: 'high',
+  })
+  expect(JSON.stringify(progress.history[0])).not.toMatch(
+    /choice|correct_choice|explanation/
+  )
+
+  let analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+
+  await page.getByRole('button', { name: 'New quiz' }).click()
+  await page.getByRole('button', { name: /Progress/ }).click()
+  await expect(page.getByText(/Confidence calibration:/)).toBeVisible()
+  await expect(page.getByText(/Pace uses measured time to first answer/)).toBeVisible()
+  analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
+})
+
 test('new quiz returns to setup after a drill launched from progress', async ({
   page,
 }) => {
@@ -280,6 +335,7 @@ test('an interrupted exam restores answers, flags, position and deadline', async
   await page.goto('/')
   await page.getByRole('button', { name: /Exam simulation/ }).click()
   await page.getByRole('button', { name: /Start exam/ }).click()
+  await page.getByRole('button', { name: 'Low' }).click()
   await page.getByRole('button', { name: /option 1/ }).click()
   await page.getByRole('button', { name: '⚐ Flag' }).click()
   await page.getByRole('button', { name: 'Next →' }).click()
@@ -287,7 +343,12 @@ test('an interrupted exam restores answers, flags, position and deadline', async
     .poll(() =>
       page.evaluate(() => JSON.parse(localStorage.getItem('pcep.activeExam'))?.data)
     )
-    .toMatchObject({ index: 1, answers: { 1: 11 }, flagged: [1] })
+    .toMatchObject({
+      index: 1,
+      answers: { 1: 11 },
+      flagged: [1],
+      confidences: { 1: 'low' },
+    })
 
   const raw = await page.evaluate(() => localStorage.getItem('pcep.activeExam'))
   expect(raw).not.toContain('is_correct')
@@ -314,6 +375,10 @@ test('an interrupted exam restores answers, flags, position and deadline', async
     'true'
   )
   await page.getByRole('button', { name: /Go to question 1/ }).click()
+  await expect(page.getByRole('button', { name: 'Low' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
   await expect(page.getByRole('button', { name: /option 1/ })).toHaveAttribute(
     'aria-pressed',
     'true'

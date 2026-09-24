@@ -145,10 +145,24 @@ function StudyMomentum({ attempts }) {
           Complete at least four graded sessions to compare recent performance.
         </p>
       )}
+      {insights.confidence.rated > 0 && (
+        <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-100">
+          <span className="font-semibold">Confidence calibration: </span>
+          {insights.confidence.highTotal > 0
+            ? `${Math.round((insights.confidence.highCorrect / insights.confidence.highTotal) * 100)}% accuracy when highly confident; ${insights.confidence.highMisses} confident miss${insights.confidence.highMisses === 1 ? '' : 'es'}.`
+            : 'Rate more answers with high confidence to measure calibration.'}{' '}
+          {insights.confidence.lowCorrect > 0
+            ? `${insights.confidence.lowCorrect} low-confidence answer${insights.confidence.lowCorrect === 1 ? ' was' : 's were'} correct.`
+            : ''}
+        </div>
+      )}
       <ScoreTrend scores={insights.scores} />
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
         Study streaks use local calendar days and stay active until the end of the day
         after your last session. Score trends and pace exclude self-rated flashcards.
+        {insights.measuredResponseTime
+          ? ' Pace uses measured time to first answer.'
+          : ' Older sessions use total session time for pace.'}
       </p>
     </section>
   )
@@ -165,8 +179,8 @@ function StudyPlan({ summary, onDueReviews, adaptivePlan, onAdaptivePractice }) 
           </h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Correct reviews move through 1, 3, 7 and longer day intervals. A miss is due
-            again immediately. The recommended set ranks due work, mistakes, low mastery
-            and tougher questions locally in your browser.
+            again immediately. The recommended set ranks due work, mistakes, low
+            confidence, low mastery and tougher questions locally in your browser.
           </p>
         </div>
         <div className="flex shrink-0 flex-col gap-2">
@@ -199,6 +213,12 @@ function StudyPlan({ summary, onDueReviews, adaptivePlan, onAdaptivePractice }) 
       {summary.due === 0 && summary.nextReview && (
         <p className="mt-3 text-sm text-emerald-900 dark:text-emerald-200">
           Next review: {new Date(summary.nextReview).toLocaleDateString()}.
+        </p>
+      )}
+      {summary.uncertain > 0 && (
+        <p className="mt-3 text-sm text-violet-800 dark:text-violet-200">
+          {summary.uncertain} question{summary.uncertain === 1 ? '' : 's'} with a latest
+          low-confidence rating will stay visible to adaptive practice.
         </p>
       )}
     </section>

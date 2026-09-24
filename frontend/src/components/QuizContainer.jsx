@@ -87,6 +87,7 @@ export default function QuizContainer() {
     questions,
     index,
     selectedChoiceId,
+    confidence,
     feedback,
     history,
     lastConfig,
@@ -97,6 +98,7 @@ export default function QuizContainer() {
     examProgress,
     startQuiz,
     handleSelect,
+    handleConfidence,
     handleNext,
     handleExamSubmit,
     finish,
@@ -373,6 +375,8 @@ export default function QuizContainer() {
         totalQuestions={questions.length}
         onAnswerSelect={handleSelect}
         selectedChoiceId={selectedChoiceId}
+        confidence={confidence}
+        onConfidenceChange={handleConfidence}
         feedback={feedback}
         disabled={phase !== 'answering'}
         runnable

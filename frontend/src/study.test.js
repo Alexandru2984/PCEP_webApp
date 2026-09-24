@@ -87,7 +87,12 @@ describe('study schedule', () => {
     }
     const plan = adaptivePracticePlan([strong, due], [question(2)], now, 2)
     expect(plan.ids).toEqual([2, 1])
-    expect(plan.signals).toEqual({ due: 2, mistakes: 1, weak: 2 })
+    expect(plan.signals).toEqual({
+      due: 2,
+      mistakes: 1,
+      weak: 2,
+      lowConfidence: 0,
+    })
   })
 
   it('uses difficulty then age as deterministic priority tie-breakers', () => {
@@ -132,7 +137,23 @@ describe('study schedule', () => {
     expect(adaptivePracticePlan([strong], [], now)).toEqual({
       ids: [],
       count: 0,
-      signals: { due: 0, mistakes: 0, weak: 0 },
+      signals: { due: 0, mistakes: 0, weak: 0, lowConfidence: 0 },
     })
+  })
+
+  it('keeps low-confidence answers visible in adaptive practice', () => {
+    const now = Date.UTC(2026, 8, 20, 12)
+    let records = []
+    for (let attempt = 0; attempt < 5; attempt++) {
+      records = updateStudyRecords(
+        records,
+        [{ ...item(true), confidence: attempt === 4 ? 'low' : 'high' }],
+        now + attempt * DAY_MS
+      )
+    }
+    const plan = adaptivePracticePlan(records, [], now + 5 * DAY_MS)
+    expect(plan.ids).toEqual([1])
+    expect(plan.signals.lowConfidence).toBe(1)
+    expect(records[0].lastConfidence).toBe('low')
   })
 })

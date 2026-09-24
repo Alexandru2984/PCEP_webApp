@@ -1,4 +1,5 @@
 import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
+import { CONFIDENCE_VALUES, MAX_RESPONSE_MS, validConfidence } from './confidence'
 import {
   STUDY_LIMIT,
   adaptivePracticePlan,
@@ -16,7 +17,7 @@ const PROGRESS_KEY = 'pcep.progress'
 const ACTIVE_EXAM_KEY = 'pcep.activeExam'
 const BACKUP_MAX_BYTES = 8 * 1024 * 1024
 const ACTIVE_EXAM_MAX_AGE_MS = 24 * 60 * 60 * 1000
-const ACTIVE_EXAM_MAX_DURATION_MS = 3 * 60 * 60 * 1000
+const ACTIVE_EXAM_MAX_DURATION_MS = MAX_RESPONSE_MS
 const MODES = ['practice', 'exam', 'flashcards']
 const integer = (v, min, max) => Number.isSafeInteger(v) && v >= min && v <= max
 const object = (v) => v && typeof v === 'object' && !Array.isArray(v)
@@ -41,7 +42,7 @@ function write(key, value) {
   }
 }
 
-function breakdown(value, keys, score, total) {
+function breakdown(value, keys, score, total, allowPartial = false) {
   if (value == null) return undefined
   if (!object(value) || Object.keys(value).some((k) => !keys.includes(k))) return null
   const out = {}
@@ -50,9 +51,12 @@ function breakdown(value, keys, score, total) {
       return null
     out[key] = { score: row.score, total: row.total }
   }
+  const groupedTotal = Object.values(out).reduce((sum, row) => sum + row.total, 0)
+  const groupedScore = Object.values(out).reduce((sum, row) => sum + row.score, 0)
   if (
-    Object.values(out).reduce((s, r) => s + r.total, 0) !== total ||
-    Object.values(out).reduce((s, r) => s + r.score, 0) !== score
+    (allowPartial ? groupedTotal > total : groupedTotal !== total) ||
+    (allowPartial ? groupedScore > score : groupedScore !== score) ||
+    (allowPartial && score - groupedScore > total - groupedTotal)
   )
     return null
   return out
@@ -74,7 +78,25 @@ export function validAttempt(a) {
     return null
   const byModule = breakdown(a.byModule, MODULES, a.score, a.total)
   const byDifficulty = breakdown(a.byDifficulty, DIFFICULTIES, a.score, a.total)
-  if (byModule === null || byDifficulty === null) return null
+  const byConfidence = breakdown(
+    a.byConfidence,
+    CONFIDENCE_VALUES,
+    a.score,
+    a.total,
+    true
+  )
+  const hasResponseTiming =
+    a.responseMsTotal !== undefined || a.responseCount !== undefined
+  if (
+    byModule === null ||
+    byDifficulty === null ||
+    byConfidence === null ||
+    (hasResponseTiming &&
+      (!integer(a.responseMsTotal, 0, 7 * 86400 * 1000) ||
+        !integer(a.responseCount, 1, a.total) ||
+        a.responseMsTotal > a.responseCount * MAX_RESPONSE_MS))
+  )
+    return null
   return {
     ...(typeof a.id === 'string' && a.id.length <= 80 ? { id: a.id } : {}),
     date: new Date(a.date).toISOString(),
@@ -88,6 +110,10 @@ export function validAttempt(a) {
     bestStreak: a.bestStreak ?? 0,
     ...(byModule ? { byModule } : {}),
     ...(byDifficulty ? { byDifficulty } : {}),
+    ...(byConfidence ? { byConfidence } : {}),
+    ...(hasResponseTiming
+      ? { responseMsTotal: a.responseMsTotal, responseCount: a.responseCount }
+      : {}),
   }
 }
 function records(value, normalize) {
@@ -237,6 +263,8 @@ function normalizeActiveExam(value, now = Date.now()) {
     'index',
     'answers',
     'flagged',
+    'confidences',
+    'responseMs',
   ])
   if (!object(value) || Object.keys(value).some((key) => !allowed.has(key))) return null
   const config = normalizeSettings(value.config)
@@ -263,6 +291,8 @@ function normalizeActiveExam(value, now = Date.now()) {
     now - value.deadline > ACTIVE_EXAM_MAX_AGE_MS ||
     !integer(value.index, 0, normalizedQuestions.length - 1) ||
     !object(value.answers) ||
+    !object(value.confidences ?? {}) ||
+    !object(value.responseMs ?? {}) ||
     !Array.isArray(value.flagged)
   )
     return null
@@ -279,6 +309,24 @@ function normalizeActiveExam(value, now = Date.now()) {
       return null
     answers[questionId] = choiceId
   }
+  const confidences = {}
+  for (const [questionId, confidence] of Object.entries(value.confidences ?? {})) {
+    if (!byId.has(questionId) || !validConfidence(confidence)) return null
+    confidences[questionId] = confidence
+  }
+  const responseMs = {}
+  for (const [questionId, duration] of Object.entries(value.responseMs ?? {})) {
+    if (!byId.has(questionId) || !integer(duration, 0, ACTIVE_EXAM_MAX_DURATION_MS))
+      return null
+    responseMs[questionId] = duration
+  }
+  if (
+    Object.keys(confidences).length > normalizedQuestions.length ||
+    Object.keys(responseMs).length > normalizedQuestions.length ||
+    Object.values(responseMs).reduce((sum, duration) => sum + duration, 0) >
+      ACTIVE_EXAM_MAX_DURATION_MS
+  )
+    return null
   if (
     value.flagged.length > normalizedQuestions.length ||
     new Set(value.flagged).size !== value.flagged.length ||
@@ -294,6 +342,8 @@ function normalizeActiveExam(value, now = Date.now()) {
     index: value.index,
     answers,
     flagged: [...value.flagged],
+    ...(Object.keys(confidences).length ? { confidences } : {}),
+    ...(Object.keys(responseMs).length ? { responseMs } : {}),
   }
 }
 

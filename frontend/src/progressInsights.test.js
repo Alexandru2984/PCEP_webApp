@@ -91,6 +91,30 @@ describe('performanceInsights', () => {
     expect(performanceInsights(attempts).averageMsPerQuestion).toBe(10_000)
   })
 
+  it('prefers measured response timing and aggregates confidence calibration', () => {
+    const attempts = [
+      attempt({
+        responseMsTotal: 30_000,
+        responseCount: 3,
+        byConfidence: {
+          low: { score: 1, total: 1 },
+          high: { score: 1, total: 2 },
+        },
+      }),
+      attempt({ elapsedMs: 900_000 }),
+    ]
+    const insights = performanceInsights(attempts)
+    expect(insights.averageMsPerQuestion).toBe(10_000)
+    expect(insights.measuredResponseTime).toBe(true)
+    expect(insights.confidence).toEqual({
+      rated: 3,
+      highTotal: 2,
+      highCorrect: 1,
+      highMisses: 1,
+      lowCorrect: 1,
+    })
+  })
+
   it('returns the ten most recent graded scores in chronological chart order', () => {
     const attempts = Array.from({ length: 12 }, (_, index) =>
       attempt({

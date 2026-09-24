@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchQuizSet, gradeAnswers, submitAnswer } from './api'
 import {
   loadActiveExam,
@@ -45,6 +45,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   fetchQuizSet.mockResolvedValue({ questions: [question] })
 })
+afterEach(() => vi.useRealTimers())
 
 describe('quiz session requests', () => {
   it('blocks duplicate starts and duplicate answer requests synchronously', async () => {
@@ -118,6 +119,28 @@ describe('quiz session requests', () => {
     expect(result.current.history).toEqual([])
     await act(async () => result.current.handleSelect(11))
     expect(result.current.phase).toBe('reviewing')
+  })
+
+  it('records optional confidence and time to answer without answer metadata', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-24T12:00:00Z'))
+    submitAnswer.mockResolvedValue(feedback)
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+    act(() => result.current.handleConfidence('low'))
+    await act(async () => vi.advanceTimersByTime(4200))
+    await act(async () => result.current.handleSelect(11))
+    expect(result.current.history[0]).toMatchObject({
+      confidence: 'low',
+      responseMs: 4200,
+    })
+    act(() => result.current.handleNext())
+    expect(loadHistory()[0]).toMatchObject({
+      byConfidence: { low: { score: 1, total: 1 } },
+      responseMsTotal: 4200,
+      responseCount: 1,
+    })
+    expect(JSON.stringify(loadHistory()[0])).not.toMatch(/correct_choice_id|explanation/)
   })
 
   it('keeps an exam mounted after grading failure and safely retries the same answers', async () => {

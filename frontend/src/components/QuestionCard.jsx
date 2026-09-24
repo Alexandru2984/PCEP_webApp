@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef } from 'react'
 import CodeBlock from './CodeBlock'
 import BookmarkButton from './BookmarkButton'
 import QuestionNote from './QuestionNote'
+import { CONFIDENCE_LEVELS } from '../confidence'
 
 // CodeRunner pulls in the Pyodide worker manager — only practice/review need it,
 // so load it on demand and show the static (read-only) CodeBlock until it's ready.
@@ -22,6 +23,8 @@ export default function QuestionCard({
   feedback,
   disabled,
   runnable = false,
+  confidence = null,
+  onConfidenceChange,
 }) {
   const heading = useRef(null)
   useEffect(() => {
@@ -93,6 +96,35 @@ export default function QuestionCard({
         ) : (
           <CodeBlock code={question.code_snippet} className="mb-4" />
         ))}
+
+      {onConfidenceChange && (
+        <fieldset className="mb-4">
+          <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            How confident are you?{' '}
+            <span className="font-normal text-slate-500 dark:text-slate-400">
+              Optional
+            </span>
+          </legend>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {CONFIDENCE_LEVELS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={confidence === value}
+                disabled={disabled}
+                onClick={() => onConfidenceChange(confidence === value ? null : value)}
+                className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  confidence === value
+                    ? 'border-violet-600 bg-violet-100 text-violet-950 dark:border-violet-500 dark:bg-violet-950/60 dark:text-violet-100'
+                    : 'border-slate-300 bg-white text-slate-700 hover:border-violet-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <div className="space-y-2" role="group" aria-label="Answer choices">
         {question.choices.map((choice, idx) => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import QuestionCard from './QuestionCard'
 import { formatClock } from '../format'
 import { ignoreShortcut } from '../shortcuts'
+import { MAX_RESPONSE_MS, validConfidence } from '../confidence'
 
 const SECONDS_PER_QUESTION = 80 // application simulation pace
 
@@ -17,6 +18,9 @@ export default function ExamView({
   const total = questions.length
   const [index, setIndex] = useState(() => initialProgress?.index ?? 0)
   const [answers, setAnswers] = useState(() => ({ ...(initialProgress?.answers ?? {}) }))
+  const [confidences, setConfidences] = useState(() => ({
+    ...(initialProgress?.confidences ?? {}),
+  }))
   const [flagged, setFlagged] = useState(() => new Set(initialProgress?.flagged ?? []))
   const [deadline] = useState(
     () => initialProgress?.deadline ?? Date.now() + total * SECONDS_PER_QUESTION * 1000
@@ -25,35 +29,74 @@ export default function ExamView({
     Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
   )
   const [confirming, setConfirming] = useState(false)
+  const [locked, setLocked] = useState(false)
   const submittedRef = useRef(false)
+  const submission = useRef(null)
   const autoAttempted = useRef(false)
   const expiredAnswers = useRef(null)
+  const responseMs = useRef({ ...(initialProgress?.responseMs ?? {}) })
+  const answeredOnce = useRef(new Set(Object.keys(answers).map(Number)))
+  const [initialEnteredAt] = useState(Date.now)
+  const enteredAt = useRef(initialEnteredAt)
   const [navigatorOpen, setNavigatorOpen] = useState(
     () => window.matchMedia?.('(min-width: 640px)').matches ?? false
   )
   const confirmButton = useRef(null)
   const submitButton = useRef(null)
+  const current = questions[index]
+  const recordCurrentTime = useCallback(() => {
+    const now = Date.now()
+    if (!answeredOnce.current.has(current.id)) {
+      const elapsed = Math.max(0, now - enteredAt.current)
+      responseMs.current[current.id] = Math.min(
+        MAX_RESPONSE_MS,
+        (responseMs.current[current.id] ?? 0) + elapsed
+      )
+    }
+    enteredAt.current = now
+    return { ...responseMs.current }
+  }, [current.id])
   useEffect(() => {
     if (confirming) confirmButton.current?.focus()
   }, [confirming])
   useEffect(() => {
-    onProgress?.({ index, answers, flagged: [...flagged], deadline })
-  }, [answers, deadline, flagged, index, onProgress])
+    onProgress?.({
+      index,
+      answers,
+      flagged: [...flagged],
+      deadline,
+      confidences,
+      responseMs: { ...responseMs.current },
+    })
+  }, [answers, confidences, deadline, flagged, index, onProgress])
 
   const answeredCount = Object.keys(answers).length
 
   const submit = useCallback(async () => {
     if (submittedRef.current) return
     submittedRef.current = true
+    setLocked(true)
     if (Date.now() >= deadline && !expiredAnswers.current)
       expiredAnswers.current = { ...answers }
+    if (!submission.current) {
+      submission.current = {
+        answers: { ...(expiredAnswers.current ?? answers) },
+        metadata: {
+          confidences: { ...confidences },
+          responseMs: recordCurrentTime(),
+        },
+      }
+    }
     try {
-      const success = await onSubmit(expiredAnswers.current ?? answers)
+      const success = await onSubmit(
+        submission.current.answers,
+        submission.current.metadata
+      )
       if (success === false) submittedRef.current = false
     } catch {
       submittedRef.current = false
     }
-  }, [answers, onSubmit, deadline])
+  }, [answers, confidences, deadline, onSubmit, recordCurrentTime])
 
   // Use wall-clock time so background-tab timer suspension does not extend an exam.
   useEffect(() => {
@@ -74,10 +117,34 @@ export default function ExamView({
     }
   }, [timeLeft, submit])
 
-  const current = questions[index]
   const pick = (choiceId) => {
-    if (submitting || submittedRef.current || Date.now() >= deadline) return
+    if (
+      submitting ||
+      submittedRef.current ||
+      submission.current ||
+      Date.now() >= deadline
+    )
+      return
+    if (!answeredOnce.current.has(current.id)) {
+      recordCurrentTime()
+      answeredOnce.current.add(current.id)
+    }
     setAnswers((a) => ({ ...a, [current.id]: choiceId }))
+  }
+  const setConfidence = (confidence) => {
+    if (
+      submitting ||
+      submission.current ||
+      Date.now() >= deadline ||
+      (confidence !== null && !validConfidence(confidence))
+    )
+      return
+    setConfidences((currentValues) => {
+      const next = { ...currentValues }
+      if (confidence === null) delete next[current.id]
+      else next[current.id] = confidence
+      return next
+    })
   }
 
   const toggleFlag = () =>
@@ -87,7 +154,10 @@ export default function ExamView({
       return next
     })
 
-  const go = (i) => setIndex(Math.max(0, Math.min(total - 1, i)))
+  const go = (i) => {
+    recordCurrentTime()
+    setIndex(Math.max(0, Math.min(total - 1, i)))
+  }
   const jumpTo = (predicate) => {
     const after = questions.findIndex((q, i) => i > index && predicate(q))
     const next = after >= 0 ? after : questions.findIndex(predicate)
@@ -98,7 +168,14 @@ export default function ExamView({
   // Keyboard: 1–4 / A–D answer, ← → navigate, F flag.
   useEffect(() => {
     const onKey = (e) => {
-      if (ignoreShortcut(e) || submitting || confirming || timeLeft <= 0) return
+      if (
+        ignoreShortcut(e) ||
+        submitting ||
+        submission.current ||
+        confirming ||
+        timeLeft <= 0
+      )
+        return
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
         return go(index - 1)
@@ -195,8 +272,10 @@ export default function ExamView({
         totalQuestions={total}
         onAnswerSelect={pick}
         selectedChoiceId={answers[current.id] ?? null}
+        confidence={confidences[current.id] ?? null}
+        onConfidenceChange={setConfidence}
         feedback={null}
-        disabled={submitting || timeLeft <= 0}
+        disabled={submitting || locked || timeLeft <= 0}
       />
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

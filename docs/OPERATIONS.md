@@ -177,9 +177,10 @@ bounded to 1,000 compact records. The progress screen exports backup format v3,
 previews and merges strictly validated imports up to 8 MB, and still accepts
 existing v1 and v2 backups. History, mistakes, bookmarks, notes and the review
 schedule can be reset independently. Backups contain public question options,
-aggregate performance, review dates and user-written notes, never answer keys or
-explanations. Keep backups private if you want to keep your study history and
-notes private; nothing is uploaded by these features.
+aggregate performance, optional confidence ratings, bounded response-time totals,
+review dates and user-written notes, never answer keys or explanations. Keep
+backups private if you want to keep your study history and notes private; nothing
+is uploaded by these features.
 Bookmarks are available on question cards. Bookmark and mistake drills fetch
 current public question data using the bounded `ids` quiz-set filter, avoiding
 stale choice IDs after admin edits. Module/difficulty accuracy includes mixed
@@ -197,34 +198,39 @@ schedule. Consecutive successful reviews use 1, 3, 7 days and then double up to 
 60-day cap. A missed or skipped question becomes due immediately. Due drills send
 at most 20 question IDs to the existing quiz-set endpoint and receive fresh public
 question data; the schedule stores no choices, selected choice IDs, explanations
-or correctness key. Dashboard mastery combines observed accuracy, repetition and
-the achieved interval, and should be treated as a study signal rather than an exam
-credential.
+or correctness key. An optional per-question confidence value (`low`, `medium` or
+`high`) is stored with the latest review. Dashboard mastery combines observed
+accuracy, repetition and the achieved interval, and should be treated as a study
+signal rather than an exam credential.
 
 Adaptive practice is also local and rule based. It ranks at most 20 unique
 question IDs using a documented score: +100 when due, +60 while in the mistakes
-list, up to +40 from observed error rate, up to +30 from the mastery gap, and a
-small +5/+10 medium/hard bonus. Questions at or above 80% mastery are omitted
-unless currently due or missed. Equal scores prefer the least recently attempted
-question, then its numeric ID, so the plan is deterministic and testable. Only
-the selected IDs are sent to `quiz-set`; fresh public questions come back without
-answer metadata.
+list, up to +40 from observed error rate, up to +30 from the mastery gap, +20 when
+the latest confidence is low, and a small +5/+10 medium/hard bonus. Questions at
+or above 80% mastery are omitted unless currently due, missed or their latest
+recorded confidence is low. Equal scores prefer the least recently attempted question, then
+its numeric ID, so the plan is deterministic and testable. Only the selected IDs
+are sent to `quiz-set`; fresh public questions come back without answer metadata.
 
 Dashboard momentum is derived only from the bounded local attempt history. Study
 streaks count unique local calendar days and remain current through the day after
 the latest session. Score trends compare up to five recent graded sessions with
 an equally sized preceding window using question-weighted accuracy. Average pace
-is total elapsed time divided by timed graded questions. Flashcards count as study
-activity but are excluded from performance and pace because their result is
-self-rated.
+prefers measured time to the first answer for sessions created by this version;
+legacy sessions fall back to total elapsed time divided by graded questions.
+Confidence calibration compares aggregate high-confidence misses and
+low-confidence successes. Flashcards count as study activity but are excluded from
+performance, confidence calibration and pace because their result is self-rated.
 
 ## Active exam recovery
 
 An in-progress exam is stored separately under the versioned
 `pcep.activeExam` key. It contains only sanitized public questions, the learner's
-selected choice IDs, flags, current index, start time and original deadline. It
-never contains correctness flags, explanations or a correct-choice ID, and it is
-not included in progress exports. Only one active exam is retained.
+selected choice IDs, optional confidence ratings, bounded time-to-first-answer
+values, flags, current index, start time and original deadline. It never contains
+correctness flags, explanations or a correct-choice ID, and it is not included in
+progress exports. Only one active exam is retained. A failed grading request keeps
+the exact answer, confidence and timing snapshot for a safe retry.
 
 On reload the setup screen requires an explicit choice: resume the saved exam or
 discard it before starting any quiz or dashboard drill. Resuming preserves the

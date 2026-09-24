@@ -99,6 +99,9 @@ export default function QuizSetup({
             <span className="mt-1 block text-xs text-violet-800 dark:text-violet-300/90">
               {adaptivePlan.signals.due} due · {adaptivePlan.signals.mistakes} mistakes ·{' '}
               {adaptivePlan.signals.weak} below-target mastery
+              {adaptivePlan.signals.lowConfidence > 0
+                ? ` · ${adaptivePlan.signals.lowConfidence} low confidence`
+                : ''}
             </span>
           </span>
           <span className="shrink-0 rounded-full bg-violet-200 px-2.5 py-1 text-sm font-bold text-violet-950 dark:bg-violet-800 dark:text-violet-100">

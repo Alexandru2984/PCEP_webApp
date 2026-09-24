@@ -2,9 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import PerformanceReport from './PerformanceReport'
 
-const item = (module, difficulty, is_correct) => ({
+const item = (module, difficulty, is_correct, extras = {}) => ({
   question: { id: Math.random(), module, difficulty },
   feedback: { is_correct },
+  ...extras,
 })
 
 describe('PerformanceReport', () => {
@@ -62,5 +63,19 @@ describe('PerformanceReport', () => {
   it('renders nothing for an empty result set', () => {
     const { container } = render(<PerformanceReport items={[]} />)
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('shows confidence calibration and the slowest response times', () => {
+    const items = [
+      item('module1', 'easy', false, { confidence: 'high', responseMs: 5000 }),
+      item('module2', 'medium', true, { confidence: 'low', responseMs: 15_000 }),
+      item('module2', 'hard', true, { confidence: 'high', responseMs: 10_000 }),
+    ]
+    render(<PerformanceReport items={items} />)
+    expect(screen.getByText('By confidence')).toBeInTheDocument()
+    expect(screen.getByText(/1 high-confidence miss to revisit/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 low-confidence answer was correct/i)).toBeInTheDocument()
+    expect(screen.getByText(/10s average/i)).toBeInTheDocument()
+    expect(screen.getByText(/Q2 15s · Q3 10s · Q1 5s/i)).toBeInTheDocument()
   })
 })

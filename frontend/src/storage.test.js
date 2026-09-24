@@ -39,7 +39,7 @@ const question = (id) => ({
     { id: id * 10 + 2, text: 'Two' },
   ],
 })
-const attempt = (id, score = 0) => ({
+const attempt = (id, score = 0, extras = {}) => ({
   id: String(id),
   date: '2026-09-18T12:00:00.000Z',
   mode: 'practice',
@@ -50,6 +50,7 @@ const attempt = (id, score = 0) => ({
   pct: score * 10,
   elapsedMs: 0,
   bestStreak: 0,
+  ...extras,
 })
 const wrong = (id) => ({ question: question(id), feedback: { is_correct: false } })
 const right = (id) => ({ question: question(id), feedback: { is_correct: true } })
@@ -103,6 +104,35 @@ describe('history', () => {
 
   it('falls back to [] when the stored value is corrupt', () => {
     localStorage.setItem('pcep.history', '{not valid json')
+    expect(loadHistory()).toEqual([])
+  })
+
+  it('validates confidence summaries and measured response timing', () => {
+    appendAttempt(
+      attempt('calibrated', 7, {
+        byConfidence: {
+          low: { score: 2, total: 3 },
+          high: { score: 5, total: 6 },
+        },
+        responseMsTotal: 90_000,
+        responseCount: 9,
+      })
+    )
+    expect(loadHistory()[0]).toMatchObject({
+      byConfidence: {
+        low: { score: 2, total: 3 },
+        high: { score: 5, total: 6 },
+      },
+      responseMsTotal: 90_000,
+      responseCount: 9,
+    })
+  })
+
+  it.each([
+    { byConfidence: { high: { score: 0, total: 1 } } },
+    { responseMsTotal: 3 * 60 * 60 * 1000 + 1, responseCount: 1 },
+  ])('rejects inconsistent confidence or response aggregates: %j', (extras) => {
+    appendAttempt(attempt('invalid', 10, extras))
     expect(loadHistory()).toEqual([])
   })
 })
@@ -186,11 +216,27 @@ describe('active exam recovery', () => {
     })
   })
 
+  it('round-trips bounded confidence and response-time recovery data', () => {
+    const exam = activeExam({
+      confidences: { 1: 'low', 2: 'high' },
+      responseMs: { 1: 12_000, 2: 8_000 },
+    })
+    expect(saveActiveExam(exam)).toBe(true)
+    expect(loadActiveExam()).toMatchObject({
+      confidences: { 1: 'low', 2: 'high' },
+      responseMs: { 1: 12_000, 2: 8_000 },
+    })
+  })
+
   it.each([
     { answers: { 1: 999 } },
     { flagged: [2, 2] },
     { questions: [question(1), question(1)] },
     { correct_choice_id: 11 },
+    { confidences: { 1: 'certain' } },
+    { confidences: { 999: 'low' } },
+    { responseMs: { 1: -1 } },
+    { responseMs: { 999: 1000 } },
   ])('rejects malformed recovery data: %j', (override) => {
     expect(saveActiveExam(activeExam(override))).toBe(false)
     expect(loadActiveExam()).toBeNull()
