@@ -8,7 +8,11 @@ from django.forms.models import inlineformset_factory
 
 from quiz.admin import ChoiceFormSet
 from quiz.models import Question, Choice
-from quiz.question_bank import duplicate_questions, validation_errors
+from quiz.question_bank import (
+    duplicate_questions,
+    similar_questions,
+    validation_errors,
+)
 
 
 def question(**overrides):
@@ -39,6 +43,25 @@ def test_duplicate_audit_ignores_python_quote_and_whitespace_style():
     first = question(text='What is the output?', code_snippet='print("same")')
     second = question(text='  What  is the output? ', code_snippet="print( 'same' )")
     assert [index for index, _ in duplicate_questions([first, second])] == [1, 2]
+    assert similar_questions([first, second]) == []
+
+
+def test_near_duplicate_audit_returns_distinct_high_similarity_candidates():
+    first = question(
+        module='module3',
+        text='What is the output?',
+        code_snippet='print([x for x in range(4) if x])',
+    )
+    second = question(
+        module='module3',
+        text='What is the output?',
+        code_snippet='print([x for x in range(4) if x > 0])',
+    )
+    [(first_index, second_index, similarity, _, _)] = similar_questions(
+        [first, second], threshold=0.8
+    )
+    assert (first_index, second_index) == (1, 2)
+    assert similarity >= 0.8
 
 
 @pytest.mark.django_db
@@ -128,3 +151,31 @@ def test_duplicate_replacement_migration_preserves_all_ids(make_question):
     q.refresh_from_db()
     assert q.code_snippet == migration.OLD_SNIPPET
     assert list(q.choices.values_list('id', flat=True)) == choice_ids
+
+
+@pytest.mark.django_db
+def test_comprehension_replacement_migration_preserves_all_ids(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+    migration = importlib.import_module(
+        'quiz.migrations.0005_replace_equivalent_comprehension'
+    )
+    q = make_question(module='module3', difficulty='hard')
+    q.text = migration.QUESTION_TEXT
+    q.code_snippet = migration.OLD_SNIPPET
+    q.save()
+    choice_ids = list(q.choices.values_list('id', flat=True))
+    editor = connection.schema_editor()
+
+    migration.replace_equivalent(apps, editor)
+    q.refresh_from_db()
+    assert q.code_snippet == migration.NEW_SNIPPET
+    assert list(q.choices.values_list('id', flat=True)) == choice_ids
+    assert q.choices.get(is_correct=True).text == '[4]'
+
+    migration.restore_equivalent(apps, editor)
+    q.refresh_from_db()
+    assert q.code_snippet == migration.OLD_SNIPPET
+    assert list(q.choices.values_list('id', flat=True)) == choice_ids
+    assert q.choices.get(is_correct=True).text == '[2, 6]'

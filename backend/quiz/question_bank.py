@@ -1,5 +1,6 @@
 import ast
 from collections import Counter
+from difflib import SequenceMatcher
 
 from .seed_data import ALL_QUESTIONS
 
@@ -7,6 +8,7 @@ from .seed_data import ALL_QUESTIONS
 VALID_MODULES = ('module1', 'module2', 'module3', 'module4')
 VALID_DIFFICULTIES = ('easy', 'medium', 'hard')
 MIN_HARD_PER_MODULE = 8
+NEAR_DUPLICATE_THRESHOLD = 0.96
 
 
 def question_key(question):
@@ -34,6 +36,39 @@ def duplicate_questions(questions=ALL_QUESTIONS):
         if counts[key] > 1:
             duplicates.append((index, question))
     return duplicates
+
+
+def similar_questions(questions=ALL_QUESTIONS, threshold=NEAR_DUPLICATE_THRESHOLD):
+    """Return high-similarity candidates for human review, excluding exact matches."""
+    prepared = [
+        (
+            index,
+            question,
+            question_key(question),
+            '\n'.join(
+                (
+                    ' '.join(question.get('text', '').casefold().split()),
+                    ' '.join(question.get('code_snippet', '').split()),
+                )
+            ),
+        )
+        for index, question in enumerate(questions, start=1)
+    ]
+    candidates = []
+    for position, first in enumerate(prepared):
+        for second in prepared[position + 1:]:
+            if first[1].get('module') != second[1].get('module'):
+                continue
+            if first[2] == second[2]:
+                continue
+            similarity = SequenceMatcher(
+                None, first[3], second[3], autojunk=False
+            ).ratio()
+            if similarity >= threshold:
+                candidates.append(
+                    (first[0], second[0], similarity, first[1], second[1])
+                )
+    return sorted(candidates, key=lambda item: (-item[2], item[0], item[1]))
 
 
 def validation_errors(questions=ALL_QUESTIONS):

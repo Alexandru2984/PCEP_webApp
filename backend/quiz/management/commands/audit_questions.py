@@ -5,6 +5,7 @@ from quiz.question_bank import (
     VALID_MODULES,
     question_bank_summary,
     database_questions,
+    similar_questions,
 )
 
 
@@ -18,6 +19,11 @@ class Command(BaseCommand):
             '--fail-on-warnings',
             action='store_true',
             help='Exit non-zero when duplicates are found.',
+        )
+        parser.add_argument(
+            '--show-similar',
+            action='store_true',
+            help='List conservative near-duplicate candidates for human review.',
         )
 
     def handle(self, *args, **options):
@@ -62,6 +68,31 @@ class Command(BaseCommand):
                 self.stdout.write(
                     f'  - #{index} [{question["module"]}/{question["difficulty"]}] '
                     f'{question["text"]} | {question.get("code_snippet", "")!r}'
+                )
+
+        if options['show_similar']:
+            candidates = (
+                similar_questions(questions)
+                if options['database']
+                else similar_questions()
+            )
+            self.stdout.write('\nNear-duplicate candidates (informational):')
+            if not candidates:
+                self.stdout.write('  none')
+            for first_index, second_index, similarity, first, second in candidates:
+                first_ref = f'id={first["id"]}' if 'id' in first else f'#{first_index}'
+                second_ref = f'id={second["id"]}' if 'id' in second else f'#{second_index}'
+                self.stdout.write(
+                    f'  {first_ref} <-> {second_ref} ({similarity:.1%}) '
+                    f'[{first.get("module", "unknown")}]'
+                )
+                self.stdout.write(
+                    f'    A: {first.get("text", "")} | '
+                    f'{first.get("code_snippet", "")!r}'
+                )
+                self.stdout.write(
+                    f'    B: {second.get("text", "")} | '
+                    f'{second.get("code_snippet", "")!r}'
                 )
 
         if summary['warnings']:

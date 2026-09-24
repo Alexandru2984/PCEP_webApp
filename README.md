@@ -142,10 +142,11 @@ make test
 make audit
 make django-check
 
-# Backend — 105 tests (API/security, integrity, startup, release and SEO behavior)
+# Backend — 107 tests (API/security, integrity, startup, release and SEO behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
+# Add --show-similar for conservative near-duplicate candidates requiring human review.
 
 # Frontend — 126 Vitest tests, then static checks, the production build and
 # 16 Playwright flows (including axe, PWA, scheduled review, exam resume and Pyodide).

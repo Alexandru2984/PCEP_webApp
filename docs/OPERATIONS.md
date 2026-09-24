@@ -243,6 +243,13 @@ exception question with a distinct `try/except/else` exercise. It updates the
 existing question and its four choices in place, preserving every database ID and
 avoiding stale local bookmarks or interrupted exam selections.
 
+Use `audit_questions --show-similar` to list conservative near-duplicate
+candidates within the same module. These are informational because deliberate
+contrast pairs can be very similar; `--fail-on-warnings` continues to fail only
+on definite duplicates, coverage warnings and integrity errors. Migration
+`0005_replace_equivalent_comprehension` replaces one logically equivalent list
+comprehension while preserving its question and choice IDs.
+
 ## Nginx production topology and hardening
 
 The tracked vhost now matches the existing TLS deployment, including SEO,
