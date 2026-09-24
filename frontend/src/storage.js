@@ -3,7 +3,10 @@ import { DIFFICULTIES, MODULES, publicQuestion } from './questionData'
 const VERSION = 1
 const LIMIT = 100
 const PROGRESS_KEY = 'pcep.progress'
+const ACTIVE_EXAM_KEY = 'pcep.activeExam'
 const BACKUP_MAX_BYTES = 8 * 1024 * 1024
+const ACTIVE_EXAM_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const ACTIVE_EXAM_MAX_DURATION_MS = 3 * 60 * 60 * 1000
 const MODES = ['practice', 'exam', 'flashcards']
 const integer = (v, min, max) => Number.isSafeInteger(v) && v >= min && v <= max
 const object = (v) => v && typeof v === 'object' && !Array.isArray(v)
@@ -140,9 +143,7 @@ function saveProgress(data) {
   return true
 }
 
-export function loadSettings() {
-  const saved = read('pcep.settings', null)
-  const s = saved?.version === VERSION ? saved.data : saved
+function normalizeSettings(s) {
   if (!object(s)) return null
   if (
     !MODES.includes(s.mode ?? 'practice') ||
@@ -158,6 +159,10 @@ export function loadSettings() {
     count: s.count,
   }
 }
+export function loadSettings() {
+  const saved = read('pcep.settings', null)
+  return normalizeSettings(saved?.version === VERSION ? saved.data : saved)
+}
 export const saveSettings = (settings) =>
   write('pcep.settings', { version: VERSION, data: settings })
 export const loadTheme = () => {
@@ -168,6 +173,103 @@ export const saveTheme = (theme) => write('pcep.theme', theme)
 export const loadHistory = () => loadProgress().history
 export const loadMistakes = () => loadProgress().mistakes
 export const loadBookmarks = () => loadProgress().bookmarks
+
+function normalizeActiveExam(value, now = Date.now()) {
+  const allowed = new Set([
+    'config',
+    'questions',
+    'startedAt',
+    'deadline',
+    'index',
+    'answers',
+    'flagged',
+  ])
+  if (!object(value) || Object.keys(value).some((key) => !allowed.has(key))) return null
+  const config = normalizeSettings(value.config)
+  if (config?.mode !== 'exam') return null
+  if (
+    !Array.isArray(value.questions) ||
+    value.questions.length < 1 ||
+    value.questions.length > LIMIT
+  )
+    return null
+  const normalizedQuestions = value.questions.map(publicQuestion)
+  if (
+    normalizedQuestions.some((question) => !question) ||
+    new Set(normalizedQuestions.map((question) => question.id)).size !==
+      normalizedQuestions.length
+  )
+    return null
+  if (
+    !integer(value.startedAt, 1, Number.MAX_SAFE_INTEGER) ||
+    !integer(value.deadline, 1, Number.MAX_SAFE_INTEGER) ||
+    value.deadline <= value.startedAt ||
+    value.deadline - value.startedAt > ACTIVE_EXAM_MAX_DURATION_MS ||
+    value.startedAt > now + 5 * 60 * 1000 ||
+    now - value.deadline > ACTIVE_EXAM_MAX_AGE_MS ||
+    !integer(value.index, 0, normalizedQuestions.length - 1) ||
+    !object(value.answers) ||
+    !Array.isArray(value.flagged)
+  )
+    return null
+
+  const byId = new Map(
+    normalizedQuestions.map((question) => [String(question.id), question])
+  )
+  const answerEntries = Object.entries(value.answers)
+  if (answerEntries.length > normalizedQuestions.length) return null
+  const answers = {}
+  for (const [questionId, choiceId] of answerEntries) {
+    const question = byId.get(questionId)
+    if (!question || !question.choices.some((choice) => choice.id === choiceId))
+      return null
+    answers[questionId] = choiceId
+  }
+  if (
+    value.flagged.length > normalizedQuestions.length ||
+    new Set(value.flagged).size !== value.flagged.length ||
+    value.flagged.some((id) => !byId.has(String(id)))
+  )
+    return null
+
+  return {
+    config,
+    questions: normalizedQuestions,
+    startedAt: value.startedAt,
+    deadline: value.deadline,
+    index: value.index,
+    answers,
+    flagged: [...value.flagged],
+  }
+}
+
+export function loadActiveExam() {
+  const saved = read(ACTIVE_EXAM_KEY, null)
+  const normalized = saved?.version === VERSION ? normalizeActiveExam(saved.data) : null
+  if (!normalized) {
+    try {
+      localStorage.removeItem(ACTIVE_EXAM_KEY)
+    } catch {
+      /* unavailable */
+    }
+  }
+  return normalized
+}
+export function saveActiveExam(exam) {
+  const normalized = normalizeActiveExam(exam)
+  return normalized
+    ? write(ACTIVE_EXAM_KEY, { version: VERSION, data: normalized })
+    : false
+}
+export function clearActiveExam() {
+  try {
+    localStorage.removeItem(ACTIVE_EXAM_KEY)
+    return true
+  } catch {
+    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    return false
+  }
+}
 
 export function appendAttempt(attempt) {
   const normalized = validAttempt({ ...attempt, id: attempt.id ?? crypto.randomUUID() })

@@ -12,6 +12,15 @@ const question = {
     { id: 12, text: 'Two' },
   ],
 }
+const secondQuestion = {
+  ...question,
+  id: 2,
+  text: 'Second question?',
+  choices: [
+    { id: 21, text: 'Three' },
+    { id: 22, text: 'Four' },
+  ],
+}
 afterEach(() => vi.useRealTimers())
 
 describe('exam recovery and timing', () => {
@@ -71,5 +80,60 @@ describe('exam recovery and timing', () => {
       'aria-pressed',
       'false'
     )
+  })
+
+  it('restores saved answers, flags, position and deadline', () => {
+    const onProgress = vi.fn()
+    const deadline = Date.now() + 120_000
+    render(
+      <ExamView
+        questions={[question, secondQuestion]}
+        onSubmit={vi.fn()}
+        onQuit={() => {}}
+        onProgress={onProgress}
+        initialProgress={{
+          index: 0,
+          answers: { 1: 11 },
+          flagged: [1],
+          deadline,
+        }}
+      />
+    )
+    expect(screen.getByRole('button', { name: /One/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: '⚑ Flagged' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByRole('heading', { name: 'Second question?' })).toBeVisible()
+    expect(onProgress).toHaveBeenLastCalledWith({
+      index: 1,
+      answers: { 1: 11 },
+      flagged: [1],
+      deadline,
+    })
+  })
+
+  it('submits saved answers immediately when a resumed deadline has expired', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(false)
+    render(
+      <ExamView
+        questions={[question]}
+        onSubmit={onSubmit}
+        onQuit={() => {}}
+        initialProgress={{
+          index: 0,
+          answers: { 1: 12 },
+          flagged: [],
+          deadline: Date.now() - 1,
+        }}
+      />
+    )
+    await act(async () => {})
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({ 1: 12 })
+    expect(screen.getByRole('button', { name: /One/ })).toBeDisabled()
   })
 })

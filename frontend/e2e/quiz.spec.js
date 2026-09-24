@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 import { Buffer } from 'node:buffer'
 
 import { QUESTIONS, correctId, mockApi } from './fixtures'
@@ -107,6 +108,57 @@ test('bookmarks persist across reload and start a targeted drill', async ({ page
   await expect(drill).toBeVisible()
   await drill.click()
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
+})
+
+test('an interrupted exam restores answers, flags, position and deadline', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Exam simulation/ }).click()
+  await page.getByRole('button', { name: /Start exam/ }).click()
+  await page.getByRole('button', { name: /option 1/ }).click()
+  await page.getByRole('button', { name: '⚐ Flag' }).click()
+  await page.getByRole('button', { name: 'Next →' }).click()
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('pcep.activeExam'))?.data)
+    )
+    .toMatchObject({ index: 1, answers: { 1: 11 }, flagged: [1] })
+
+  const raw = await page.evaluate(() => localStorage.getItem('pcep.activeExam'))
+  expect(raw).not.toContain('is_correct')
+  expect(raw).not.toContain('correct_choice_id')
+  expect(raw).not.toContain('explanation')
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Resume saved exam' })).toBeVisible()
+  await expect(page.getByText('1/4 answered.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Progress' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Start practice/ })).toHaveCount(0)
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
+  for (const width of [390, 360]) {
+    await page.setViewportSize({ width, height: 844 })
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true)
+  }
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.getByRole('button', { name: 'Resume exam' }).click()
+  await expect(page.getByRole('button', { name: /Go to question 2/ })).toHaveAttribute(
+    'aria-current',
+    'true'
+  )
+  await page.getByRole('button', { name: /Go to question 1/ }).click()
+  await expect(page.getByRole('button', { name: /option 1/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(page.getByRole('button', { name: '⚑ Flagged' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
 })
 
 test('progress backup exports and imports with a preview', async ({ page }) => {

@@ -2,16 +2,21 @@ import { useEffect, useReducer, useRef } from 'react'
 import { apiErrorMessage, fetchQuizSet, gradeAnswers, submitAnswer } from './api'
 import {
   appendAttempt,
+  clearActiveExam,
+  loadActiveExam,
   loadMistakes,
   loadBookmarks,
   loadSettings,
+  saveActiveExam,
   saveSettings,
   updateMistakes,
 } from './storage'
 import { publicQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
 
-function initialState() {
+const EXAM_SECONDS_PER_QUESTION = 80
+
+function emptyState(lastConfig = null, resumableExam = null) {
   return {
     phase: 'setup',
     questions: [],
@@ -19,24 +24,29 @@ function initialState() {
     selectedChoiceId: null,
     feedback: null,
     history: [],
-    lastConfig: loadSettings(),
+    lastConfig,
+    resumableExam,
+    examProgress: null,
     startedAt: 0,
     elapsedMs: 0,
     submitting: false,
     error: null,
   }
 }
+function initialState() {
+  return emptyState(loadSettings(), loadActiveExam())
+}
 
 export function sessionReducer(state, event) {
   switch (event.type) {
     case 'loading':
-      return { ...initialState(), phase: 'loading', lastConfig: event.config }
+      return { ...emptyState(event.config), phase: 'loading' }
     case 'start':
       return {
-        ...initialState(),
+        ...emptyState(event.config),
         questions: event.questions,
-        lastConfig: event.config,
         startedAt: event.now,
+        examProgress: event.examProgress,
         phase:
           event.config.mode === 'exam'
             ? 'exam'
@@ -44,6 +54,21 @@ export function sessionReducer(state, event) {
               ? 'flashcards'
               : 'answering',
       }
+    case 'resume':
+      return {
+        ...emptyState(event.exam.config),
+        phase: 'exam',
+        questions: event.exam.questions,
+        startedAt: event.exam.startedAt,
+        examProgress: {
+          index: event.exam.index,
+          answers: event.exam.answers,
+          flagged: event.exam.flagged,
+          deadline: event.exam.deadline,
+        },
+      }
+    case 'discard-resume':
+      return { ...state, resumableExam: null }
     case 'load-error':
       return { ...state, phase: 'error', error: event.error }
     case 'answering':
@@ -90,7 +115,7 @@ export function sessionReducer(state, event) {
         error: null,
       }
     case 'reset':
-      return { ...initialState(), lastConfig: state.lastConfig }
+      return emptyState(state.lastConfig)
     default:
       return state
   }
@@ -131,6 +156,7 @@ export default function useQuizSession() {
     const controller = begin()
     if (!controller) return
     finished.current = false
+    clearActiveExam()
     saveSettings(config)
     dispatch({ type: 'loading', config })
     try {
@@ -145,7 +171,24 @@ export default function useQuizSession() {
         new Set(questions.map((q) => q.id)).size !== questions.length
       )
         throw new Error('The server returned invalid questions. Please retry.')
-      dispatch({ type: 'start', config, questions, now: Date.now() })
+      const now = Date.now()
+      const examProgress =
+        config.mode === 'exam'
+          ? {
+              index: 0,
+              answers: {},
+              flagged: [],
+              deadline: now + questions.length * EXAM_SECONDS_PER_QUESTION * 1000,
+            }
+          : null
+      if (examProgress)
+        saveActiveExam({
+          config,
+          questions,
+          startedAt: now,
+          ...examProgress,
+        })
+      dispatch({ type: 'start', config, questions, now, examProgress })
     } catch (error) {
       if (current(controller))
         dispatch({ type: 'load-error', error: apiErrorMessage(error) })
@@ -183,6 +226,7 @@ export default function useQuizSession() {
   const finish = (items, total) => {
     if (finished.current || !mounted.current) return
     finished.current = true
+    if (state.lastConfig?.mode === 'exam') clearActiveExam()
     const elapsed = Date.now() - state.startedAt
     const score = items.filter((i) => i.feedback?.is_correct).length
     const breakdown = (key) =>
@@ -260,7 +304,30 @@ export default function useQuizSession() {
   const resetToSetup = () => {
     request.current?.abort()
     request.current = null
+    clearActiveExam()
     dispatch({ type: 'reset' })
+  }
+  const resumeExam = () => {
+    const exam = loadActiveExam()
+    if (!exam) {
+      dispatch({ type: 'discard-resume' })
+      return
+    }
+    finished.current = false
+    dispatch({ type: 'resume', exam })
+  }
+  const discardSavedExam = () => {
+    clearActiveExam()
+    dispatch({ type: 'discard-resume' })
+  }
+  const saveExamProgress = (progress) => {
+    if (state.phase !== 'exam') return false
+    return saveActiveExam({
+      config: state.lastConfig,
+      questions: state.questions,
+      startedAt: state.startedAt,
+      ...progress,
+    })
   }
   const startSavedDrill = (list, source) => {
     if (!list.length) return
@@ -284,6 +351,9 @@ export default function useQuizSession() {
     handleExamSubmit,
     finish,
     resetToSetup,
+    resumeExam,
+    discardSavedExam,
+    saveExamProgress,
     startMistakesQuiz,
     startBookmarksQuiz,
     startModuleDrill: (module) =>

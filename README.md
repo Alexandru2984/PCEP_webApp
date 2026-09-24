@@ -47,6 +47,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - ⏱️ **Three study modes** — Practice (instant feedback), a timed **Exam
   simulation** (question navigator, flagging, auto-submit), and **Flashcards**
   (flip to reveal the answer, self-mark what you know)
+- 💾 **Crash-safe exam recovery** — an interrupted exam restores its deadline,
+  current question, selected answers and flags from a validated local-only copy
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
 - 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
   accuracy, strongest/weakest modules and separate flashcard self-ratings (local-first)
@@ -141,8 +143,8 @@ make django-check
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 
-# Frontend — 90 Vitest tests, then static checks, the production build and
-# 12 Playwright flows (including axe, PWA and real Pyodide recovery).
+# Frontend — 101 Vitest tests, then static checks, the production build and
+# 13 Playwright flows (including axe, PWA, exam resume and real Pyodide recovery).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```

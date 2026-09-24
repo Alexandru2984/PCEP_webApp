@@ -13,6 +13,9 @@ import {
   exportProgress,
   parseProgressBackup,
   importProgress,
+  loadActiveExam,
+  saveActiveExam,
+  clearActiveExam,
 } from './storage'
 
 const question = (id) => ({
@@ -40,6 +43,19 @@ const attempt = (id, score = 0) => ({
 })
 const wrong = (id) => ({ question: question(id), feedback: { is_correct: false } })
 const right = (id) => ({ question: question(id), feedback: { is_correct: true } })
+const activeExam = (override = {}) => {
+  const startedAt = Date.now()
+  return {
+    config: { mode: 'exam', module: '', difficulty: '', count: 10 },
+    questions: [question(1), question(2)],
+    startedAt,
+    deadline: startedAt + 160_000,
+    index: 1,
+    answers: { 1: 11 },
+    flagged: [2],
+    ...override,
+  }
+}
 
 // localStorage is reset by the global afterEach in src/test/setup.js, but reset
 // here too so each case is independent regardless of run order.
@@ -95,6 +111,66 @@ describe('settings', () => {
     }
     saveSettings(settings)
     expect(loadSettings()).toEqual(settings)
+  })
+})
+
+describe('active exam recovery', () => {
+  it('round-trips only public questions, selections and navigation state', () => {
+    const unsafe = activeExam({
+      questions: [
+        {
+          ...question(1),
+          correct_choice_id: 11,
+          choices: question(1).choices.map((choice) => ({
+            ...choice,
+            is_correct: true,
+            explanation: 'SECRET',
+          })),
+        },
+        question(2),
+      ],
+    })
+    expect(saveActiveExam(unsafe)).toBe(true)
+    const raw = localStorage.getItem('pcep.activeExam')
+    expect(raw).not.toContain('SECRET')
+    expect(raw).not.toContain('is_correct')
+    expect(raw).not.toContain('correct_choice_id')
+    expect(loadActiveExam()).toEqual({
+      ...unsafe,
+      config: { mode: 'exam', module: '', difficulty: '', count: 10 },
+      questions: [question(1), question(2)],
+    })
+  })
+
+  it.each([
+    { answers: { 1: 999 } },
+    { flagged: [2, 2] },
+    { questions: [question(1), question(1)] },
+    { correct_choice_id: 11 },
+  ])('rejects malformed recovery data: %j', (override) => {
+    expect(saveActiveExam(activeExam(override))).toBe(false)
+    expect(loadActiveExam()).toBeNull()
+  })
+
+  it('expires abandoned recovery data one day after its deadline', () => {
+    const deadline = Date.now() - 24 * 60 * 60 * 1000 - 1
+    localStorage.setItem(
+      'pcep.activeExam',
+      JSON.stringify({
+        version: 1,
+        data: activeExam({ startedAt: deadline - 160_000, deadline }),
+      })
+    )
+    expect(loadActiveExam()).toBeNull()
+    expect(localStorage.getItem('pcep.activeExam')).toBeNull()
+  })
+
+  it('clears a saved exam without changing progress history', () => {
+    appendAttempt(attempt('kept'))
+    saveActiveExam(activeExam())
+    expect(clearActiveExam()).toBe(true)
+    expect(loadActiveExam()).toBeNull()
+    expect(loadHistory()).toEqual([attempt('kept')])
   })
 })
 

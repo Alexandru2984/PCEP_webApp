@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchQuizSet, gradeAnswers, submitAnswer } from './api'
-import { loadHistory } from './storage'
+import { loadActiveExam, loadHistory, saveActiveExam } from './storage'
 import useQuizSession from './useQuizSession'
 
 vi.mock('./api', async (original) => ({
@@ -140,5 +140,54 @@ describe('quiz session requests', () => {
     expect(result.current.phase).toBe('exam')
     expect(result.current.error).toMatch(/incomplete grading/)
     expect(loadHistory()).toEqual([])
+  })
+
+  it('persists exam progress and clears it when the learner quits', async () => {
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'exam' }))
+    expect(loadActiveExam()).toMatchObject({
+      index: 0,
+      answers: {},
+      flagged: [],
+    })
+    act(() =>
+      result.current.saveExamProgress({
+        index: 0,
+        answers: { 1: 11 },
+        flagged: [1],
+        deadline: result.current.examProgress.deadline,
+      })
+    )
+    expect(loadActiveExam()).toMatchObject({ answers: { 1: 11 }, flagged: [1] })
+    act(() => result.current.resetToSetup())
+    expect(result.current.phase).toBe('setup')
+    expect(loadActiveExam()).toBeNull()
+  })
+
+  it('resumes a validated exam and removes recovery data after grading', async () => {
+    const startedAt = Date.now()
+    saveActiveExam({
+      config: { ...config, mode: 'exam' },
+      questions: [question],
+      startedAt,
+      deadline: startedAt + 80_000,
+      index: 0,
+      answers: { 1: 11 },
+      flagged: [1],
+    })
+    gradeAnswers.mockResolvedValue({
+      results: [{ ...feedback, question_id: 1, choice_id: 11 }],
+    })
+    const { result } = renderHook(useQuizSession)
+    expect(result.current.resumableExam).toMatchObject({ answers: { 1: 11 } })
+    act(() => result.current.resumeExam())
+    expect(result.current.phase).toBe('exam')
+    expect(result.current.examProgress).toMatchObject({
+      answers: { 1: 11 },
+      flagged: [1],
+    })
+    await act(async () => result.current.handleExamSubmit({ 1: 11 }))
+    expect(result.current.phase).toBe('done')
+    expect(loadActiveExam()).toBeNull()
   })
 })

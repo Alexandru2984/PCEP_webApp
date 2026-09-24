@@ -3,7 +3,7 @@ import { fetchQuestionStats, apiErrorMessage } from '../api'
 import { loadHistory, loadMistakes, loadBookmarks } from '../storage'
 import useQuizSession from '../useQuizSession'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
-import { formatElapsed } from '../format'
+import { formatClock, formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
@@ -28,6 +28,53 @@ function LoadingCard() {
   )
 }
 
+function SavedExamCard({ exam, onResume, onDiscard }) {
+  const answered = Object.keys(exam.answers).length
+  const [remaining] = useState(() =>
+    Math.max(0, Math.ceil((exam.deadline - Date.now()) / 1000))
+  )
+  const expired = remaining === 0
+  return (
+    <section
+      aria-labelledby="saved-exam-heading"
+      className="rounded-xl border border-sky-300 bg-sky-50 p-5 shadow-sm dark:border-sky-800 dark:bg-sky-950/30"
+    >
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+        Exam recovery
+      </p>
+      <h2 id="saved-exam-heading" className="text-xl font-semibold">
+        Resume saved exam
+      </h2>
+      <p className="mt-2 text-slate-700 dark:text-slate-200">
+        {answered}/{exam.questions.length} answered.{' '}
+        {expired
+          ? 'Time has expired; resume to grade the answers that were saved.'
+          : `${formatClock(remaining)} remaining.`}
+      </p>
+      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+        This recovery copy stays in this browser and contains public questions and your
+        selections, never the answer key.
+      </p>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={onResume}
+          className="rounded-lg bg-slate-900 px-4 py-2.5 font-medium text-white hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
+        >
+          Resume exam
+        </button>
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+        >
+          Discard and start new
+        </button>
+      </div>
+    </section>
+  )
+}
+
 export default function QuizContainer() {
   const {
     phase,
@@ -40,12 +87,17 @@ export default function QuizContainer() {
     elapsedMs,
     submitting,
     error,
+    resumableExam,
+    examProgress,
     startQuiz,
     handleSelect,
     handleNext,
     handleExamSubmit,
     finish,
     resetToSetup,
+    resumeExam,
+    discardSavedExam,
+    saveExamProgress,
     startMistakesQuiz,
     startBookmarksQuiz,
     startModuleDrill,
@@ -109,6 +161,14 @@ export default function QuizContainer() {
   }, [phase, index, questions])
 
   if (phase === 'setup') {
+    if (resumableExam)
+      return (
+        <SavedExamCard
+          exam={resumableExam}
+          onResume={resumeExam}
+          onDiscard={discardSavedExam}
+        />
+      )
     const attemptCount = loadHistory().length
     const tab = (active) =>
       `rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 ${
@@ -201,6 +261,8 @@ export default function QuizContainer() {
           questions={questions}
           onSubmit={handleExamSubmit}
           onQuit={resetToSetup}
+          onProgress={saveExamProgress}
+          initialProgress={examProgress}
           submitting={submitting}
           error={error}
         />

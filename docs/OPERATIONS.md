@@ -177,6 +177,24 @@ sessions completed in this version. Flashcard self-ratings are excluded from
 graded accuracy. Older mixed attempts lack detailed breakdowns and remain visible
 in history without invented module performance.
 
+## Active exam recovery
+
+An in-progress exam is stored separately under the versioned
+`pcep.activeExam` key. It contains only sanitized public questions, the learner's
+selected choice IDs, flags, current index, start time and original deadline. It
+never contains correctness flags, explanations or a correct-choice ID, and it is
+not included in progress exports. Only one active exam is retained.
+
+On reload the setup screen requires an explicit choice: resume the saved exam or
+discard it before starting any quiz or dashboard drill. Resuming preserves the
+original wall-clock deadline. If that deadline passed while the app was closed,
+the saved answers are locked and submitted for grading immediately; a network
+failure keeps the recovery copy for retry. Successful grading, Quit and Discard
+remove it. Strict schema validation rejects unknown questions/choices, duplicate
+flags, invalid timestamps and extra top-level fields. Abandoned data expires 24
+hours after its deadline. Storage failure uses the existing persistence warning
+and never blocks the live in-memory exam.
+
 The Python runner limits source to 20,000 characters, output/tracebacks to
 10,000 characters, queued/running jobs to four, startup to 30 seconds and each
 execution to eight seconds. Timeout terminates the worker; later Run recreates

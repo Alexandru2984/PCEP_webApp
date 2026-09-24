@@ -5,16 +5,28 @@ import { ignoreShortcut } from '../shortcuts'
 
 const SECONDS_PER_QUESTION = 80 // application simulation pace
 
-export default function ExamView({ questions, onSubmit, onQuit, submitting, error }) {
+export default function ExamView({
+  questions,
+  onSubmit,
+  onQuit,
+  onProgress,
+  initialProgress,
+  submitting,
+  error,
+}) {
   const total = questions.length
-  const [index, setIndex] = useState(0)
-  const [answers, setAnswers] = useState({})
-  const [flagged, setFlagged] = useState(() => new Set())
-  const [timeLeft, setTimeLeft] = useState(total * SECONDS_PER_QUESTION)
+  const [index, setIndex] = useState(() => initialProgress?.index ?? 0)
+  const [answers, setAnswers] = useState(() => ({ ...(initialProgress?.answers ?? {}) }))
+  const [flagged, setFlagged] = useState(() => new Set(initialProgress?.flagged ?? []))
+  const [deadline] = useState(
+    () => initialProgress?.deadline ?? Date.now() + total * SECONDS_PER_QUESTION * 1000
+  )
+  const [timeLeft, setTimeLeft] = useState(() =>
+    Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
+  )
   const [confirming, setConfirming] = useState(false)
   const submittedRef = useRef(false)
   const autoAttempted = useRef(false)
-  const [deadline] = useState(() => Date.now() + total * SECONDS_PER_QUESTION * 1000)
   const expiredAnswers = useRef(null)
   const [navigatorOpen, setNavigatorOpen] = useState(
     () => window.matchMedia?.('(min-width: 640px)').matches ?? false
@@ -24,6 +36,9 @@ export default function ExamView({ questions, onSubmit, onQuit, submitting, erro
   useEffect(() => {
     if (confirming) confirmButton.current?.focus()
   }, [confirming])
+  useEffect(() => {
+    onProgress?.({ index, answers, flagged: [...flagged], deadline })
+  }, [answers, deadline, flagged, index, onProgress])
 
   const answeredCount = Object.keys(answers).length
 
