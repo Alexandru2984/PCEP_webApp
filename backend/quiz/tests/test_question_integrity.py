@@ -11,6 +11,7 @@ from quiz.models import Question, Choice
 from quiz.question_bank import (
     duplicate_questions,
     similar_questions,
+    syllabus_warnings,
     validation_errors,
 )
 
@@ -62,6 +63,21 @@ def test_near_duplicate_audit_returns_distinct_high_similarity_candidates():
     )
     assert (first_index, second_index) == (1, 2)
     assert similarity >= 0.8
+
+
+@pytest.mark.parametrize(
+    'snippet',
+    [
+        'items = {1, 2, 3}',
+        'items = {value for value in range(3)}',
+        'items = set([1, 2, 3])',
+    ],
+)
+def test_syllabus_audit_reports_set_usage(snippet):
+    warnings = syllabus_warnings([question(module='module3', code_snippet=snippet)])
+    assert warnings == [
+        'question #1 uses sets, which are outside the PCEP-30-02 data-collection objectives'
+    ]
 
 
 @pytest.mark.django_db
@@ -179,3 +195,41 @@ def test_comprehension_replacement_migration_preserves_all_ids(make_question):
     assert q.code_snippet == migration.OLD_SNIPPET
     assert list(q.choices.values_list('id', flat=True)) == choice_ids
     assert q.choices.get(is_correct=True).text == '[2, 6]'
+
+
+@pytest.mark.django_db
+def test_set_replacement_migration_preserves_all_ids(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+    migration = importlib.import_module(
+        'quiz.migrations.0006_replace_out_of_syllabus_sets'
+    )
+    editor = connection.schema_editor()
+    questions = []
+    original_choice_ids = []
+    for replacement in migration.REPLACEMENTS:
+        source = replacement['old']
+        q = make_question(module='module3', difficulty=source['difficulty'])
+        q.text = source['text']
+        q.code_snippet = source['code_snippet']
+        q.save()
+        questions.append(q)
+        original_choice_ids.append(list(q.choices.values_list('id', flat=True)))
+
+    migration.replace_out_of_syllabus_sets(apps, editor)
+    for q, choice_ids, replacement in zip(
+        questions, original_choice_ids, migration.REPLACEMENTS, strict=True
+    ):
+        q.refresh_from_db()
+        assert q.code_snippet == replacement['new']['code_snippet']
+        assert list(q.choices.values_list('id', flat=True)) == choice_ids
+        assert q.choices.get(is_correct=True).text == replacement['new']['choices'][0][0]
+
+    migration.restore_out_of_syllabus_sets(apps, editor)
+    for q, choice_ids, replacement in zip(
+        questions, original_choice_ids, migration.REPLACEMENTS, strict=True
+    ):
+        q.refresh_from_db()
+        assert q.code_snippet == replacement['old']['code_snippet']
+        assert list(q.choices.values_list('id', flat=True)) == choice_ids

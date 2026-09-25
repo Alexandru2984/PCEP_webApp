@@ -85,6 +85,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
   and database readiness probes
+- 🔎 AST-backed question audits catch duplicates, malformed answer sets and
+  out-of-syllabus collection syntax before release
 
 ## Tech stack
 
@@ -156,7 +158,7 @@ make test
 make audit
 make django-check
 
-# Backend — 135 tests (API/security, integrity, startup, release and SEO behavior)
+# Backend — 139 tests (API/security, integrity, startup, release and SEO behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings

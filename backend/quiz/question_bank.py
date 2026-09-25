@@ -111,6 +111,35 @@ def validation_errors(questions=ALL_QUESTIONS):
     return errors
 
 
+def syllabus_warnings(questions=ALL_QUESTIONS):
+    warnings = []
+    for index, question in enumerate(questions, start=1):
+        snippet = question.get('code_snippet', '').strip()
+        if not snippet:
+            continue
+        try:
+            tree = ast.parse(snippet)
+        except (SyntaxError, ValueError):
+            continue
+        uses_set = any(
+            isinstance(node, (ast.Set, ast.SetComp))
+            or (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == 'set'
+            )
+            for node in ast.walk(tree)
+        )
+        if uses_set:
+            label = f'question #{index}'
+            if 'id' in question:
+                label = f'database question id={question["id"]}'
+            warnings.append(
+                f'{label} uses sets, which are outside the PCEP-30-02 data-collection objectives'
+            )
+    return warnings
+
+
 def coverage_warnings(questions=ALL_QUESTIONS):
     summary = question_bank_summary(questions, include_warnings=False)
     warnings = []
@@ -121,7 +150,7 @@ def coverage_warnings(questions=ALL_QUESTIONS):
                 f'{module} has {hard_count} hard questions, '
                 f'expected at least {MIN_HARD_PER_MODULE}'
             )
-    return warnings
+    return warnings + syllabus_warnings(questions)
 
 
 def question_bank_summary(questions=ALL_QUESTIONS, include_warnings=True):

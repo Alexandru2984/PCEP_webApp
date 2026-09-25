@@ -131,10 +131,11 @@ Backend rollback uses the retained image: tag the chosen
 `docker compose up -d --no-deps --no-build backend` and verify readiness/public
 API. The 2026-09-18 pre-change image is `pcep-backend-rollback:20260918`.
 It contains old vulnerable dependencies, so use only for an emergency rollback.
-Migration 0003 only labels an existing option; it needs no database restore for
-an application rollback. Database restoration is a separate planned maintenance
-operation into a suitable database, never an automatic pipe into the running
-production database.
+Question-content migrations 0003 through 0006 update existing rows in place,
+preserve question/choice IDs and are reversible; they need no database restore
+for an application rollback. Database restoration is a separate planned
+maintenance operation into a suitable database, never an automatic pipe into the
+running production database.
 
 ## Public study pages
 
@@ -192,6 +193,10 @@ require four unique non-empty options, one boolean correct flag, an explanation
 per option, valid module/difficulty and a non-empty prompt. The question admin
 validates the complete inline set; the separate choice admin is view-only.
 Seed validation runs before any writes, including an explicitly requested reset.
+The syllabus audit also parses valid snippets and rejects set literals, set
+comprehensions and `set()` calls because PCEP-30-02 defines its data-collection
+scope as lists, tuples, dictionaries and strings. Invalid snippets used for syntax
+questions retain the existing normalized-source fallback.
 Migration `0003_label_empty_output_choice` changes only the empty wrong option
 for `print(0 or "" or "x" or "y")` to `(empty output)`, preserving all IDs and
 explanations. It is reversible and does not recreate the question bank.
@@ -300,6 +305,10 @@ contrast pairs can be very similar; `--fail-on-warnings` continues to fail only
 on definite duplicates, coverage warnings and integrity errors. Migration
 `0005_replace_equivalent_comprehension` replaces one logically equivalent list
 comprehension while preserving its question and choice IDs.
+Migration `0006_replace_out_of_syllabus_sets` replaces two equivalent set
+questions with distinct `dict.values()` and dynamic `dict.items()` exercises from
+objective 3.3. It updates rows and choices in place so local bookmarks and saved
+exam selections keep valid IDs.
 
 ## Nginx production topology and hardening
 

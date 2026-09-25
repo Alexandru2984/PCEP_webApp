@@ -118,9 +118,11 @@ not printed or copied. No database or Docker volume was deleted.
   consistent cache/error middleware.
 - Added reusable question-bank validation, database-aware audit diagnostics,
   admin inline enforcement and safe seed preflight.
-- Applied migration `0003_label_empty_output_choice`, which labels one existing
-  blank wrong option as `(empty output)` without changing IDs, correct flags or
-  explanations.
+- Applied reversible question-content migrations in place without changing IDs.
+  The latest removes two equivalent, out-of-syllabus set questions and replaces
+  them with `dict.values()` and dynamic `dict.items()` exercises from objective 3.3.
+- Extended the AST-backed audit to reject set literals, set comprehensions and
+  `set()` calls outside the PCEP-30-02 collection scope.
 - Added bounded database startup, connection health checks, short connect
   timeout, ManifestStaticFilesStorage, structured Gunicorn logs and request IDs.
 
@@ -272,7 +274,7 @@ Final validation on 2026-09-19:
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
 
-Continuation validation on 2026-09-25 covers 135 backend tests, 183 Vitest tests
+Continuation validation on 2026-09-25 covers 139 backend tests, 183 Vitest tests
 and 23 Playwright flows, including the answer-safe daily challenge, confidence
 insights, PWA installation, focused review, flashcard self-rating semantics and
 the exact PCEP-30-02 full-mock contract.
@@ -316,7 +318,8 @@ added.
 
 ## 14. Deployment notes
 
-Migration `0003_label_empty_output_choice` is applied. The backend image was
+Question-content migrations through `0006_replace_out_of_syllabus_sets` are
+applied. The backend image was
 rebuilt and only the backend service was recreated for deployment. Static and
 frontend trees were published with atomic swaps. The Nginx vhost/snippets were
 installed only after validation and reloaded gracefully. The safe SEO generator
