@@ -229,6 +229,24 @@ test('flashcards reveal shows the answer and self-marking advances the deck', as
   await page.getByRole('button', { name: /Got it/i }).click()
   // Advancing resets the card, so the reveal control is back for card 2.
   await expect(page.getByRole('button', { name: /Reveal answer/i })).toBeVisible()
+  for (let index = 1; index < QUESTIONS.length; index += 1) {
+    await page.getByRole('button', { name: /Reveal answer/i }).click()
+    await page
+      .getByRole('button', { name: index % 2 ? /Review later/i : /Got it/i })
+      .click()
+  }
+  await expect(page.getByRole('heading', { name: 'Flashcards complete' })).toBeVisible()
+  await expect(
+    page
+      .getByRole('heading', { name: 'Flashcards complete' })
+      .locator('xpath=following-sibling::p[1]')
+  ).toContainText('2 of 4 marked “Got it”')
+  await expect(page.getByText(/PCEP threshold/)).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Flashcard self-rating' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Review later (2)' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
 })
 
 test('exam preserves answers through a throttled grading request and retries once', async ({

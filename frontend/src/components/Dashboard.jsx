@@ -430,7 +430,8 @@ export default function Dashboard({
               >
                 {a.pct}%
                 <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
-                  ({a.score}/{a.total})
+                  ({a.score}/{a.total}
+                  {a.mode === 'flashcards' ? ' got it' : ''})
                 </span>
               </div>
             </li>

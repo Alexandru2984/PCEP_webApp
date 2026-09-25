@@ -190,6 +190,8 @@ assistive-technology certification.
   explicit explanation of which study actions still require a connection.
 - A focused end-of-session review queue combines misses with low-confidence correct
   answers and shows the learner's confidence and decision time beside each item.
+- Flashcard reports use "Got it" / "Review later" recall language and never present
+  self-ratings as a graded PCEP pass result; shared summaries also reflect the mode.
 - Focus-area drill actions from reports and preserved mistake drills.
 
 ## 9. Performance

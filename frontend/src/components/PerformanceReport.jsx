@@ -84,7 +84,7 @@ function Breakdown({ title, rows }) {
   )
 }
 
-export default function PerformanceReport({ items, onDrillModule }) {
+export default function PerformanceReport({ items, onDrillModule, selfRated = false }) {
   if (!items || items.length === 0) return null
 
   const moduleRows = toRows(
@@ -119,7 +119,9 @@ export default function PerformanceReport({ items, onDrillModule }) {
   // Weakest module worth calling out: lowest pct, tie broken by the larger
   // sample so a 0/1 fluke doesn't outrank a 2/6 genuine weak spot.
   const weakest = [...moduleRows].sort((a, b) => a.pct - b.pct || b.total - a.total)[0]
-  const hasGap = weakest && weakest.pct < PASS_THRESHOLD
+  const hasGap =
+    weakest &&
+    (selfRated ? weakest.correct < weakest.total : weakest.pct < PASS_THRESHOLD)
 
   return (
     <section
@@ -130,7 +132,7 @@ export default function PerformanceReport({ items, onDrillModule }) {
         id="performance-breakdown-heading"
         className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-300"
       >
-        Performance breakdown
+        {selfRated ? 'Flashcard self-rating' : 'Performance breakdown'}
       </h3>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -177,8 +179,10 @@ export default function PerformanceReport({ items, onDrillModule }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span>
               <span className="font-semibold">Focus area: </span>
-              {weakest.label} — {weakest.correct}/{weakest.total} ({weakest.pct}%). Drill
-              it next to lift it above the {PASS_THRESHOLD}% pass line.
+              {weakest.label} — {weakest.correct}/{weakest.total} ({weakest.pct}%).{' '}
+              {selfRated
+                ? 'Review the cards you marked “Review later”, then practice this module.'
+                : `Drill it next to lift it above the ${PASS_THRESHOLD}% pass line.`}
             </span>
             {onDrillModule && (
               <button
@@ -192,8 +196,14 @@ export default function PerformanceReport({ items, onDrillModule }) {
           </div>
         ) : (
           <>
-            <span className="font-semibold">Strong across the board — </span>
-            every module you touched is at or above the {PASS_THRESHOLD}% pass line.
+            <span className="font-semibold">
+              {selfRated
+                ? 'Strong recall across this deck — '
+                : 'Strong across the board — '}
+            </span>
+            {selfRated
+              ? 'every card was marked “Got it”.'
+              : `every module you touched is at or above the ${PASS_THRESHOLD}% pass line.`}
           </>
         )}
       </div>

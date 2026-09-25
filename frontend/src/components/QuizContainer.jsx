@@ -323,6 +323,8 @@ export default function QuizContainer() {
           onDrillModule={startModuleDrill}
           elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
           streakStats={getStreakStats(history)}
+          mode={lastConfig?.mode}
+          challengeDate={lastConfig?.challengeDate}
         />
       </Suspense>
     )

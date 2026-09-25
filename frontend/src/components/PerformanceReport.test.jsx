@@ -78,4 +78,12 @@ describe('PerformanceReport', () => {
     expect(screen.getByText(/10s average/i)).toBeInTheDocument()
     expect(screen.getByText(/Q2 15s · Q3 10s · Q1 5s/i)).toBeInTheDocument()
   })
+
+  it('describes flashcards as self-ratings without applying the pass line', () => {
+    const items = [item('module1', 'easy', true), item('module1', 'easy', false)]
+    render(<PerformanceReport items={items} selfRated />)
+    expect(screen.getByRole('heading', { name: 'Flashcard self-rating' })).toBeVisible()
+    expect(screen.getByText(/marked “Review later”/)).toBeVisible()
+    expect(screen.queryByText(/pass line/)).toBeNull()
+  })
 })

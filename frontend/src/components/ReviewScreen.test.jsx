@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import ReviewScreen from './ReviewScreen'
 
@@ -61,5 +61,52 @@ describe('ReviewScreen focused review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'All (3)' }))
     expect(within(list).getByText('Question 3')).toBeVisible()
+  })
+
+  it('keeps flashcard self-ratings separate from graded pass semantics', async () => {
+    const clipboard = vi.fn().mockResolvedValue(undefined)
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboard },
+    })
+    const items = [
+      reviewItem(1, { correct: true, responseMs: undefined }),
+      reviewItem(2, { correct: false, responseMs: undefined }),
+    ]
+    items[1].pickedChoiceId = null
+    items[1].feedback.explanation = ''
+    try {
+      render(
+        <ReviewScreen
+          items={items}
+          score={1}
+          total={2}
+          mode="flashcards"
+          onRestart={vi.fn()}
+        />
+      )
+
+      expect(
+        screen.getByRole('heading', { name: 'Flashcards complete' }).nextElementSibling
+      ).toHaveTextContent('1 of 2 marked “Got it”')
+      expect(screen.queryByText(/PCEP threshold/)).toBeNull()
+      expect(screen.queryByRole('button', { name: /Needs review/ })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Review later (1)' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      expect(screen.getByText('Review later', { selector: 'span' })).toBeVisible()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy result' }))
+      await waitFor(() => expect(clipboard).toHaveBeenCalledOnce())
+      expect(clipboard.mock.calls[0][0]).toContain(
+        'reviewed 2 PCEP flashcards and marked 1 (50%) “Got it”'
+      )
+      expect(screen.getByRole('status')).toHaveTextContent('copied to clipboard')
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
+      else delete navigator.clipboard
+    }
   })
 })

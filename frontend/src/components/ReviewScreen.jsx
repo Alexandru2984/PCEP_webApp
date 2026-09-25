@@ -27,7 +27,7 @@ const CONFIDENCE_LABELS = {
   high: 'High confidence',
 }
 
-function ReviewItem({ index, item }) {
+function ReviewItem({ index, item, selfRated }) {
   const { question, pickedChoiceId, feedback, confidence, responseMs } = item
   const ok = feedback?.is_correct
   const correctId = feedback?.correct_choice_id
@@ -58,14 +58,24 @@ function ReviewItem({ index, item }) {
           )}
           <span
             className={`rounded-full px-2 py-0.5 font-semibold ${
-              skipped
-                ? 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200'
-                : ok
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                  : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+              selfRated && !ok
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+                : skipped
+                  ? 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200'
+                  : ok
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
             }`}
           >
-            {skipped ? 'skipped' : ok ? '✓ correct' : '✗ wrong'}
+            {selfRated
+              ? ok
+                ? 'Got it'
+                : 'Review later'
+              : skipped
+                ? 'skipped'
+                : ok
+                  ? '✓ correct'
+                  : '✗ wrong'}
           </span>
         </div>
       </div>
@@ -142,12 +152,15 @@ export default function ReviewScreen({
   onDrillModule,
   elapsedLabel,
   streakStats,
+  mode = 'practice',
+  challengeDate,
 }) {
   const heading = useRef(null)
   useEffect(() => {
     heading.current?.focus()
   }, [])
-  const [filter, setFilter] = useState('focus')
+  const selfRated = mode === 'flashcards'
+  const [filter, setFilter] = useState(() => (selfRated ? 'wrong' : 'focus'))
   const wrong = items.filter((i) => !i.feedback?.is_correct)
   const focus = items.filter(
     (item) => !item.feedback?.is_correct || item.confidence === 'low'
@@ -155,26 +168,42 @@ export default function ReviewScreen({
   const shown = filter === 'focus' ? focus : filter === 'wrong' ? wrong : items
 
   const pct = total > 0 ? Math.round((score / total) * 100) : 0
-  const passed = pct >= 70
+  const passed = !selfRated && pct >= 70
+  const positiveResult = selfRated ? score === total : passed
   const animatedPct = useCountUp(pct)
-  const [copied, setCopied] = useState(false)
+  const [shareStatus, setShareStatus] = useState('')
+  const canShare = typeof navigator.share === 'function'
 
   useEffect(() => {
     if (passed) celebrate()
   }, [passed])
 
   const share = async () => {
-    const text = `I scored ${score}/${total} (${pct}%) on the PCEP practice exam${passed ? ' ✅' : ''} — try it at https://pcep.micutu.com 🐍`
+    const url = 'https://pcep.micutu.com/'
+    const text = selfRated
+      ? `I reviewed ${total} PCEP flashcards and marked ${score} (${pct}%) “Got it”.`
+      : `I scored ${score}/${total} (${pct}%) on ${challengeDate ? "today's PCEP Quiz daily challenge" : mode === 'exam' ? 'a PCEP Quiz exam simulation' : 'a PCEP Quiz practice session'}${passed ? ' ✅' : '.'}`
+    const copy = async () => {
+      if (!navigator.clipboard?.writeText) return false
+      await navigator.clipboard.writeText(`${text} ${url} 🐍`)
+      setShareStatus('Result copied to clipboard.')
+      return true
+    }
+    setShareStatus('')
     try {
-      if (navigator.share) {
-        await navigator.share({ text, url: 'https://pcep.micutu.com' })
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(text)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
+      if (canShare) {
+        await navigator.share({ title: 'PCEP Quiz result', text, url })
+        setShareStatus('Result shared.')
+      } else if (!(await copy())) {
+        setShareStatus('Sharing is unavailable in this browser.')
       }
-    } catch {
-      /* user dismissed the share sheet — ignore */
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+      try {
+        if (!(await copy())) setShareStatus('Sharing is unavailable in this browser.')
+      } catch {
+        setShareStatus('Could not copy the result. Check clipboard permissions.')
+      }
     }
   }
 
@@ -195,17 +224,18 @@ export default function ReviewScreen({
               tabIndex={-1}
               className="text-2xl font-bold text-slate-900 dark:text-slate-100"
             >
-              Quiz complete
+              {selfRated ? 'Flashcards complete' : 'Quiz complete'}
             </h2>
             <p className="mt-1 text-slate-700 dark:text-slate-300">
               <span className="font-semibold">{score}</span> of{' '}
-              <span className="font-semibold">{total}</span> correct —{' '}
+              <span className="font-semibold">{total}</span>{' '}
+              {selfRated ? 'marked “Got it”' : 'correct'} —{' '}
               <span
-                className={`font-bold ${passed ? 'text-green-700 dark:text-green-400' : 'text-orange-700 dark:text-orange-400'}`}
+                className={`font-bold ${positiveResult ? 'text-green-700 dark:text-green-400' : 'text-orange-700 dark:text-orange-400'}`}
               >
                 {animatedPct}%
               </span>
-              {passed ? ' · passing' : ' · below 70% PCEP threshold'}
+              {!selfRated && (passed ? ' · passing' : ' · below 70% PCEP threshold')}
               {elapsedLabel ? ` · ${elapsedLabel}` : ''}
             </p>
             {streakStats?.best > 1 && (
@@ -214,21 +244,31 @@ export default function ReviewScreen({
               </div>
             )}
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={share}
-              className="rounded-lg border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              {copied ? 'Copied ✓' : 'Share'}
-            </button>
-            <button
-              type="button"
-              onClick={onRestart}
-              className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
-            >
-              New quiz
-            </button>
+          <div className="sm:text-right">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={share}
+                className="rounded-lg border border-slate-300 px-4 py-2.5 font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                {canShare ? 'Share' : 'Copy result'}
+              </button>
+              <button
+                type="button"
+                onClick={onRestart}
+                className="rounded-lg bg-slate-900 px-5 py-2.5 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
+              >
+                New quiz
+              </button>
+            </div>
+            {shareStatus && (
+              <p
+                role="status"
+                className="mt-2 max-w-xs text-xs text-slate-600 dark:text-slate-300"
+              >
+                {shareStatus}
+              </p>
+            )}
           </div>
         </div>
 
@@ -237,21 +277,23 @@ export default function ReviewScreen({
           role="group"
           aria-label="Question review filter"
         >
-          <button
-            type="button"
-            aria-pressed={filter === 'focus'}
-            onClick={() => setFilter('focus')}
-            className={tab(filter === 'focus')}
-          >
-            Needs review ({focus.length})
-          </button>
+          {!selfRated && (
+            <button
+              type="button"
+              aria-pressed={filter === 'focus'}
+              onClick={() => setFilter('focus')}
+              className={tab(filter === 'focus')}
+            >
+              Needs review ({focus.length})
+            </button>
+          )}
           <button
             type="button"
             aria-pressed={filter === 'wrong'}
             onClick={() => setFilter('wrong')}
             className={tab(filter === 'wrong')}
           >
-            Wrong only ({wrong.length})
+            {selfRated ? 'Review later' : 'Wrong only'} ({wrong.length})
           </button>
           <button
             type="button"
@@ -264,18 +306,29 @@ export default function ReviewScreen({
         </div>
       </div>
 
-      <PerformanceReport items={items} onDrillModule={onDrillModule} />
+      <PerformanceReport
+        items={items}
+        onDrillModule={onDrillModule}
+        selfRated={selfRated}
+      />
 
       {shown.length === 0 ? (
         <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center font-medium text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
-          {filter === 'focus'
-            ? 'Nothing needs focused review — no misses or low-confidence answers.'
-            : 'Flawless — no wrong answers to review.'}
+          {selfRated
+            ? 'All cards were marked “Got it” — no cards need review.'
+            : filter === 'focus'
+              ? 'Nothing needs focused review — no misses or low-confidence answers.'
+              : 'Flawless — no wrong answers to review.'}
         </div>
       ) : (
         <ul className="space-y-3" aria-label="Question review">
           {shown.map((item) => (
-            <ReviewItem key={item.question.id} index={items.indexOf(item)} item={item} />
+            <ReviewItem
+              key={item.question.id}
+              index={items.indexOf(item)}
+              item={item}
+              selfRated={selfRated}
+            />
           ))}
         </ul>
       )}

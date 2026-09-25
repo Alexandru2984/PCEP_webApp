@@ -59,7 +59,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   up to 20 matches; search previews deliberately exclude choices and answer metadata
 - 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
   accuracy, confidence calibration, local-day study streaks, score trends, measured
-  response pace and separate flashcard self-ratings (local-first)
+  response pace and separate flashcard self-ratings in both reports and history
+  (local-first)
 - 📈 **End-of-quiz report** — per-module, per-difficulty and optional confidence
   breakdowns, decision timing and a "focus area" recommendation you can drill in one
   click, plus a focused review queue combining misses with correct answers given at

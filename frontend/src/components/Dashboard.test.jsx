@@ -58,6 +58,7 @@ describe('Dashboard', () => {
     expect(screen.getByText('Difficulty accuracy')).toBeInTheDocument()
     expect(screen.getByText('0%')).toBeInTheDocument()
     expect(screen.getByText(/self-rated and excluded/)).toBeInTheDocument()
+    expect(screen.getByText('(4/4 got it)')).toBeInTheDocument()
   })
 
   it('labels completed daily challenges in recent attempts', () => {
