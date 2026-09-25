@@ -138,6 +138,16 @@ test('confidence and response timing produce actionable local insights', async (
   await expect(page.getByText(/1 high-confidence miss to revisit/)).toBeVisible()
   await expect(page.getByText(/1 low-confidence answer was correct/)).toBeVisible()
   await expect(page.getByText(/Decision timing:/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Needs review (2)' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  const focusedReview = page.getByRole('list', { name: 'Question review' })
+  await expect(focusedReview.getByText('Low confidence')).toBeVisible()
+  await expect(focusedReview.getByText(/response$/)).toHaveCount(2)
+  await page.getByRole('button', { name: 'Wrong only (1)' }).click()
+  await expect(focusedReview.getByText('Low confidence')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Needs review (2)' }).click()
   const progress = await page.evaluate(
     () => JSON.parse(localStorage.getItem('pcep.progress')).data
   )

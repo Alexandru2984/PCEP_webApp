@@ -188,6 +188,8 @@ assistive-technology certification.
 - Online/offline, update-available, persistence-failure and app-error recovery UI.
 - Browser-native PWA installation guidance with a tab-scoped dismissal and an
   explicit explanation of which study actions still require a connection.
+- A focused end-of-session review queue combines misses with low-confidence correct
+  answers and shows the learner's confidence and decision time beside each item.
 - Focus-area drill actions from reports and preserved mistake drills.
 
 ## 9. Performance

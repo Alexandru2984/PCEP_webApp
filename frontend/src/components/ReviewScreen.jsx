@@ -4,6 +4,8 @@ import PerformanceReport from './PerformanceReport'
 import { celebrate } from '../confetti'
 import { useCountUp } from '../useCountUp'
 import QuestionNote from './QuestionNote'
+import { formatElapsed } from '../format'
+import { validConfidence } from '../confidence'
 
 // Same dynamic specifier as QuestionCard, so the runner ships as one shared
 // chunk. The static CodeBlock stands in until it loads.
@@ -19,8 +21,14 @@ const MODULE_LABELS = {
 const pill =
   'rounded-full px-2 py-0.5 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
 
+const CONFIDENCE_LABELS = {
+  low: 'Low confidence',
+  medium: 'Medium confidence',
+  high: 'High confidence',
+}
+
 function ReviewItem({ index, item }) {
-  const { question, pickedChoiceId, feedback } = item
+  const { question, pickedChoiceId, feedback, confidence, responseMs } = item
   const ok = feedback?.is_correct
   const correctId = feedback?.correct_choice_id
   const skipped = pickedChoiceId == null
@@ -31,13 +39,23 @@ function ReviewItem({ index, item }) {
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
         <span>Q{index + 1}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <span className={pill}>
             {MODULE_LABELS[question.module] ?? question.module}
           </span>
           <span className={`${pill} uppercase tracking-wide`}>{question.difficulty}</span>
+          {validConfidence(confidence) && (
+            <span
+              className={`${pill} ${confidence === 'low' ? 'font-semibold text-violet-700 dark:text-violet-300' : ''}`}
+            >
+              {CONFIDENCE_LABELS[confidence]}
+            </span>
+          )}
+          {Number.isSafeInteger(responseMs) && responseMs >= 0 && (
+            <span className={pill}>{formatElapsed(responseMs)} response</span>
+          )}
           <span
             className={`rounded-full px-2 py-0.5 font-semibold ${
               skipped
@@ -129,9 +147,12 @@ export default function ReviewScreen({
   useEffect(() => {
     heading.current?.focus()
   }, [])
-  const [filter, setFilter] = useState('wrong')
+  const [filter, setFilter] = useState('focus')
   const wrong = items.filter((i) => !i.feedback?.is_correct)
-  const shown = filter === 'wrong' ? wrong : items
+  const focus = items.filter(
+    (item) => !item.feedback?.is_correct || item.confidence === 'low'
+  )
+  const shown = filter === 'focus' ? focus : filter === 'wrong' ? wrong : items
 
   const pct = total > 0 ? Math.round((score / total) * 100) : 0
   const passed = pct >= 70
@@ -211,9 +232,22 @@ export default function ReviewScreen({
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2">
+        <div
+          className="mt-5 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Question review filter"
+        >
           <button
             type="button"
+            aria-pressed={filter === 'focus'}
+            onClick={() => setFilter('focus')}
+            className={tab(filter === 'focus')}
+          >
+            Needs review ({focus.length})
+          </button>
+          <button
+            type="button"
+            aria-pressed={filter === 'wrong'}
             onClick={() => setFilter('wrong')}
             className={tab(filter === 'wrong')}
           >
@@ -221,6 +255,7 @@ export default function ReviewScreen({
           </button>
           <button
             type="button"
+            aria-pressed={filter === 'all'}
             onClick={() => setFilter('all')}
             className={tab(filter === 'all')}
           >
@@ -233,10 +268,12 @@ export default function ReviewScreen({
 
       {shown.length === 0 ? (
         <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center font-medium text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
-          Flawless — no wrong answers to review.
+          {filter === 'focus'
+            ? 'Nothing needs focused review — no misses or low-confidence answers.'
+            : 'Flawless — no wrong answers to review.'}
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-3" aria-label="Question review">
           {shown.map((item) => (
             <ReviewItem key={item.question.id} index={items.indexOf(item)} item={item} />
           ))}

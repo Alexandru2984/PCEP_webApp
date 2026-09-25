@@ -62,7 +62,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   response pace and separate flashcard self-ratings (local-first)
 - 📈 **End-of-quiz report** — per-module, per-difficulty and optional confidence
   breakdowns, decision timing and a "focus area" recommendation you can drill in one
-  click, plus a question-by-question review filtered to misses
+  click, plus a focused review queue combining misses with correct answers given at
+  low confidence
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused drill; answer one correctly and it drops off the list (local-first)
 - 🔖 **Bookmarks and portable progress** — bookmark drills plus validated,
