@@ -10,6 +10,21 @@ const baseProps = {
 }
 
 describe('QuizSetup — practice your mistakes', () => {
+  it("starts the daily challenge and shows today's completed score", () => {
+    const onDailyChallenge = vi.fn()
+    render(
+      <QuizSetup
+        {...baseProps}
+        onDailyChallenge={onDailyChallenge}
+        dailyCompletion={{ pct: 80 }}
+      />
+    )
+    const button = screen.getByRole('button', { name: /Daily challenge/i })
+    expect(button).toHaveTextContent('80% · Again')
+    fireEvent.click(button)
+    expect(onDailyChallenge).toHaveBeenCalledOnce()
+  })
+
   it('offers the mistakes drill with a count and fires the callback', () => {
     const onPracticeMistakes = vi.fn()
     render(

@@ -281,14 +281,12 @@ added.
 2. Disable or correctly scope Cloudflare JavaScript detection, then repeat the
    public console/CSP check. Review the dashboard's cache rules and tunnel
    hostname ownership directly.
-3. Consider a privacy-friendly daily challenge if its rotation can remain useful
-   without downloading answer data or adding server-side learner tracking.
-4. Add concept tags only with a curated taxonomy and coverage audit; use them to
+3. Add concept tags only with a curated taxonomy and coverage audit; use them to
    drive search and weak-topic reports. Current adaptive practice deliberately
    uses only validated performance, due-date, confidence and difficulty signals.
-5. Add external uptime/error monitoring for liveness, readiness and release
+4. Add external uptime/error monitoring for liveness, readiness and release
    version, without collecting learner behavior or personal data.
-6. Re-evaluate PostgreSQL random ordering only when bank size or measured query
+5. Re-evaluate PostgreSQL random ordering only when bank size or measured query
    time makes the current implementation material.
 
 ## 14. Deployment notes

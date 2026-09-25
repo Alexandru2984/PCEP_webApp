@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { Buffer } from 'node:buffer'
 
-import { QUESTIONS, correctId, mockApi } from './fixtures'
+import { DAILY_DATE, QUESTIONS, correctId, mockApi } from './fixtures'
 
 // --- Tests ------------------------------------------------------------------
 test('setup screen loads and shows the question-bank snapshot', async ({ page }) => {
@@ -10,6 +10,44 @@ test('setup screen loads and shows the question-bank snapshot', async ({ page })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Start a new quiz/i })).toBeVisible()
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
+})
+
+test('daily challenge is answer-safe, repeatable and visible in progress', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.goto('/')
+  const responsePromise = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('/api/daily/')
+  )
+  await page.getByRole('button', { name: /Daily challenge/ }).click()
+  const payload = await (await responsePromise).json()
+  expect(payload.date).toBe(DAILY_DATE)
+  expect(JSON.stringify(payload)).not.toMatch(/is_correct|correct_choice|explanation/)
+
+  for (let index = 0; index < QUESTIONS.length; index += 1) {
+    await page.getByRole('button', { name: /option 1/ }).click()
+    await page
+      .getByRole('button', {
+        name: index === QUESTIONS.length - 1 ? /See Results/ : /Next Question/,
+      })
+      .click()
+  }
+
+  const progress = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.progress')).data
+  )
+  expect(progress.history[0]).toMatchObject({
+    challengeDate: DAILY_DATE,
+    score: QUESTIONS.length,
+    total: QUESTIONS.length,
+  })
+  await page.getByRole('button', { name: 'New quiz' }).click()
+  await expect(page.getByRole('button', { name: /Daily challenge/ })).toContainText(
+    '100% · Again'
+  )
+  await page.getByRole('button', { name: /Progress/ }).click()
+  await expect(page.getByText('Daily')).toBeVisible()
 })
 
 test('search builds an answer-safe custom drill on mobile', async ({ page }) => {

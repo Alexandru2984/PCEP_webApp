@@ -128,6 +128,13 @@ describe('history', () => {
     })
   })
 
+  it('round-trips only valid daily challenge dates', () => {
+    appendAttempt(attempt('daily', 8, { challengeDate: '2026-09-24' }))
+    appendAttempt(attempt('invalid-date', 8, { challengeDate: '2026-02-29' }))
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadHistory()[0].challengeDate).toBe('2026-09-24')
+  })
+
   it.each([
     { byConfidence: { high: { score: 0, total: 1 } } },
     { responseMsTotal: 3 * 60 * 60 * 1000 + 1, responseCount: 1 },

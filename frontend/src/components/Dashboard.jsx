@@ -395,16 +395,20 @@ export default function Dashboard({
                 <div className="flex items-center gap-2">
                   <span
                     className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                      a.mode === 'exam'
-                        ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      a.challengeDate
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+                        : a.mode === 'exam'
+                          ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                     }`}
                   >
-                    {a.mode === 'exam'
-                      ? 'Exam'
-                      : a.mode === 'flashcards'
-                        ? 'Cards'
-                        : 'Practice'}
+                    {a.challengeDate
+                      ? 'Daily'
+                      : a.mode === 'exam'
+                        ? 'Exam'
+                        : a.mode === 'flashcards'
+                          ? 'Cards'
+                          : 'Practice'}
                   </span>
                   <span className="truncate text-slate-600 dark:text-slate-400">
                     {MODULE_LABELS[a.module] ?? a.module}

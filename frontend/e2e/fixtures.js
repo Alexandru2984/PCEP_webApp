@@ -36,6 +36,18 @@ const STATS = {
   pass_threshold: 70,
 }
 
+const bucharestParts = Object.fromEntries(
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Bucharest',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .formatToParts(new Date())
+    .map(({ type, value }) => [type, value])
+)
+export const DAILY_DATE = `${bucharestParts.year}-${bucharestParts.month}-${bucharestParts.day}`
+
 // The first choice of each question is the correct one in this mock.
 export const correctId = (questionId) => questionId * 10 + 1
 
@@ -46,6 +58,10 @@ export async function mockApi(page) {
     const url = new URL(req.url())
     const path = url.pathname
     if (path.endsWith('/api/stats/')) return route.fulfill({ json: STATS })
+    if (path.endsWith('/api/daily/'))
+      return route.fulfill({
+        json: { date: DAILY_DATE, count: QUESTIONS.length, questions: QUESTIONS },
+      })
     if (path.endsWith('/api/search/')) {
       const query = url.searchParams.get('q')?.toLowerCase() ?? ''
       const results = QUESTIONS.filter(

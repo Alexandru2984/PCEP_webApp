@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from quiz.models import Question
@@ -163,6 +165,30 @@ def test_search_rejects_invalid_parameters(api_client, params):
     resp = api_client.get('/api/search/', params)
     assert resp.status_code == 400
     assert set(resp.json()) == {'detail'}
+
+
+def test_daily_challenge_is_stable_balanced_and_answer_safe(
+    api_client, question_bank, django_assert_num_queries, monkeypatch
+):
+    monkeypatch.setattr('quiz.views.timezone.localdate', lambda: date(2026, 9, 24))
+
+    with django_assert_num_queries(3):
+        first = api_client.get('/api/daily/')
+    second = api_client.get('/api/daily/')
+
+    assert first.status_code == 200
+    assert second.json() == first.json()
+    body = first.json()
+    assert body['date'] == '2026-09-24'
+    assert body['count'] == 5
+    assert {question['module'] for question in body['questions']} == {
+        'module1', 'module2', 'module3', 'module4'
+    }
+    for question in body['questions']:
+        assert set(question) == {
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'choices'
+        }
+        assert all(set(choice) == {'id', 'text'} for choice in question['choices'])
 
 
 def test_submit_correct_answer(api_client, make_question):

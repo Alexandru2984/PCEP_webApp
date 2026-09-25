@@ -60,6 +60,12 @@ describe('Dashboard', () => {
     expect(screen.getByText(/self-rated and excluded/)).toBeInTheDocument()
   })
 
+  it('labels completed daily challenges in recent attempts', () => {
+    seedHistory([attempt({ challengeDate: '2026-09-24', score: 4, total: 5, pct: 80 })])
+    render(<Dashboard />)
+    expect(screen.getByText('Daily')).toBeInTheDocument()
+  })
+
   it('shows accessible study momentum from graded history', () => {
     seedHistory([
       attempt({ date: '2026-09-24T10:00:00.000Z', score: 9, pct: 90 }),

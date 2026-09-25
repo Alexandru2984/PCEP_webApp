@@ -52,6 +52,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
   due-review drills, per-question mastery and transparent adaptive practice that also
   prioritizes low-confidence answers, without accounts or tracking
+- 📅 **Daily challenge** — five deterministic questions with all four syllabus modules,
+  a local completion score and the same answer-safe set throughout the Bucharest day
 - 🧩 **Filter by module & difficulty**, choose how many questions to take
 - 🔎 **Search question text or Python code** and build a focused practice drill from
   up to 20 matches; search previews deliberately exclude choices and answer metadata
@@ -146,15 +148,15 @@ make test
 make audit
 make django-check
 
-# Backend — 119 tests (API/security, integrity, startup, release and SEO behavior)
+# Backend — 120 tests (API/security, integrity, startup, release and SEO behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 155 Vitest tests, then static checks, the production build and
-# 19 Playwright flows (including axe, confidence, PWA, notes, search, scheduled review,
-# exam resume and Pyodide).
+# Frontend — 162 Vitest tests, then static checks, the production build and
+# 20 Playwright flows (including axe, daily challenge, confidence, PWA, notes, search,
+# scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```
@@ -172,6 +174,7 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 | `GET`  | `/api/health/`                | Readiness; returns 200 only if PostgreSQL is reachable                                |
 | `GET`  | `/api/stats/`                 | Aggregate question coverage, without question or answer data                          |
 | `GET`  | `/api/search/`                | Search text/code; bounded summary results without choices or answer metadata          |
+| `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata          |
 | `GET`  | `/api/quiz-set/`              | Random public question set. Params: `count`, `module`, `difficulty`, bounded `ids`    |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |

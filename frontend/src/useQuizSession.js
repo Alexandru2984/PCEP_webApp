@@ -1,5 +1,11 @@
 import { useEffect, useReducer, useRef } from 'react'
-import { apiErrorMessage, fetchQuizSet, gradeAnswers, submitAnswer } from './api'
+import {
+  apiErrorMessage,
+  fetchDailyChallenge,
+  fetchQuizSet,
+  gradeAnswers,
+  submitAnswer,
+} from './api'
 import {
   appendAttempt,
   clearActiveExam,
@@ -17,6 +23,7 @@ import {
 import { publicQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
 import { MAX_RESPONSE_MS, validConfidence } from './confidence'
+import { validDateKey } from './daily'
 
 const EXAM_SECONDS_PER_QUESTION = 80
 
@@ -128,7 +135,7 @@ export function sessionReducer(state, event) {
         error: null,
       }
     case 'reset':
-      return emptyState(state.lastConfig)
+      return emptyState('config' in event ? event.config : state.lastConfig)
     default:
       return state
   }
@@ -174,10 +181,13 @@ export default function useQuizSession() {
     if (!controller) return
     finished.current = false
     clearActiveExam()
-    saveSettings(config)
+    const isDaily = config.source === 'daily'
+    if (!config.source) saveSettings(config)
     dispatch({ type: 'loading', config })
     try {
-      const data = await fetchQuizSet(config, { signal: controller.signal })
+      const data = isDaily
+        ? await fetchDailyChallenge({ signal: controller.signal })
+        : await fetchQuizSet(config, { signal: controller.signal })
       if (!current(controller)) return
       if (!Array.isArray(data?.questions) || !data.questions.length)
         throw new Error('No questions match these filters. Try loosening them.')
@@ -188,9 +198,19 @@ export default function useQuizSession() {
         new Set(questions.map((q) => q.id)).size !== questions.length
       )
         throw new Error('The server returned invalid questions. Please retry.')
+      if (
+        isDaily &&
+        (!validDateKey(data.date) ||
+          data.count !== questions.length ||
+          questions.length > 5)
+      )
+        throw new Error('The server returned an invalid daily challenge. Please retry.')
+      const sessionConfig = isDaily
+        ? { ...config, count: questions.length, challengeDate: data.date }
+        : config
       const now = Date.now()
       const examProgress =
-        config.mode === 'exam'
+        sessionConfig.mode === 'exam'
           ? {
               index: 0,
               answers: {},
@@ -202,12 +222,12 @@ export default function useQuizSession() {
           : null
       if (examProgress)
         saveActiveExam({
-          config,
+          config: sessionConfig,
           questions,
           startedAt: now,
           ...examProgress,
         })
-      dispatch({ type: 'start', config, questions, now, examProgress })
+      dispatch({ type: 'start', config: sessionConfig, questions, now, examProgress })
     } catch (error) {
       if (current(controller))
         dispatch({ type: 'load-error', error: apiErrorMessage(error) })
@@ -292,6 +312,9 @@ export default function useQuizSession() {
       byModule: breakdown('module'),
       byDifficulty: breakdown('difficulty'),
       ...(Object.keys(byConfidence).length ? { byConfidence } : {}),
+      ...(validDateKey(state.lastConfig?.challengeDate)
+        ? { challengeDate: state.lastConfig.challengeDate }
+        : {}),
       ...(timedItems.length
         ? {
             responseMsTotal: timedItems.reduce((sum, item) => sum + item.responseMs, 0),
@@ -369,7 +392,7 @@ export default function useQuizSession() {
     request.current?.abort()
     request.current = null
     clearActiveExam()
-    dispatch({ type: 'reset' })
+    dispatch({ type: 'reset', config: loadSettings() })
   }
   const resumeExam = () => {
     const exam = loadActiveExam()
@@ -439,6 +462,14 @@ export default function useQuizSession() {
     startDueReviewsQuiz,
     startAdaptiveQuiz,
     startSearchDrill,
+    startDailyChallenge: () =>
+      startQuiz({
+        mode: 'practice',
+        module: '',
+        difficulty: '',
+        count: 5,
+        source: 'daily',
+      }),
     startModuleDrill: (module) =>
       startQuiz({ mode: 'practice', module, difficulty: '', count: 20 }),
   }

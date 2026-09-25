@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fetchQuizSet, gradeAnswers, submitAnswer } from './api'
+import { fetchDailyChallenge, fetchQuizSet, gradeAnswers, submitAnswer } from './api'
 import {
   loadActiveExam,
   loadHistory,
@@ -13,6 +13,7 @@ import useQuizSession from './useQuizSession'
 vi.mock('./api', async (original) => ({
   ...(await original()),
   fetchQuizSet: vi.fn(),
+  fetchDailyChallenge: vi.fn(),
   gradeAnswers: vi.fn(),
   submitAnswer: vi.fn(),
 }))
@@ -44,10 +45,49 @@ const deferred = () => {
 beforeEach(() => {
   vi.clearAllMocks()
   fetchQuizSet.mockResolvedValue({ questions: [question] })
+  fetchDailyChallenge.mockResolvedValue({
+    date: '2026-09-24',
+    count: 1,
+    questions: [question],
+  })
 })
 afterEach(() => vi.useRealTimers())
 
 describe('quiz session requests', () => {
+  it('starts the server-defined daily set and records its challenge date', async () => {
+    submitAnswer.mockResolvedValue(feedback)
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startDailyChallenge())
+    expect(fetchDailyChallenge).toHaveBeenCalledOnce()
+    expect(fetchQuizSet).not.toHaveBeenCalled()
+    expect(result.current.lastConfig).toMatchObject({
+      source: 'daily',
+      challengeDate: '2026-09-24',
+      count: 1,
+    })
+    await act(async () => result.current.handleSelect(11))
+    act(() => result.current.handleNext())
+    expect(loadHistory()[0]).toMatchObject({
+      mode: 'practice',
+      challengeDate: '2026-09-24',
+    })
+    act(() => result.current.resetToSetup())
+    expect(result.current.lastConfig).toBeNull()
+  })
+
+  it('rejects malformed daily challenge metadata', async () => {
+    fetchDailyChallenge.mockResolvedValueOnce({
+      date: '2026-02-29',
+      count: 1,
+      questions: [question],
+    })
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startDailyChallenge())
+    expect(result.current.phase).toBe('error')
+    expect(result.current.error).toMatch(/invalid daily challenge/i)
+  })
+
   it('blocks duplicate starts and duplicate answer requests synchronously', async () => {
     const loading = deferred()
     fetchQuizSet.mockReturnValueOnce(loading.promise)

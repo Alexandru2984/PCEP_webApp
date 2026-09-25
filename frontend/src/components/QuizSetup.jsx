@@ -51,6 +51,8 @@ export default function QuizSetup({
   onPracticeDueReviews,
   adaptivePlan,
   onAdaptivePractice,
+  onDailyChallenge,
+  dailyCompletion,
   onSearchDrill,
   initial,
   stats,
@@ -82,6 +84,26 @@ export default function QuizSetup({
       <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">
         Pick a mode and scope. Leave filters on defaults for a full mixed-bag PCEP run.
       </p>
+
+      {onDailyChallenge && (
+        <button
+          type="button"
+          onClick={onDailyChallenge}
+          className="mb-4 flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left transition-colors hover:border-amber-500 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30 dark:hover:border-amber-600 dark:hover:bg-amber-950/50"
+        >
+          <span>
+            <span className="block font-semibold text-amber-950 dark:text-amber-100">
+              Daily challenge
+            </span>
+            <span className="mt-1 block text-xs text-amber-800 dark:text-amber-300">
+              Five balanced questions · the same set all day
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full bg-amber-200 px-2.5 py-1 text-sm font-bold text-amber-950 dark:bg-amber-800 dark:text-amber-100">
+            {dailyCompletion ? `${dailyCompletion.pct}% · Again` : 'Start'}
+          </span>
+        </button>
+      )}
 
       {adaptivePlan?.count > 0 && onAdaptivePractice && (
         <button

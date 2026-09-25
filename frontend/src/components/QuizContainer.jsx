@@ -11,6 +11,7 @@ import useQuizSession from '../useQuizSession'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
 import { formatClock, formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
+import { bucharestDateKey } from '../daily'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
 import QuizSetup from './QuizSetup'
@@ -111,6 +112,7 @@ export default function QuizContainer() {
     startDueReviewsQuiz,
     startAdaptiveQuiz,
     startSearchDrill,
+    startDailyChallenge,
     startModuleDrill,
   } = useQuizSession()
   const [view, setView] = useState('setup')
@@ -184,7 +186,11 @@ export default function QuizContainer() {
           onDiscard={discardSavedExam}
         />
       )
-    const attemptCount = loadHistory().length
+    const attempts = loadHistory()
+    const attemptCount = attempts.length
+    const dailyCompletion = attempts.find(
+      (attempt) => attempt.challengeDate === bucharestDateKey()
+    )
     const tab = (active) =>
       `rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 ${
         active
@@ -232,6 +238,8 @@ export default function QuizContainer() {
             onPracticeDueReviews={startDueReviewsQuiz}
             adaptivePlan={loadAdaptivePlan()}
             onAdaptivePractice={startAdaptiveQuiz}
+            onDailyChallenge={startDailyChallenge}
+            dailyCompletion={dailyCompletion}
             onSearchDrill={startSearchDrill}
             initial={lastConfig}
             stats={questionStats}

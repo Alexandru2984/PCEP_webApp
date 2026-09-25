@@ -150,6 +150,14 @@ and returns only question ID, text, code, module and difficulty. Choices,
 explanations and answer metadata are deliberately absent. A selected drill sends
 only unique IDs to `quiz-set`, which returns fresh public choices under the
 existing answer-leakage contract.
+`GET /api/daily/` returns five public questions for the current
+`Europe/Bucharest` date. Selection is deterministic for the date and production
+secret, covers every populated syllabus module before filling the fifth slot, and
+reads only IDs/modules during ranking. The returned questions use the same public
+serializer as `quiz-set`; correctness and explanations remain server-side until
+submission. Rotating `DJANGO_SECRET_KEY` can change that day's set. The browser
+stores only the challenge date on the bounded attempt record, so completion and
+score remain local and portable; replaying the challenge is allowed.
 Django ignores X-Forwarded-Host; the origin proxy must overwrite Host and
 X-Forwarded-For and supply X-Forwarded-Proto. NUM_PROXIES remains exactly 1.
 
@@ -177,10 +185,10 @@ bounded to 1,000 compact records. The progress screen exports backup format v3,
 previews and merges strictly validated imports up to 8 MB, and still accepts
 existing v1 and v2 backups. History, mistakes, bookmarks, notes and the review
 schedule can be reset independently. Backups contain public question options,
-aggregate performance, optional confidence ratings, bounded response-time totals,
-review dates and user-written notes, never answer keys or explanations. Keep
-backups private if you want to keep your study history and notes private; nothing
-is uploaded by these features.
+aggregate performance, optional confidence ratings, daily challenge dates,
+bounded response-time totals, review dates and user-written notes, never answer
+keys or explanations. Keep backups private if you want to keep your study history
+and notes private; nothing is uploaded by these features.
 Bookmarks are available on question cards. Bookmark and mistake drills fetch
 current public question data using the bounded `ids` quiz-set filter, avoiding
 stale choice IDs after admin edits. Module/difficulty accuracy includes mixed
@@ -208,9 +216,10 @@ question IDs using a documented score: +100 when due, +60 while in the mistakes
 list, up to +40 from observed error rate, up to +30 from the mastery gap, +20 when
 the latest confidence is low, and a small +5/+10 medium/hard bonus. Questions at
 or above 80% mastery are omitted unless currently due, missed or their latest
-recorded confidence is low. Equal scores prefer the least recently attempted question, then
-its numeric ID, so the plan is deterministic and testable. Only the selected IDs
-are sent to `quiz-set`; fresh public questions come back without answer metadata.
+recorded confidence is low. Equal scores prefer the least recently attempted
+question, then its numeric ID, so the plan is deterministic and testable. Only
+the selected IDs are sent to `quiz-set`; fresh public questions come back without
+answer metadata.
 
 Dashboard momentum is derived only from the bounded local attempt history. Study
 streaks count unique local calendar days and remain current through the day after

@@ -1,6 +1,10 @@
+import hmac
+
+from django.conf import settings
 from django.db import connection, DatabaseError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.generics import RetrieveAPIView
@@ -23,6 +27,28 @@ PASS_THRESHOLD = 70
 SEARCH_QUERY_MIN_LENGTH = 2
 SEARCH_QUERY_MAX_LENGTH = 80
 SEARCH_RESULT_LIMIT = 20
+DAILY_CHALLENGE_SIZE = 5
+
+
+def _daily_question_ids(rows, challenge_date):
+    """Choose a stable, syllabus-balanced set without loading answer data."""
+    key = settings.SECRET_KEY.encode('utf-8')
+
+    def rank(row):
+        message = f'pcep-daily:{challenge_date}:{row["id"]}'.encode('ascii')
+        return hmac.digest(key, message, 'sha256'), row['id']
+
+    ranked = sorted(rows, key=rank)
+    first_by_module = {}
+    for row in ranked:
+        first_by_module.setdefault(row['module'], row['id'])
+
+    selected = set(first_by_module.values())
+    for row in ranked:
+        if len(selected) >= DAILY_CHALLENGE_SIZE:
+            break
+        selected.add(row['id'])
+    return [row['id'] for row in ranked if row['id'] in selected][:DAILY_CHALLENGE_SIZE]
 
 
 @api_view(['GET'])
@@ -141,6 +167,25 @@ def search_questions(request):
 
     data = QuestionSearchSerializer(questions.order_by('id')[:limit], many=True).data
     return Response({'count': len(data), 'results': data})
+
+
+@api_view(['GET'])
+def daily_challenge(request):
+    """Return the same balanced public question set throughout the local day."""
+    challenge_date = timezone.localdate().isoformat()
+    rows = list(Question.objects.values('id', 'module'))
+    selected_ids = _daily_question_ids(rows, challenge_date)
+    position = {question_id: index for index, question_id in enumerate(selected_ids)}
+    questions = list(
+        Question.objects.filter(id__in=selected_ids).prefetch_related('choices')
+    )
+    questions.sort(key=lambda question: position[question.id])
+    data = QuestionSerializer(questions, many=True).data
+    return Response({
+        'date': challenge_date,
+        'count': len(data),
+        'questions': data,
+    })
 
 
 class SubmitAnswerThrottle(AnonRateThrottle):

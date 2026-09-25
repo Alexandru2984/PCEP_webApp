@@ -1,5 +1,6 @@
 import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
 import { CONFIDENCE_VALUES, MAX_RESPONSE_MS, validConfidence } from './confidence'
+import { validDateKey } from './daily'
 import {
   STUDY_LIMIT,
   adaptivePracticePlan,
@@ -73,7 +74,8 @@ export function validAttempt(a) {
     !integer(a.total, 1, 100) ||
     !integer(a.score, 0, a.total) ||
     !integer(a.elapsedMs ?? 0, 0, 7 * 86400 * 1000) ||
-    !integer(a.bestStreak ?? 0, 0, a.total)
+    !integer(a.bestStreak ?? 0, 0, a.total) ||
+    (a.challengeDate !== undefined && !validDateKey(a.challengeDate))
   )
     return null
   const byModule = breakdown(a.byModule, MODULES, a.score, a.total)
@@ -108,6 +110,7 @@ export function validAttempt(a) {
     pct: Math.round((a.score / a.total) * 100),
     elapsedMs: a.elapsedMs ?? 0,
     bestStreak: a.bestStreak ?? 0,
+    ...(a.challengeDate ? { challengeDate: a.challengeDate } : {}),
     ...(byModule ? { byModule } : {}),
     ...(byDifficulty ? { byDifficulty } : {}),
     ...(byConfidence ? { byConfidence } : {}),
@@ -552,7 +555,16 @@ export function importProgress(backup) {
   const progress = loadProgress()
   const attemptKey = (a) =>
     a.id ??
-    [a.date, a.mode, a.module, a.difficulty, a.score, a.total, a.elapsedMs].join('|')
+    [
+      a.date,
+      a.mode,
+      a.module,
+      a.difficulty,
+      a.score,
+      a.total,
+      a.elapsedMs,
+      a.challengeDate ?? '',
+    ].join('|')
   const history = [
     ...new Map(
       [...progress.history, ...incoming.history].map((a) => [attemptKey(a), a])

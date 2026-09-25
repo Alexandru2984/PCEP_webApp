@@ -21,6 +21,9 @@ export const fetchQuizSet = (
 export const fetchQuestionStats = (options = {}) =>
   api.get('/stats/', options).then((r) => r.data)
 
+export const fetchDailyChallenge = (options = {}) =>
+  api.get('/daily/', options).then((r) => r.data)
+
 export const searchQuestions = (
   { query, module = '', difficulty = '', limit = 20 },
   options = {}
