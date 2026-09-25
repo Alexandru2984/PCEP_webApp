@@ -250,14 +250,15 @@ progress exports. Only one active exam is retained. A failed grading request kee
 the exact answer, confidence and timing snapshot for a safe retry.
 
 On reload the setup screen requires an explicit choice: resume the saved exam or
-discard it before starting any quiz or dashboard drill. Resuming preserves the
-original wall-clock deadline. If that deadline passed while the app was closed,
-the saved answers are locked and submitted for grading immediately; a network
-failure keeps the recovery copy for retry. Successful grading, Quit and Discard
-remove it. Strict schema validation rejects unknown questions/choices, duplicate
-flags, invalid timestamps and extra top-level fields. Abandoned data expires 24
-hours after its deadline. Storage failure uses the existing persistence warning
-and never blocks the live in-memory exam.
+discard it before starting any quiz or dashboard drill. The recovery countdown
+uses the original wall-clock deadline and refreshes after timer suspension, focus
+or visibility changes. Discard requires a second explicit confirmation. If the
+deadline passes, the action changes to grading the locked saved answers; a network
+failure keeps the recovery copy for retry. Successful grading, Quit and confirmed
+Discard remove it. Strict schema validation rejects unknown questions/choices,
+duplicate flags, invalid timestamps and extra top-level fields. Abandoned data
+expires 24 hours after its deadline. Storage failure uses the existing persistence
+warning and never blocks the live in-memory exam.
 
 The Python runner limits source to 20,000 characters, output/tracebacks to
 10,000 characters, queued/running jobs to four, startup to 30 seconds and each

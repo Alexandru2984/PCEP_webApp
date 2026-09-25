@@ -156,6 +156,10 @@ visible, uses a real deadline, gives one low-time announcement and prevents a
 timer/manual-submit race. Submission confirmation wraps and restores focus;
 failed grading keeps the attempt and offers retry.
 
+The recovery screen follows that same wall-clock deadline while it remains open,
+refreshes after browser suspension, switches expired attempts to a clear grading
+action and requires confirmation before deleting the saved attempt.
+
 Question and result headings receive focus after navigation. Code blocks scroll
 without expanding the viewport. Actions, feedback, empty states, offline state,
 storage failures and chunk failures now explain a useful recovery path. Manual
@@ -264,7 +268,7 @@ Final validation on 2026-09-19:
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
 
-Continuation validation on 2026-09-25 covers 127 backend tests, 178 Vitest tests
+Continuation validation on 2026-09-25 covers 127 backend tests, 183 Vitest tests
 and 23 Playwright flows, including the answer-safe daily challenge, confidence
 insights, PWA installation, focused review, flashcard self-rating semantics and
 the exact PCEP-30-02 full-mock contract.

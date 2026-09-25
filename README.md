@@ -50,8 +50,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   [PCEP-30-02](https://pythoninstitute.org/pcep) full-mock preset with 30 questions,
   40 minutes and the official 7/8/7/8 module item distribution; the UI clearly notes
   that this trainer does not reproduce the official interactive item formats.
-- 💾 **Crash-safe exam recovery** — an interrupted exam restores its deadline,
-  current question, selected answers and flags from a validated local-only copy
+- 💾 **Crash-safe exam recovery** — an interrupted exam restores its live deadline,
+  current question, selected answers and flags from a validated local-only copy;
+  discarding it requires explicit confirmation
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
   due-review drills, per-question mastery and transparent adaptive practice that also
   prioritizes low-confidence answers, without accounts or tracking
@@ -161,7 +162,7 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 178 Vitest tests, then static checks, the production build and
+# Frontend — 183 Vitest tests, then static checks, the production build and
 # 23 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build

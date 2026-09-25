@@ -3,6 +3,7 @@ import QuestionCard from './QuestionCard'
 import { formatClock } from '../format'
 import { ignoreShortcut } from '../shortcuts'
 import { MAX_RESPONSE_MS, validConfidence } from '../confidence'
+import useDeadlineCountdown from '../useDeadlineCountdown'
 
 const SECONDS_PER_QUESTION = 80 // application simulation pace
 
@@ -25,9 +26,7 @@ export default function ExamView({
   const [deadline] = useState(
     () => initialProgress?.deadline ?? Date.now() + total * SECONDS_PER_QUESTION * 1000
   )
-  const [timeLeft, setTimeLeft] = useState(() =>
-    Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
-  )
+  const timeLeft = useDeadlineCountdown(deadline)
   const [confirming, setConfirming] = useState(false)
   const [locked, setLocked] = useState(false)
   const submittedRef = useRef(false)
@@ -98,18 +97,6 @@ export default function ExamView({
     }
   }, [answers, confidences, deadline, onSubmit, recordCurrentTime])
 
-  // Use wall-clock time so background-tab timer suspension does not extend an exam.
-  useEffect(() => {
-    const tick = () => setTimeLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
-    const id = setInterval(tick, 1000)
-    window.addEventListener('focus', tick)
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      clearInterval(id)
-      window.removeEventListener('focus', tick)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [deadline])
   useEffect(() => {
     if (timeLeft <= 0 && !autoAttempted.current) {
       autoAttempted.current = true

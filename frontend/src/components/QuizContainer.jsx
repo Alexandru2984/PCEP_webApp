@@ -9,12 +9,13 @@ import {
 } from '../storage'
 import useQuizSession from '../useQuizSession'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
-import { formatClock, formatElapsed } from '../format'
+import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
 import { bucharestDateKey } from '../daily'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
 import QuizSetup from './QuizSetup'
+import SavedExamCard from './SavedExamCard'
 
 // Loaded on demand: none of these are on the first-paint (setup) path, so they
 // ship as separate chunks and stay out of the initial bundle.
@@ -32,53 +33,6 @@ function LoadingCard() {
     >
       <p className="text-slate-600 dark:text-slate-400">Loading…</p>
     </div>
-  )
-}
-
-function SavedExamCard({ exam, onResume, onDiscard }) {
-  const answered = Object.keys(exam.answers).length
-  const [remaining] = useState(() =>
-    Math.max(0, Math.ceil((exam.deadline - Date.now()) / 1000))
-  )
-  const expired = remaining === 0
-  return (
-    <section
-      aria-labelledby="saved-exam-heading"
-      className="rounded-xl border border-sky-300 bg-sky-50 p-5 shadow-sm dark:border-sky-800 dark:bg-sky-950/30"
-    >
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
-        Exam recovery
-      </p>
-      <h2 id="saved-exam-heading" className="text-xl font-semibold">
-        Resume saved exam
-      </h2>
-      <p className="mt-2 text-slate-700 dark:text-slate-200">
-        {answered}/{exam.questions.length} answered.{' '}
-        {expired
-          ? 'Time has expired; resume to grade the answers that were saved.'
-          : `${formatClock(remaining)} remaining.`}
-      </p>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        This recovery copy stays in this browser and contains public questions and your
-        selections, never the answer key.
-      </p>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={onResume}
-          className="rounded-lg bg-slate-900 px-4 py-2.5 font-medium text-white hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
-        >
-          Resume exam
-        </button>
-        <button
-          type="button"
-          onClick={onDiscard}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-        >
-          Discard and start new
-        </button>
-      </div>
-    </section>
   )
 }
 

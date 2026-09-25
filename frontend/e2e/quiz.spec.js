@@ -463,6 +463,7 @@ test('an interrupted exam restores answers, flags, position and deadline', async
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Resume saved exam' })).toBeVisible()
   await expect(page.getByText('1/4 answered.')).toBeVisible()
+  await expect(page.getByRole('timer')).toHaveAccessibleName(/Time remaining:/)
   await expect(page.getByRole('button', { name: 'Progress' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Start practice/ })).toHaveCount(0)
   const { violations } = await new AxeBuilder({ page }).analyze()
@@ -474,6 +475,14 @@ test('an interrupted exam restores answers, flags, position and deadline', async
     ).toBe(true)
   }
   await page.setViewportSize({ width: 1280, height: 900 })
+  await page.getByRole('button', { name: 'Discard and start new' }).click()
+  await expect(
+    page.getByRole('group', { name: 'Confirm saved exam deletion' })
+  ).toBeVisible()
+  expect(
+    await page.evaluate(() => localStorage.getItem('pcep.activeExam'))
+  ).not.toBeNull()
+  await page.getByRole('button', { name: 'Keep exam' }).click()
   await page.getByRole('button', { name: 'Resume exam' }).click()
   await expect(page.getByRole('button', { name: /Go to question 2/ })).toHaveAttribute(
     'aria-current',
