@@ -223,6 +223,10 @@ reload after an update, avoiding an automatic mid-exam takeover.
   headers, JSON request IDs/timing logs without IP/query/cookie/auth data, body
   and rate limits, compression, strict route caching, correct manifest/WASM/JS
   media types and missing-asset 404s. Every reload followed `nginx -t`.
+- **Release retention:** a read-only-by-default utility reports only exact
+  frontend/static rollback and backup snapshots, enforces at least two retained
+  copies and requires `--apply` before removal. Database/security backups cannot
+  match its allowlist. No production snapshot was deleted during this work.
 - **Cloudflare/Tunnel:** service is enabled and healthy. Live cache behavior is
   BYPASS/DYNAMIC for shell/API/workers and immutable for hashed assets. No
   dashboard setting was changed because no Cloudflare account connector was
@@ -268,7 +272,7 @@ Final validation on 2026-09-19:
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
 
-Continuation validation on 2026-09-25 covers 127 backend tests, 183 Vitest tests
+Continuation validation on 2026-09-25 covers 135 backend tests, 183 Vitest tests
 and 23 Playwright flows, including the answer-safe daily challenge, confidence
 insights, PWA installation, focused review, flashcard self-rating semantics and
 the exact PCEP-30-02 full-mock contract.

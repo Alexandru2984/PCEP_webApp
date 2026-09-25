@@ -6,8 +6,9 @@ NPM ?= npm
 COMPOSE ?= docker compose
 FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
+RELEASE_KEEP ?= 5
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build seed-reset deploy-frontend status
+.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -21,6 +22,7 @@ help:
 		'  compose-up       Start db + backend' \
 		'  seed-reset       Reset and seed production DB in backend container' \
 		'  deploy-frontend  Backup and publish frontend/dist to FRONTEND_ROOT' \
+		'  release-retention Preview old release snapshots; never deletes' \
 		'  status           Show git and docker compose status'
 
 install: install-backend install-frontend
@@ -75,6 +77,9 @@ seed-reset:
 
 deploy-frontend: build-frontend
 	"$(PYTHON_BIN)" scripts/publish_release.py frontend/dist "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)"
+
+release-retention:
+	"$(PYTHON_BIN)" scripts/release_retention.py "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)" --keep "$(RELEASE_KEEP)"
 
 status:
 	git status --short --branch

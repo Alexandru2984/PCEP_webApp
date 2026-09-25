@@ -74,7 +74,22 @@ is retained beside it as `.frontend.previous-<timestamp>-<id>`.
 `FRONTEND_ROOT`, `BACKUP_ROOT` and `PYTHON` can be overridden. Python accepts
 relative paths, absolute paths or executables from PATH. Linux atomic exchange
 support is required; the script refuses to fall back to delete-then-copy.
-Monitor backup/retained-chunk disk usage; no automatic deletion is performed.
+No automatic deletion is performed. Preview bounded retention with
+`make release-retention` (five newest rollback roots and five newest backup
+copies by default). The preview recognizes only exact `frontend`/`static`
+release names and reports allocated space without following symlinks. It cannot
+select database dumps, `security-*` directories or other backup files. After
+reviewing every listed path, apply the exact plan explicitly with:
+
+```bash
+backend/.venv/bin/python scripts/release_retention.py \
+  /var/www/pcep/frontend --backup-root /home/micu/backups/pcep \
+  --keep 5 --apply
+```
+
+Keep at least two complete snapshots; the utility rejects a lower value. Run the
+dry-run again after cleanup and verify a retained rollback directory before the
+next deployment.
 The prior stale backend virtualenv was archived under security-20260918; local
 checks now use a separate Python 3.12.14 environment without changing host Python.
 Node 24 LTS is used in CI and the non-root frontend builder because Node 20 is EOL
