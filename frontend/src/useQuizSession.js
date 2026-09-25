@@ -319,6 +319,9 @@ export default function useQuizSession() {
       ...(validDateKey(state.lastConfig?.challengeDate)
         ? { challengeDate: state.lastConfig.challengeDate }
         : {}),
+      ...(state.lastConfig?.preset === PCEP_30_02_PRESET.value
+        ? { preset: state.lastConfig.preset }
+        : {}),
       ...(timedItems.length
         ? {
             responseMsTotal: timedItems.reduce((sum, item) => sum + item.responseMs, 0),

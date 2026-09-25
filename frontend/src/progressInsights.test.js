@@ -130,4 +130,36 @@ describe('performanceInsights', () => {
       10, 15, 20, 25, 30, 35, 40, 45, 50, 55,
     ])
   })
+
+  it('summarizes full mock history separately from custom exams', () => {
+    const attempts = [
+      attempt({
+        date: atLocalNoon(2026, 8, 24),
+        mode: 'exam',
+        preset: 'pcep-30-02',
+        score: 24,
+        total: 30,
+        pct: 80,
+      }),
+      attempt({
+        date: atLocalNoon(2026, 8, 23),
+        mode: 'exam',
+        preset: 'pcep-30-02',
+        score: 18,
+        total: 30,
+        pct: 60,
+      }),
+      attempt({ mode: 'exam', score: 10, total: 10, pct: 100 }),
+    ]
+    expect(performanceInsights(attempts).fullMocks).toEqual({
+      count: 2,
+      latest: 80,
+      best: 80,
+      passed: 1,
+      scores: [
+        { date: atLocalNoon(2026, 8, 23), score: 60 },
+        { date: atLocalNoon(2026, 8, 24), score: 80 },
+      ],
+    })
+  })
 })

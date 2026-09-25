@@ -195,6 +195,9 @@ assistive-technology certification.
 - Exam setup offers an exact PCEP-30-02 preset: 30 questions, a 40-minute absolute
   deadline and the official 7/8/7/8 module item distribution. Custom timed exams
   remain available, and the UI discloses the trainer's single-choice format limit.
+- The bounded local attempt and backup schemas preserve the validated full-mock
+  marker through crash recovery. Dashboard history then reports latest, best and
+  passed full mocks separately from custom exams, without storing answer data.
 - Focus-area drill actions from reports and preserved mistake drills.
 
 ## 9. Performance
@@ -261,8 +264,8 @@ Final validation on 2026-09-19:
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
 
-Continuation validation on 2026-09-25 covers 127 backend tests, 172 Vitest tests
-and 22 Playwright flows, including the answer-safe daily challenge, confidence
+Continuation validation on 2026-09-25 covers 127 backend tests, 178 Vitest tests
+and 23 Playwright flows, including the answer-safe daily challenge, confidence
 insights, PWA installation, focused review, flashcard self-rating semantics and
 the exact PCEP-30-02 full-mock contract.
 

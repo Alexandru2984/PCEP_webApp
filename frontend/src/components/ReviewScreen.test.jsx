@@ -109,4 +109,33 @@ describe('ReviewScreen focused review', () => {
       else delete navigator.clipboard
     }
   })
+
+  it('identifies and shares a completed full mock without answer details', async () => {
+    const clipboard = vi.fn().mockResolvedValue(undefined)
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboard },
+    })
+    try {
+      render(
+        <ReviewScreen
+          items={[reviewItem(1, { correct: false, responseMs: 1000 })]}
+          score={0}
+          total={1}
+          mode="exam"
+          preset="pcep-30-02"
+          onRestart={vi.fn()}
+        />
+      )
+      expect(screen.getByText('Full PCEP-30-02 mock')).toBeVisible()
+      fireEvent.click(screen.getByRole('button', { name: 'Copy result' }))
+      await waitFor(() => expect(clipboard).toHaveBeenCalledOnce())
+      expect(clipboard.mock.calls[0][0]).toContain('on a full PCEP-30-02 mock')
+      expect(clipboard.mock.calls[0][0]).not.toMatch(/choice|explanation|Question 1/)
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor)
+      else delete navigator.clipboard
+    }
+  })
 })

@@ -6,6 +6,7 @@ import { useCountUp } from '../useCountUp'
 import QuestionNote from './QuestionNote'
 import { formatElapsed } from '../format'
 import { validConfidence } from '../confidence'
+import { PCEP_30_02_PRESET } from '../exam'
 
 // Same dynamic specifier as QuestionCard, so the runner ships as one shared
 // chunk. The static CodeBlock stands in until it loads.
@@ -154,6 +155,7 @@ export default function ReviewScreen({
   streakStats,
   mode = 'practice',
   challengeDate,
+  preset,
 }) {
   const heading = useRef(null)
   useEffect(() => {
@@ -173,6 +175,7 @@ export default function ReviewScreen({
   const animatedPct = useCountUp(pct)
   const [shareStatus, setShareStatus] = useState('')
   const canShare = typeof navigator.share === 'function'
+  const fullMock = preset === PCEP_30_02_PRESET.value
 
   useEffect(() => {
     if (passed) celebrate()
@@ -182,7 +185,7 @@ export default function ReviewScreen({
     const url = 'https://pcep.micutu.com/'
     const text = selfRated
       ? `I reviewed ${total} PCEP flashcards and marked ${score} (${pct}%) “Got it”.`
-      : `I scored ${score}/${total} (${pct}%) on ${challengeDate ? "today's PCEP Quiz daily challenge" : mode === 'exam' ? 'a PCEP Quiz exam simulation' : 'a PCEP Quiz practice session'}${passed ? ' ✅' : '.'}`
+      : `I scored ${score}/${total} (${pct}%) on ${fullMock ? 'a full PCEP-30-02 mock' : challengeDate ? "today's PCEP Quiz daily challenge" : mode === 'exam' ? 'a PCEP Quiz exam simulation' : 'a PCEP Quiz practice session'}${passed ? ' ✅' : '.'}`
     const copy = async () => {
       if (!navigator.clipboard?.writeText) return false
       await navigator.clipboard.writeText(`${text} ${url} 🐍`)
@@ -238,6 +241,11 @@ export default function ReviewScreen({
               {!selfRated && (passed ? ' · passing' : ' · below 70% PCEP threshold')}
               {elapsedLabel ? ` · ${elapsedLabel}` : ''}
             </p>
+            {fullMock && (
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                Full PCEP-30-02 mock
+              </p>
+            )}
             {streakStats?.best > 1 && (
               <div className="mt-3 inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300">
                 Best streak: {streakStats.best}

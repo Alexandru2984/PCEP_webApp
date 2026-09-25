@@ -62,8 +62,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   up to 20 matches; search previews deliberately exclude choices and answer metadata
 - 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
   accuracy, confidence calibration, local-day study streaks, score trends, measured
-  response pace and separate flashcard self-ratings in both reports and history
-  (local-first)
+  response pace, separate full-mock history and separate flashcard self-ratings in
+  both reports and history (local-first)
 - 📈 **End-of-quiz report** — per-module, per-difficulty and optional confidence
   breakdowns, decision timing and a "focus area" recommendation you can drill in one
   click, plus a focused review queue combining misses with correct answers given at
@@ -161,8 +161,8 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 172 Vitest tests, then static checks, the production build and
-# 22 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
+# Frontend — 178 Vitest tests, then static checks, the production build and
+# 23 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e

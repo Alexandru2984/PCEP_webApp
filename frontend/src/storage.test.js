@@ -135,6 +135,27 @@ describe('history', () => {
     expect(loadHistory()[0].challengeDate).toBe('2026-09-24')
   })
 
+  it('round-trips only the exact full-mock preset on matching exam attempts', () => {
+    appendAttempt(
+      attempt('mock', 24, {
+        mode: 'exam',
+        total: 30,
+        pct: 80,
+        preset: 'pcep-30-02',
+      })
+    )
+    appendAttempt(attempt('wrong-mode', 8, { preset: 'pcep-30-02' }))
+    appendAttempt(attempt('wrong-preset', 8, { mode: 'exam', preset: 'pcep-unknown' }))
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadHistory()[0]).toMatchObject({
+      mode: 'exam',
+      total: 30,
+      score: 24,
+      preset: 'pcep-30-02',
+    })
+    expect(parseProgressBackup(exportProgress()).history[0].preset).toBe('pcep-30-02')
+  })
+
   it.each([
     { byConfidence: { high: { score: 0, total: 1 } } },
     { responseMsTotal: 3 * 60 * 60 * 1000 + 1, responseCount: 1 },
@@ -155,6 +176,18 @@ describe('settings', () => {
       module: 'module2',
       difficulty: 'hard',
       count: 20,
+    }
+    saveSettings(settings)
+    expect(loadSettings()).toEqual(settings)
+  })
+
+  it('preserves a valid full-mock marker for exam recovery', () => {
+    const settings = {
+      mode: 'exam',
+      module: '',
+      difficulty: '',
+      count: 30,
+      preset: 'pcep-30-02',
     }
     saveSettings(settings)
     expect(loadSettings()).toEqual(settings)

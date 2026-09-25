@@ -325,6 +325,7 @@ export default function QuizContainer() {
           streakStats={getStreakStats(history)}
           mode={lastConfig?.mode}
           challengeDate={lastConfig?.challengeDate}
+          preset={lastConfig?.preset}
         />
       </Suspense>
     )

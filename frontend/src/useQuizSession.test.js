@@ -9,6 +9,7 @@ import {
   updateStudyProgress,
 } from './storage'
 import useQuizSession from './useQuizSession'
+import { PCEP_30_02_PRESET } from './exam'
 
 vi.mock('./api', async (original) => ({
   ...(await original()),
@@ -35,6 +36,21 @@ const feedback = {
   correct_explanation: 'Why',
 }
 const config = { mode: 'practice', count: 10, module: '', difficulty: '' }
+const fullMockQuestions = Object.entries(PCEP_30_02_PRESET.distribution).flatMap(
+  ([module, count], moduleIndex) =>
+    Array.from({ length: count }, (_, index) => {
+      const id = (moduleIndex + 1) * 100 + index + 1
+      return {
+        ...question,
+        id,
+        module,
+        choices: [
+          { id: id * 10 + 1, text: 'One' },
+          { id: id * 10 + 2, text: 'Two' },
+        ],
+      }
+    })
+)
 const deferred = () => {
   let resolve
   const promise = new Promise((r) => {
@@ -101,6 +117,42 @@ describe('quiz session requests', () => {
     )
     expect(result.current.phase).toBe('error')
     expect(result.current.error).toMatch(/invalid full mock/i)
+  })
+
+  it('preserves a completed full mock in recovery and attempt history', async () => {
+    fetchQuizSet.mockResolvedValueOnce({
+      preset: PCEP_30_02_PRESET.value,
+      count: PCEP_30_02_PRESET.count,
+      questions: fullMockQuestions,
+    })
+    gradeAnswers.mockResolvedValueOnce({
+      results: fullMockQuestions.map((item) => ({
+        question_id: item.id,
+        choice_id: null,
+        is_correct: false,
+        correct_choice_id: item.choices[0].id,
+        explanation: '',
+        correct_explanation: 'Why',
+      })),
+    })
+    const fullConfig = {
+      mode: 'exam',
+      module: '',
+      difficulty: '',
+      count: 30,
+      preset: 'pcep-30-02',
+    }
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startQuiz(fullConfig))
+    expect(loadActiveExam()?.config.preset).toBe('pcep-30-02')
+    await act(async () => result.current.handleExamSubmit({}))
+    expect(result.current.phase).toBe('done')
+    expect(loadHistory()[0]).toMatchObject({
+      mode: 'exam',
+      total: 30,
+      preset: 'pcep-30-02',
+    })
   })
 
   it('blocks duplicate starts and duplicate answer requests synchronously', async () => {

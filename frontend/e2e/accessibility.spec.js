@@ -137,6 +137,57 @@ test('populated study momentum is accessible and responsive', async ({ page }) =
   await accessible(page)
 })
 
+test('full mock history is distinct, accessible and responsive', async ({ page }) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.addInitScript(() => {
+    const history = [
+      {
+        date: '2026-09-24T10:00:00.000Z',
+        mode: 'exam',
+        module: '',
+        difficulty: '',
+        score: 24,
+        total: 30,
+        pct: 80,
+        elapsedMs: 2_300_000,
+        bestStreak: 8,
+        preset: 'pcep-30-02',
+      },
+      {
+        date: '2026-09-23T10:00:00.000Z',
+        mode: 'exam',
+        module: '',
+        difficulty: '',
+        score: 18,
+        total: 30,
+        pct: 60,
+        elapsedMs: 2_400_000,
+        bestStreak: 5,
+        preset: 'pcep-30-02',
+      },
+    ]
+    localStorage.setItem(
+      'pcep.progress',
+      JSON.stringify({
+        version: 1,
+        data: { history, mistakes: [], bookmarks: [], study: [], notes: [] },
+      })
+    )
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Progress/ }).click()
+  await expect(page.getByRole('heading', { name: 'Full mock history' })).toBeVisible()
+  await expect(page.getByText('Full mock', { exact: true })).toHaveCount(2)
+  await expect(
+    page.getByRole('list', {
+      name: 'Full mock scores from oldest to newest: 60%, 80%',
+    })
+  ).toBeVisible()
+  await fitsEveryWidth(page)
+  await accessible(page)
+})
+
 test('offline and failed storage warnings explain recovery', async ({
   page,
   context,

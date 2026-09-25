@@ -1,6 +1,7 @@
 const DAY_MS = 24 * 60 * 60 * 1000
 const TREND_WINDOW = 5
 const TREND_THRESHOLD = 3
+const FULL_MOCK_PRESET = 'pcep-30-02'
 
 function timestamp(attempt) {
   const value = Date.parse(attempt?.date)
@@ -120,6 +121,19 @@ export function performanceInsights(attempts, now = Date.now()) {
     .slice(0, 10)
     .reverse()
     .map((attempt) => ({ date: attempt.date, score: attempt.pct }))
+  const mockAttempts = graded.filter((attempt) => attempt.preset === FULL_MOCK_PRESET)
+  const fullMocks = {
+    count: mockAttempts.length,
+    latest: mockAttempts[0]?.pct ?? null,
+    best: mockAttempts.length
+      ? Math.max(...mockAttempts.map((attempt) => attempt.pct))
+      : null,
+    passed: mockAttempts.filter((attempt) => attempt.pct >= 70).length,
+    scores: mockAttempts
+      .slice(0, 10)
+      .reverse()
+      .map((attempt) => ({ date: attempt.date, score: attempt.pct })),
+  }
 
   return {
     ...streak,
@@ -128,5 +142,6 @@ export function performanceInsights(attempts, now = Date.now()) {
     confidence,
     trend,
     scores,
+    fullMocks,
   }
 }

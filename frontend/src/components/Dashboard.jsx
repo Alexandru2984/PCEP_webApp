@@ -57,25 +57,25 @@ function MasteryBar({ label, pct, onDrill }) {
   )
 }
 
-function ScoreTrend({ scores }) {
+function ScoreTrend({ scores, title, ariaLabel = 'Graded scores' }) {
   if (scores.length < 2) return null
   const description = scores.map(({ score }) => `${score}%`).join(', ')
   return (
     <figure className="mt-5 border-t border-slate-200 pt-5 dark:border-slate-700">
       <figcaption className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">
-        Last {scores.length} graded scores
+        {title ?? `Last ${scores.length} graded scores`}
       </figcaption>
       <div className="flex gap-3">
         <div
           aria-hidden="true"
-          className="flex h-32 flex-col justify-between text-xs text-slate-500 dark:text-slate-400"
+          className="flex h-32 flex-col justify-between text-xs text-slate-600 dark:text-slate-400"
         >
           <span>100%</span>
           <span>50%</span>
           <span>0%</span>
         </div>
         <ol
-          aria-label={`Graded scores from oldest to newest: ${description}`}
+          aria-label={`${ariaLabel} from oldest to newest: ${description}`}
           className="flex h-32 min-w-0 flex-1 items-end gap-1 border-b border-l border-slate-300 px-2 pt-2 dark:border-slate-600 sm:gap-2"
         >
           {scores.map(({ date, score }, index) => (
@@ -99,6 +99,37 @@ function ScoreTrend({ scores }) {
         </ol>
       </div>
     </figure>
+  )
+}
+
+function FullMockHistory({ attempts }) {
+  const mocks = performanceInsights(attempts).fullMocks
+  if (!mocks.count) return null
+  return (
+    <section className="rounded-xl border border-sky-200 bg-sky-50/60 p-6 dark:border-sky-900 dark:bg-sky-950/20">
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        Full mock history
+      </h2>
+      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        PCEP-30-02 presets only: 30 questions, 40 minutes and the 7/8/7/8 module
+        distribution. Custom exams remain in the overall trend.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Full mocks" value={mocks.count} />
+        <Stat label="Latest score" value={`${mocks.latest}%`} />
+        <Stat
+          label="Best full mock"
+          value={`${mocks.best}%`}
+          accent={mocks.best >= 70 ? 'text-green-700 dark:text-green-400' : undefined}
+        />
+        <Stat label="Passed" value={`${mocks.passed}/${mocks.count}`} />
+      </div>
+      <ScoreTrend
+        scores={mocks.scores}
+        title={`Last ${mocks.scores.length} full mock scores`}
+        ariaLabel="Full mock scores"
+      />
+    </section>
   )
 }
 
@@ -382,6 +413,8 @@ export default function Dashboard({
 
       <StudyMomentum attempts={attempts} />
 
+      <FullMockHistory attempts={attempts} />
+
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -402,13 +435,15 @@ export default function Dashboard({
                           : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                     }`}
                   >
-                    {a.challengeDate
-                      ? 'Daily'
-                      : a.mode === 'exam'
-                        ? 'Exam'
-                        : a.mode === 'flashcards'
-                          ? 'Cards'
-                          : 'Practice'}
+                    {a.preset === 'pcep-30-02'
+                      ? 'Full mock'
+                      : a.challengeDate
+                        ? 'Daily'
+                        : a.mode === 'exam'
+                          ? 'Exam'
+                          : a.mode === 'flashcards'
+                            ? 'Cards'
+                            : 'Practice'}
                   </span>
                   <span className="truncate text-slate-600 dark:text-slate-400">
                     {MODULE_LABELS[a.module] ?? a.module}

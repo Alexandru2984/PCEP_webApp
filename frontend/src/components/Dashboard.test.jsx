@@ -67,6 +67,39 @@ describe('Dashboard', () => {
     expect(screen.getByText('Daily')).toBeInTheDocument()
   })
 
+  it('shows a separate full mock history and labels preset attempts', () => {
+    seedHistory([
+      attempt({
+        date: '2026-09-24T10:00:00.000Z',
+        mode: 'exam',
+        preset: 'pcep-30-02',
+        score: 24,
+        total: 30,
+        pct: 80,
+      }),
+      attempt({
+        date: '2026-09-23T10:00:00.000Z',
+        mode: 'exam',
+        preset: 'pcep-30-02',
+        score: 18,
+        total: 30,
+        pct: 60,
+      }),
+    ])
+    render(<Dashboard />)
+    expect(screen.getByRole('heading', { name: 'Full mock history' })).toBeVisible()
+    expect(screen.getByText('Latest score').previousElementSibling).toHaveTextContent(
+      '80%'
+    )
+    expect(screen.getByText('Passed').previousElementSibling).toHaveTextContent('1/2')
+    expect(screen.getAllByText('Full mock')).toHaveLength(2)
+    expect(
+      screen.getByRole('list', {
+        name: 'Full mock scores from oldest to newest: 60%, 80%',
+      })
+    ).toBeVisible()
+  })
+
   it('shows accessible study momentum from graded history', () => {
     seedHistory([
       attempt({ date: '2026-09-24T10:00:00.000Z', score: 9, pct: 90 }),

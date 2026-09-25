@@ -193,9 +193,10 @@ previews and merges strictly validated imports up to 8 MB, and still accepts
 existing v1 and v2 backups. History, mistakes, bookmarks, notes and the review
 schedule can be reset independently. Backups contain public question options,
 aggregate performance, optional confidence ratings, daily challenge dates,
-bounded response-time totals, review dates and user-written notes, never answer
-keys or explanations. Keep backups private if you want to keep your study history
-and notes private; nothing is uploaded by these features.
+bounded response-time totals, the optional `pcep-30-02` full-mock marker, review
+dates and user-written notes, never answer keys or explanations. Keep backups
+private if you want to keep your study history and notes private; nothing is
+uploaded by these features.
 Bookmarks are available on question cards. Bookmark and mistake drills fetch
 current public question data using the bounded `ids` quiz-set filter, avoiding
 stale choice IDs after admin edits. Module/difficulty accuracy includes mixed

@@ -1,6 +1,7 @@
 import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
 import { CONFIDENCE_VALUES, MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
+import { PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
 import {
   STUDY_LIMIT,
   adaptivePracticePlan,
@@ -75,7 +76,11 @@ export function validAttempt(a) {
     !integer(a.score, 0, a.total) ||
     !integer(a.elapsedMs ?? 0, 0, 7 * 86400 * 1000) ||
     !integer(a.bestStreak ?? 0, 0, a.total) ||
-    (a.challengeDate !== undefined && !validDateKey(a.challengeDate))
+    (a.challengeDate !== undefined && !validDateKey(a.challengeDate)) ||
+    (a.preset !== undefined &&
+      (a.preset !== PCEP_30_02_PRESET.value ||
+        a.mode !== 'exam' ||
+        a.total !== PCEP_30_02_PRESET.count))
   )
     return null
   const byModule = breakdown(a.byModule, MODULES, a.score, a.total)
@@ -111,6 +116,7 @@ export function validAttempt(a) {
     elapsedMs: a.elapsedMs ?? 0,
     bestStreak: a.bestStreak ?? 0,
     ...(a.challengeDate ? { challengeDate: a.challengeDate } : {}),
+    ...(a.preset ? { preset: a.preset } : {}),
     ...(byModule ? { byModule } : {}),
     ...(byDifficulty ? { byDifficulty } : {}),
     ...(byConfidence ? { byConfidence } : {}),
@@ -218,7 +224,13 @@ function normalizeSettings(s) {
     !MODES.includes(s.mode ?? 'practice') ||
     !['', ...MODULES].includes(s.module ?? '') ||
     !['', ...DIFFICULTIES].includes(s.difficulty ?? '') ||
-    !integer(s.count, 1, 100)
+    !integer(s.count, 1, 100) ||
+    (s.preset !== undefined &&
+      (s.preset !== PCEP_30_02_PRESET.value ||
+        s.mode !== 'exam' ||
+        s.count !== PCEP_30_02_PRESET.count ||
+        (s.module ?? '') !== '' ||
+        (s.difficulty ?? '') !== ''))
   )
     return null
   return {
@@ -226,6 +238,7 @@ function normalizeSettings(s) {
     module: s.module ?? '',
     difficulty: s.difficulty ?? '',
     count: s.count,
+    ...(s.preset ? { preset: s.preset } : {}),
   }
 }
 export function loadSettings() {
@@ -283,6 +296,14 @@ function normalizeActiveExam(value, now = Date.now()) {
     normalizedQuestions.some((question) => !question) ||
     new Set(normalizedQuestions.map((question) => question.id)).size !==
       normalizedQuestions.length
+  )
+    return null
+  if (
+    config.preset === PCEP_30_02_PRESET.value &&
+    !validPcep30_02Set(
+      { preset: config.preset, count: normalizedQuestions.length },
+      normalizedQuestions
+    )
   )
     return null
   if (
@@ -564,6 +585,7 @@ export function importProgress(backup) {
       a.total,
       a.elapsedMs,
       a.challengeDate ?? '',
+      a.preset ?? '',
     ].join('|')
   const history = [
     ...new Map(
