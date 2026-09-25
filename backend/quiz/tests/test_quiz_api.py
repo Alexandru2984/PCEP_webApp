@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import date
 
 import pytest
@@ -90,6 +91,60 @@ def test_quiz_set_filters_by_difficulty(api_client, question_bank):
 def test_quiz_set_rejects_bogus_module(api_client, question_bank):
     resp = api_client.get('/api/quiz-set/?module=module99')
     assert resp.status_code == 400
+
+
+def test_quiz_set_pcep_preset_has_official_module_mix_without_answers(
+    api_client, make_question, django_assert_num_queries
+):
+    distribution = {'module1': 7, 'module2': 8, 'module3': 7, 'module4': 8}
+    for module, count in distribution.items():
+        for index in range(count):
+            make_question(module=module, text=f'{module} preset question {index}')
+
+    with django_assert_num_queries(6):
+        resp = api_client.get('/api/quiz-set/', {
+            'preset': 'pcep-30-02',
+            'count': 30,
+        })
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body['preset'] == 'pcep-30-02'
+    assert body['count'] == 30
+    assert Counter(q['module'] for q in body['questions']) == distribution
+    assert len({q['id'] for q in body['questions']}) == 30
+    for question in body['questions']:
+        assert set(question) == {
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'choices'
+        }
+        assert all(set(choice) == {'id', 'text'} for choice in question['choices'])
+
+
+@pytest.mark.parametrize(
+    'params',
+    [
+        {'preset': 'unknown', 'count': 30},
+        {'preset': 'pcep-30-02', 'count': 29},
+        {'preset': 'pcep-30-02', 'count': 30, 'module': 'module1'},
+        {'preset': 'pcep-30-02', 'count': 30, 'difficulty': 'hard'},
+        {'preset': 'pcep-30-02', 'count': 30, 'ids': '1,2'},
+    ],
+)
+def test_quiz_set_rejects_invalid_preset_combinations(api_client, params):
+    resp = api_client.get('/api/quiz-set/', params)
+    assert resp.status_code == 400
+    assert set(resp.json()) == {'detail'}
+
+
+def test_quiz_set_preset_fails_cleanly_when_a_module_is_incomplete(
+    api_client, question_bank
+):
+    resp = api_client.get('/api/quiz-set/', {
+        'preset': 'pcep-30-02',
+        'count': 30,
+    })
+    assert resp.status_code == 503
+    assert set(resp.json()) == {'detail'}
 
 
 def test_search_matches_text_and_code_without_fetching_choices(

@@ -2,7 +2,13 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { Buffer } from 'node:buffer'
 
-import { DAILY_DATE, QUESTIONS, correctId, mockApi } from './fixtures'
+import {
+  DAILY_DATE,
+  FULL_MOCK_QUESTIONS,
+  QUESTIONS,
+  correctId,
+  mockApi,
+} from './fixtures'
 
 // --- Tests ------------------------------------------------------------------
 test('setup screen loads and shows the question-bank snapshot', async ({ page }) => {
@@ -48,6 +54,39 @@ test('daily challenge is answer-safe, repeatable and visible in progress', async
   )
   await page.getByRole('button', { name: /Progress/ }).click()
   await expect(page.getByText('Daily')).toBeVisible()
+})
+
+test('full mock uses the PCEP-30-02 size, timer and syllabus distribution', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Exam simulation/ }).click()
+  await expect(page.getByText(/30 questions · 40 minutes/)).toBeVisible()
+  await expect(
+    page.getByText(/official exam also includes multiple-select/i)
+  ).toBeVisible()
+
+  const request = page.waitForRequest((request) =>
+    request.url().includes('preset=pcep-30-02')
+  )
+  await page.getByRole('button', { name: 'Start full mock' }).click()
+  await request
+  await expect(page.getByText('Question 1 of 30')).toBeVisible()
+  await expect(page.getByLabel(/Time remaining: (39:5\d|40:00)/)).toBeVisible()
+  const distribution = Object.fromEntries(
+    ['module1', 'module2', 'module3', 'module4'].map((module) => [
+      module,
+      FULL_MOCK_QUESTIONS.filter((question) => question.module === module).length,
+    ])
+  )
+  expect(distribution).toEqual({ module1: 7, module2: 8, module3: 7, module4: 8 })
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
 })
 
 test('search builds an answer-safe custom drill on mobile', async ({ page }) => {

@@ -150,6 +150,13 @@ and returns only question ID, text, code, module and difficulty. Choices,
 explanations and answer metadata are deliberately absent. A selected drill sends
 only unique IDs to `quiz-set`, which returns fresh public choices under the
 existing answer-leakage contract.
+`GET /api/quiz-set/?preset=pcep-30-02&count=30` returns an exact 7/8/7/8
+module distribution for the 30-question, 40-minute full-mock flow. Preset
+requests reject `ids`, module or difficulty combinations, fail closed with 503
+if any module lacks enough questions, and use the same public serializer as
+other question reads. The preset models PCEP-30-02 timing and syllabus item
+counts; the product discloses that its questions are single-choice while the
+official exam also has multiple-select and interactive formats.
 `GET /api/daily/` returns five public questions for the current
 `Europe/Bucharest` date. Selection is deterministic for the date and production
 secret, covers every populated syllabus module before filling the fifth slot, and

@@ -45,7 +45,7 @@
 | P2 | Frontend deploy deletes live files before copy and ignores failures; Make test omits Vitest; runtime fetch boolean precedence uses wrong cwd. | Build before publish, copy into complete release directory, retain hashed assets for active tabs, atomic publication and backup/rollback. Fix Make paths and add frontend unit tests. Validate release before swapping. |
 | P2 | CI lacks concurrency cancellation, useful Playwright report config and Docker build smoke. | Add cancellation, bounded workers, report artifacts and backend image/build/config checks; avoid production tests in CI. Keep PostgreSQL API checks and audits. |
 | P2 | Stats perform four queries; health combines liveness/readiness and unthrottled DB endpoint. | Derive totals from one bounded grouped query; add pure `/api/live/`, preserve `/api/health/` readiness compatibility, cap DB connect/startup waits. Verify query budget and outage behavior. |
-| P3 | Curated concept tags remain an opportunity. Daily challenge, search, bounded personal notes, optional confidence calibration and measured time-to-first-answer are now implemented without learner accounts. | Add tags only with a controlled taxonomy and coverage audit; avoid speculative schema migrations and tracking. |
+| P3 | Curated concept tags remain an opportunity. Daily challenge, search, bounded personal notes, confidence/timing insights and an exact PCEP-30-02 full-mock preset are now implemented without learner accounts. | Add tags only with a controlled taxonomy and coverage audit; avoid speculative schema migrations and tracking. |
 
 ## Deployment and rollback strategy
 

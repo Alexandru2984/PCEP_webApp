@@ -17,6 +17,13 @@ export const QUESTIONS = [
   q(4, 'module3', 'medium'),
 ]
 
+export const FULL_MOCK_QUESTIONS = [
+  ...Array.from({ length: 7 }, (_, index) => q(101 + index, 'module1', 'medium', '')),
+  ...Array.from({ length: 8 }, (_, index) => q(201 + index, 'module2', 'medium', '')),
+  ...Array.from({ length: 7 }, (_, index) => q(301 + index, 'module3', 'medium', '')),
+  ...Array.from({ length: 8 }, (_, index) => q(401 + index, 'module4', 'medium', '')),
+]
+
 const STATS = {
   total: 301,
   by_module: { module1: 73, module2: 73, module3: 85, module4: 70 },
@@ -78,6 +85,14 @@ export async function mockApi(page) {
       return route.fulfill({ json: { count: results.length, results } })
     }
     if (path.includes('/api/quiz-set')) {
+      if (url.searchParams.get('preset') === 'pcep-30-02')
+        return route.fulfill({
+          json: {
+            count: FULL_MOCK_QUESTIONS.length,
+            preset: 'pcep-30-02',
+            questions: FULL_MOCK_QUESTIONS,
+          },
+        })
       const ids = url.searchParams.get('ids')
       const questions = ids
         ? QUESTIONS.filter((question) => ids.split(',').map(Number).includes(question.id))

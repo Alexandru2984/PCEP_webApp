@@ -192,6 +192,9 @@ assistive-technology certification.
   answers and shows the learner's confidence and decision time beside each item.
 - Flashcard reports use "Got it" / "Review later" recall language and never present
   self-ratings as a graded PCEP pass result; shared summaries also reflect the mode.
+- Exam setup offers an exact PCEP-30-02 preset: 30 questions, a 40-minute absolute
+  deadline and the official 7/8/7/8 module item distribution. Custom timed exams
+  remain available, and the UI discloses the trainer's single-choice format limit.
 - Focus-area drill actions from reports and preserved mistake drills.
 
 ## 9. Performance
@@ -257,6 +260,11 @@ Final validation on 2026-09-19:
   service worker became ready; zero sensitive cache entries and zero application
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
+
+Continuation validation on 2026-09-25 covers 127 backend tests, 172 Vitest tests
+and 22 Playwright flows, including the answer-safe daily challenge, confidence
+insights, PWA installation, focused review, flashcard self-rating semantics and
+the exact PCEP-30-02 full-mock contract.
 
 ## 12. Commits
 

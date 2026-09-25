@@ -25,6 +25,26 @@ describe('QuizSetup — practice your mistakes', () => {
     expect(onDailyChallenge).toHaveBeenCalledOnce()
   })
 
+  it('offers an exact PCEP-30-02 full mock separately from custom exams', () => {
+    const onStart = vi.fn()
+    render(<QuizSetup {...baseProps} onStart={onStart} />)
+    fireEvent.click(screen.getByRole('button', { name: /Exam simulation/ }))
+
+    expect(
+      screen.getByText('30 questions · 40 minutes · module mix 7 / 8 / 7 / 8')
+    ).toBeVisible()
+    expect(screen.getByText(/official exam also includes multiple-select/i)).toBeVisible()
+    expect(screen.getByText(/Timer: 40m/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Start full mock' }))
+    expect(onStart).toHaveBeenCalledWith({
+      mode: 'exam',
+      module: '',
+      difficulty: '',
+      count: 30,
+      preset: 'pcep-30-02',
+    })
+  })
+
   it('offers the mistakes drill with a count and fires the callback', () => {
     const onPracticeMistakes = vi.fn()
     render(

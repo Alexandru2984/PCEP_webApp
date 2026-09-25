@@ -24,8 +24,7 @@ import { publicQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
 import { MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
-
-const EXAM_SECONDS_PER_QUESTION = 80
+import { EXAM_SECONDS_PER_QUESTION, PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
 
 function emptyState(lastConfig = null, resumableExam = null) {
   return {
@@ -198,6 +197,11 @@ export default function useQuizSession() {
         new Set(questions.map((q) => q.id)).size !== questions.length
       )
         throw new Error('The server returned invalid questions. Please retry.')
+      if (
+        config.preset === PCEP_30_02_PRESET.value &&
+        !validPcep30_02Set(data, questions)
+      )
+        throw new Error('The server returned an invalid full mock. Please retry.')
       if (
         isDaily &&
         (!validDateKey(data.date) ||

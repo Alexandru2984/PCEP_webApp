@@ -88,6 +88,21 @@ describe('quiz session requests', () => {
     expect(result.current.error).toMatch(/invalid daily challenge/i)
   })
 
+  it('rejects a mislabeled or incomplete full-mock response', async () => {
+    const { result } = renderHook(useQuizSession)
+    await act(async () =>
+      result.current.startQuiz({
+        mode: 'exam',
+        module: '',
+        difficulty: '',
+        count: 30,
+        preset: 'pcep-30-02',
+      })
+    )
+    expect(result.current.phase).toBe('error')
+    expect(result.current.error).toMatch(/invalid full mock/i)
+  })
+
   it('blocks duplicate starts and duplicate answer requests synchronously', async () => {
     const loading = deferred()
     fetchQuizSet.mockReturnValueOnce(loading.promise)

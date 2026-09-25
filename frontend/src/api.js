@@ -8,10 +8,11 @@ const api = axios.create({
 })
 
 export const fetchQuizSet = (
-  { count = 30, module = '', difficulty = '', ids = [] } = {},
+  { count = 30, module = '', difficulty = '', ids = [], preset = '' } = {},
   options = {}
 ) => {
   const params = new URLSearchParams({ count: String(count) })
+  if (preset) params.set('preset', preset)
   if (module) params.set('module', module)
   if (difficulty) params.set('difficulty', difficulty)
   if (ids.length) params.set('ids', ids.join(','))

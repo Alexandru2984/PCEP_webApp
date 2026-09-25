@@ -46,7 +46,10 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   _and_ why the correct answer is right (skipped exam questions included)
 - ⏱️ **Three study modes** — Practice (instant feedback), a timed **Exam
   simulation** (question navigator, flagging, auto-submit), and **Flashcards**
-  (flip to reveal the answer, self-mark what you know)
+  (flip to reveal the answer, self-mark what you know). Exam mode includes a
+  [PCEP-30-02](https://pythoninstitute.org/pcep) full-mock preset with 30 questions,
+  40 minutes and the official 7/8/7/8 module item distribution; the UI clearly notes
+  that this trainer does not reproduce the official interactive item formats.
 - 💾 **Crash-safe exam recovery** — an interrupted exam restores its deadline,
   current question, selected answers and flags from a validated local-only copy
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
@@ -152,15 +155,15 @@ make test
 make audit
 make django-check
 
-# Backend — 120 tests (API/security, integrity, startup, release and SEO behavior)
+# Backend — 127 tests (API/security, integrity, startup, release and SEO behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 162 Vitest tests, then static checks, the production build and
-# 20 Playwright flows (including axe, daily challenge, confidence, PWA, notes, search,
-# scheduled review, exam resume and Pyodide).
+# Frontend — 172 Vitest tests, then static checks, the production build and
+# 22 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
+# notes, search, scheduled review, exam resume and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```
@@ -179,7 +182,7 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 | `GET`  | `/api/stats/`                 | Aggregate question coverage, without question or answer data                          |
 | `GET`  | `/api/search/`                | Search text/code; bounded summary results without choices or answer metadata          |
 | `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata          |
-| `GET`  | `/api/quiz-set/`              | Random public question set. Params: `count`, `module`, `difficulty`, bounded `ids`    |
+| `GET`  | `/api/quiz-set/`              | Random public set; filters or the answer-safe `preset=pcep-30-02&count=30` full mock |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
 | `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                        |

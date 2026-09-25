@@ -1,4 +1,5 @@
 import hmac
+import random
 
 from django.conf import settings
 from django.db import connection, DatabaseError
@@ -28,6 +29,13 @@ SEARCH_QUERY_MIN_LENGTH = 2
 SEARCH_QUERY_MAX_LENGTH = 80
 SEARCH_RESULT_LIMIT = 20
 DAILY_CHALLENGE_SIZE = 5
+PCEP_30_02_PRESET = 'pcep-30-02'
+PCEP_30_02_DISTRIBUTION = {
+    Question.MODULE_1: 7,
+    Question.MODULE_2: 8,
+    Question.MODULE_3: 7,
+    Question.MODULE_4: 8,
+}
 
 
 def _daily_question_ids(rows, challenge_date):
@@ -212,6 +220,63 @@ def quiz_set(request):
     count = max(1, min(count, 100))
 
     qs = Question.objects.all()
+
+    preset = request.query_params.get('preset')
+    if preset is not None:
+        if preset != PCEP_30_02_PRESET:
+            return Response(
+                {'detail': f'preset must be {PCEP_30_02_PRESET}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        preset_count = sum(PCEP_30_02_DISTRIBUTION.values())
+        conflicting = [
+            name for name in ('ids', 'module', 'difficulty')
+            if name in request.query_params
+        ]
+        if count != preset_count or conflicting:
+            return Response(
+                {
+                    'detail': (
+                        f'{PCEP_30_02_PRESET} requires count={preset_count} '
+                        'without ids, module or difficulty filters.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        selected_ids = []
+        for module_value, module_count in PCEP_30_02_DISTRIBUTION.items():
+            module_ids = list(
+                qs.filter(module=module_value)
+                .order_by('?')
+                .values_list('id', flat=True)[:module_count]
+            )
+            if len(module_ids) != module_count:
+                return Response(
+                    {'detail': 'The full mock preset is temporarily unavailable.'},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            selected_ids.extend(module_ids)
+
+        random.shuffle(selected_ids)
+        position = {
+            question_id: index for index, question_id in enumerate(selected_ids)
+        }
+        questions = list(
+            qs.filter(id__in=selected_ids).prefetch_related('choices')
+        )
+        if len(questions) != preset_count:
+            return Response(
+                {'detail': 'The full mock preset is temporarily unavailable.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        questions.sort(key=lambda question: position[question.id])
+        serializer = QuestionSerializer(questions, many=True)
+        return Response({
+            'count': len(serializer.data),
+            'preset': PCEP_30_02_PRESET,
+            'questions': serializer.data,
+        })
 
     ids = request.query_params.get('ids')
     if ids is not None:

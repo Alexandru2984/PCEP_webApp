@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { getScopeTotal } from '../questionStats'
 import QuestionBankStats from './QuestionBankStats'
 import QuestionSearch from './QuestionSearch'
+import { examDurationLabel, PCEP_30_02_PRESET } from '../exam'
 
 const MODULES = [
   { value: '', label: 'All modules' },
@@ -32,7 +33,7 @@ const MODES = [
   {
     value: 'exam',
     title: 'Exam simulation',
-    subtitle: 'Timed, no hints, graded at the end like the real PCEP',
+    subtitle: 'Timed, no hints, graded at the end',
   },
   {
     value: 'flashcards',
@@ -209,6 +210,47 @@ export default function QuizSetup({
         })}
       </div>
 
+      {mode === 'exam' && (
+        <section
+          aria-labelledby="full-mock-heading"
+          className="mb-5 rounded-xl border border-sky-300 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3
+                id="full-mock-heading"
+                className="font-semibold text-sky-950 dark:text-sky-100"
+              >
+                Full PCEP-30-02 mock
+              </h3>
+              <p className="mt-1 text-sm text-sky-900 dark:text-sky-200">
+                30 questions · 40 minutes · module mix 7 / 8 / 7 / 8
+              </p>
+              <p className="mt-2 text-xs text-sky-800 dark:text-sky-300">
+                Matches PCEP-30-02 timing and syllabus item counts. This trainer uses
+                single-choice questions; the official exam also includes multiple-select
+                and interactive formats.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                onStart({
+                  mode: 'exam',
+                  module: '',
+                  difficulty: '',
+                  count: PCEP_30_02_PRESET.count,
+                  preset: PCEP_30_02_PRESET.value,
+                })
+              }
+              className="min-h-11 shrink-0 rounded-lg bg-sky-700 px-4 py-2.5 font-semibold text-white hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-500"
+            >
+              Start full mock
+            </button>
+          </div>
+        </section>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col text-sm">
           <span className="mb-1 font-medium text-slate-700 dark:text-slate-300">
@@ -271,6 +313,12 @@ export default function QuizSetup({
               : canUseStats
                 ? `${scopeTotal} questions match the selected scope.`
                 : 'The requested count is clamped by what the question bank can serve.'}
+            {mode === 'exam' && (
+              <span className="mt-1 block font-medium text-slate-600 dark:text-slate-300">
+                Timer: {examDurationLabel(effectiveCount)} ({' '}
+                {effectiveCount === 1 ? '1 question' : `${effectiveCount} questions`}).
+              </span>
+            )}
           </p>
         </div>
       </div>
