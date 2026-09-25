@@ -70,9 +70,11 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 📝 **Private personal notes** — keep bounded local notes beside practice questions and
   review them after a session; notes are included in validated progress backups
 - ⌨️ **Keyboard shortcuts** and full dark mode
-- 📱 **Installable, offline-capable PWA** — a service worker precaches the public
-  shell and caches the Pyodide runtime. API answers and study pages are excluded;
-  offline mode never downloads the answer bank.
+- 📱 **Installable, offline-capable PWA** — eligible browsers offer a clear in-app
+  install action; a service worker precaches the public shell and caches the Pyodide
+  runtime. API answers and study pages are excluded, and the UI explains that new
+  questions and feedback still need a connection. Offline mode never downloads the
+  answer bank.
 - ✅ Scored against the official **70% pass threshold**
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness

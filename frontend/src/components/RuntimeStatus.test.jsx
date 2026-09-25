@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import RuntimeStatus from './RuntimeStatus'
 import ErrorBoundary from './ErrorBoundary'
@@ -28,6 +28,42 @@ describe('application recovery', () => {
       if (previous) Object.defineProperty(navigator, 'serviceWorker', previous)
       else delete navigator.serviceWorker
     }
+  })
+  it('offers the browser install prompt with accurate offline scope', async () => {
+    const prompt = vi.fn().mockResolvedValue(undefined)
+    const event = new Event('beforeinstallprompt', { cancelable: true })
+    Object.defineProperties(event, {
+      prompt: { value: prompt },
+      userChoice: { value: Promise.resolve({ outcome: 'accepted' }) },
+    })
+    render(<RuntimeStatus />)
+
+    fireEvent(window, event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(screen.getByRole('heading', { name: 'Install PCEP Quiz' })).toBeVisible()
+    expect(screen.getByText(/answer feedback still require a connection/i)).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Install app' }))
+    await waitFor(() => expect(prompt).toHaveBeenCalledOnce())
+    expect(screen.queryByRole('heading', { name: 'Install PCEP Quiz' })).toBeNull()
+  })
+  it('keeps a dismissed install suggestion hidden for the tab session', () => {
+    const installEvent = () => {
+      const event = new Event('beforeinstallprompt', { cancelable: true })
+      Object.defineProperties(event, {
+        prompt: { value: vi.fn() },
+        userChoice: { value: Promise.resolve({ outcome: 'dismissed' }) },
+      })
+      return event
+    }
+    const view = render(<RuntimeStatus />)
+    fireEvent(window, installEvent())
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    view.unmount()
+
+    render(<RuntimeStatus />)
+    fireEvent(window, installEvent())
+    expect(screen.queryByRole('heading', { name: 'Install PCEP Quiz' })).toBeNull()
   })
   it('offers reload after a lazy screen/render failure', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})

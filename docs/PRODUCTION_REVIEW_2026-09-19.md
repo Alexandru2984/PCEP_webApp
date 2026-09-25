@@ -186,6 +186,8 @@ assistive-technology certification.
 - Live question-bank snapshot and filter-aware available counts.
 - Next-unanswered and next-flagged exam navigation.
 - Online/offline, update-available, persistence-failure and app-error recovery UI.
+- Browser-native PWA installation guidance with a tab-scoped dismissal and an
+  explicit explanation of which study actions still require a connection.
 - Focus-area drill actions from reports and preserved mistake drills.
 
 ## 9. Performance
