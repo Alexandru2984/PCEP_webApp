@@ -131,9 +131,13 @@ def page(title: str, description: str, canonical: str, body: str) -> str:
 
 
 def render_question(n: int, q: dict) -> str:
+    objective = q.get("objective")
+    metadata = " · ".join(
+        value for value in (objective, q["difficulty"]) if value
+    )
     parts = [
         '<article class="q">',
-        f'<div class="qh"><span>Question {n}</span><span>{E(q["difficulty"])}</span></div>',
+        f'<div class="qh"><span>Question {n}</span><span>{E(metadata)}</span></div>',
         f'<p class="qt">{E(q["text"])}</p>',
     ]
     if q["code"].strip():

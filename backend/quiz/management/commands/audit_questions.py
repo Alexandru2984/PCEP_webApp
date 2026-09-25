@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from quiz.question_bank import (
     VALID_DIFFICULTIES,
     VALID_MODULES,
+    VALID_OBJECTIVES,
     question_bank_summary,
     database_questions,
     similar_questions,
@@ -46,6 +47,12 @@ class Command(BaseCommand):
         for difficulty in VALID_DIFFICULTIES:
             self.stdout.write(
                 f'  {difficulty}: {summary["by_difficulty"].get(difficulty, 0)}'
+            )
+
+        self.stdout.write('\nBy syllabus objective:')
+        for objective in VALID_OBJECTIVES:
+            self.stdout.write(
+                f'  {objective}: {summary["by_objective"].get(objective, 0)}'
             )
 
         self.stdout.write('\nModule/difficulty matrix:')

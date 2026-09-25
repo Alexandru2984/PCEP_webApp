@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import IntegrityError, transaction
 from django.forms.models import inlineformset_factory
 
 from quiz.admin import ChoiceFormSet
@@ -14,13 +15,26 @@ from quiz.question_bank import (
     syllabus_warnings,
     validation_errors,
 )
+from quiz.syllabus import OBJECTIVES_BY_MODULE
 
 
 def question(**overrides):
-    return {'text': 'Question?', 'module': 'module1', 'difficulty': 'easy',
-            'choices': [{'text': f'Option {i}', 'is_correct': i == 0,
-                         'explanation': 'A meaningful explanation.'} for i in range(4)],
-            **overrides}
+    result = {
+        'text': 'Question?',
+        'module': 'module1',
+        'difficulty': 'easy',
+        'choices': [
+            {
+                'text': f'Option {i}',
+                'is_correct': i == 0,
+                'explanation': 'A meaningful explanation.',
+            }
+            for i in range(4)
+        ],
+        **overrides,
+    }
+    result.setdefault('objective', OBJECTIVES_BY_MODULE[result['module']][0])
+    return result
 
 
 def test_validation_reports_empty_and_duplicate_options():
@@ -78,6 +92,22 @@ def test_syllabus_audit_reports_set_usage(snippet):
     assert warnings == [
         'question #1 uses sets, which are outside the PCEP-30-02 data-collection objectives'
     ]
+
+
+def test_validation_rejects_missing_or_cross_module_objectives():
+    missing = question()
+    missing.pop('objective')
+    mismatched = question(module='module3', objective='2.1')
+    errors = ' '.join(validation_errors([missing, mismatched]))
+    assert 'invalid objective' in errors
+    assert 'does not belong to' in errors
+
+
+@pytest.mark.django_db
+def test_database_rejects_an_objective_from_another_module(make_question):
+    q = make_question(module='module1', objective='1.4')
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Question.objects.filter(id=q.id).update(objective='3.1')
 
 
 @pytest.mark.django_db
@@ -233,3 +263,58 @@ def test_set_replacement_migration_preserves_all_ids(make_question):
         q.refresh_from_db()
         assert q.code_snippet == replacement['old']['code_snippet']
         assert list(q.choices.values_list('id', flat=True)) == choice_ids
+
+
+@pytest.mark.django_db
+def test_objective_migration_assigns_frozen_taxonomy(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+    from quiz.seed_data import ALL_QUESTIONS
+
+    migration = importlib.import_module('quiz.migrations.0007_add_question_objective')
+    source = ALL_QUESTIONS[0]
+    q = make_question(
+        module=source['module'],
+        difficulty=source['difficulty'],
+        text=source['text'],
+        code_snippet=source['code_snippet'],
+        objective='1.1',
+    )
+
+    migration.assign_objectives(apps, connection.schema_editor())
+
+    q.refresh_from_db()
+    assert q.objective == source['objective']
+
+
+def test_objective_migration_covers_the_complete_reviewed_bank():
+    import importlib
+    from types import SimpleNamespace
+    from quiz.seed_data import ALL_QUESTIONS
+
+    migration = importlib.import_module('quiz.migrations.0007_add_question_objective')
+    signatures = []
+    for source in ALL_QUESTIONS:
+        question = SimpleNamespace(
+            module=source['module'],
+            text=source['text'],
+            code_snippet=source.get('code_snippet', ''),
+        )
+        signature = migration._signature(question)
+        signatures.append(signature)
+        assert migration.OBJECTIVE_BY_SIGNATURE[signature] == source['objective']
+    assert len(signatures) == len(set(signatures)) == len(ALL_QUESTIONS)
+
+
+@pytest.mark.django_db
+def test_objective_migration_refuses_an_unreviewed_question(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+
+    migration = importlib.import_module('quiz.migrations.0007_add_question_objective')
+    q = make_question(text='An unreviewed production-only question?')
+
+    with pytest.raises(RuntimeError, match=str(q.id)):
+        migration.assign_objectives(apps, connection.schema_editor())

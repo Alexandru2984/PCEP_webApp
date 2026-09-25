@@ -1,5 +1,4 @@
-"""
-PCEP question bank for the seed_questions management command.
+"""PCEP question bank for the seed_questions management command.
 
 Coverage (PCEP-30-02 syllabus):
 - Module 1 — Computer Programming and Python Fundamentals
@@ -11,6 +10,8 @@ Each question has 4 choices. The `explanation` field on every choice should
 answer WHY: correct choices explain the Python rule at play; wrong choices
 explain the specific misconception they tempt the reader into.
 """
+
+from .syllabus import apply_objectives
 
 # ---------------------------------------------------------------------------
 # MODULE 1 — COMPUTER PROGRAMMING AND PYTHON FUNDAMENTALS
@@ -4650,9 +4651,85 @@ MODULE_4_EXTRA4 = [
     },
 ]
 
+MODULE_1_EXTRA4.extend([
+    {
+        'text': 'Which statement correctly compares a compiler and an interpreter?',
+        'code_snippet': '',
+        'difficulty': 'easy',
+        'choices': [
+            {'text': 'A compiler translates a program before execution; an interpreter processes instructions as the program runs.', 'is_correct': True,
+             'explanation': 'Correct. Compilation produces a translated form before execution, while interpretation reads and executes program instructions through an interpreter.'},
+            {'text': 'A compiler executes one source line at a time; an interpreter always creates a native executable first.', 'is_correct': False,
+             'explanation': 'Wrong. This reverses the usual roles: interpreters process instructions during execution, while compilers translate before execution.'},
+            {'text': 'They are two names for exactly the same program.', 'is_correct': False,
+             'explanation': 'Wrong. Both help run source code, but compilation and interpretation describe different translation and execution strategies.'},
+            {'text': 'An interpreter can run only code that contains no variables.', 'is_correct': False,
+             'explanation': 'Wrong. Interpreted programs can use variables and the normal features of their language.'},
+        ],
+    },
+    {
+        'text': 'What is the difference between syntax and semantics in a program?',
+        'code_snippet': '',
+        'difficulty': 'easy',
+        'choices': [
+            {'text': 'Syntax defines valid form; semantics describes the meaning of valid instructions.', 'is_correct': True,
+             'explanation': 'Correct. Syntax is the language grammar, while semantics is what a syntactically valid construct means or does.'},
+            {'text': 'Syntax describes speed; semantics describes file size.', 'is_correct': False,
+             'explanation': 'Wrong. Performance and storage size are not the definitions of syntax and semantics.'},
+            {'text': 'Syntax applies only to comments; semantics applies only to numbers.', 'is_correct': False,
+             'explanation': 'Wrong. Syntax and semantics apply to the language and its constructs generally.'},
+            {'text': 'There is no difference in programming.', 'is_correct': False,
+             'explanation': 'Wrong. Code can be syntactically valid yet express the wrong meaning, so the distinction matters.'},
+        ],
+    },
+    {
+        'text': 'What happens when this code is executed?',
+        'code_snippet': "if True:\nprint('ready')",
+        'difficulty': 'easy',
+        'choices': [
+            {'text': 'IndentationError', 'is_correct': True,
+             'explanation': 'Correct. The suite after `if True:` must be indented. The unindented `print` makes the program invalid.'},
+            {'text': 'It prints ready.', 'is_correct': False,
+             'explanation': 'Wrong. The `print` would run only after it is indented as the body of the `if` statement.'},
+            {'text': 'It prints True.', 'is_correct': False,
+             'explanation': 'Wrong. The condition is not printed, and the missing indentation prevents execution.'},
+            {'text': 'NameError', 'is_correct': False,
+             'explanation': 'Wrong. `True` and `print` are known names; Python rejects the missing indented block first.'},
+        ],
+    },
+    {
+        'text': 'What does this print?',
+        'code_snippet': "value = 1\n# value = 99\nprint(value)",
+        'difficulty': 'easy',
+        'choices': [
+            {'text': '1', 'is_correct': True,
+             'explanation': 'Correct. Text after `#` is a comment, so the second assignment is ignored and `value` remains 1.'},
+            {'text': '99', 'is_correct': False,
+             'explanation': 'Wrong. `# value = 99` is a comment and is not executed.'},
+            {'text': '1 then 99', 'is_correct': False,
+             'explanation': 'Wrong. Only one `print` call executes, and the commented assignment changes nothing.'},
+            {'text': 'SyntaxError', 'is_correct': False,
+             'explanation': 'Wrong. A line beginning with `#` is a valid Python comment.'},
+        ],
+    },
+])
+
+
 ALL_QUESTIONS = (
-    [{**q, 'module': 'module1'} for q in MODULE_1 + MODULE_1_EXTRA + MODULE_1_EXTRA2 + MODULE_1_EXTRA3 + MODULE_1_EXTRA4]
-    + [{**q, 'module': 'module2'} for q in MODULE_2 + MODULE_2_EXTRA + MODULE_2_EXTRA2 + MODULE_2_EXTRA3 + MODULE_2_EXTRA4]
-    + [{**q, 'module': 'module3'} for q in MODULE_3 + MODULE_3_EXTRA + MODULE_3_EXTRA2 + MODULE_3_EXTRA3 + MODULE_3_EXTRA4]
-    + [{**q, 'module': 'module4'} for q in MODULE_4 + MODULE_4_EXTRA + MODULE_4_EXTRA2 + MODULE_4_EXTRA3 + MODULE_4_EXTRA4]
+    apply_objectives(
+        'module1',
+        MODULE_1 + MODULE_1_EXTRA + MODULE_1_EXTRA2 + MODULE_1_EXTRA3 + MODULE_1_EXTRA4,
+    )
+    + apply_objectives(
+        'module2',
+        MODULE_2 + MODULE_2_EXTRA + MODULE_2_EXTRA2 + MODULE_2_EXTRA3 + MODULE_2_EXTRA4,
+    )
+    + apply_objectives(
+        'module3',
+        MODULE_3 + MODULE_3_EXTRA + MODULE_3_EXTRA2 + MODULE_3_EXTRA3 + MODULE_3_EXTRA4,
+    )
+    + apply_objectives(
+        'module4',
+        MODULE_4 + MODULE_4_EXTRA + MODULE_4_EXTRA2 + MODULE_4_EXTRA3 + MODULE_4_EXTRA4,
+    )
 )

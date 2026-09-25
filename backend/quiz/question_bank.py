@@ -3,10 +3,12 @@ from collections import Counter
 from difflib import SequenceMatcher
 
 from .seed_data import ALL_QUESTIONS
+from .syllabus import OBJECTIVE_LABELS, OBJECTIVE_MODULE
 
 
 VALID_MODULES = ('module1', 'module2', 'module3', 'module4')
 VALID_DIFFICULTIES = ('easy', 'medium', 'hard')
+VALID_OBJECTIVES = tuple(OBJECTIVE_LABELS)
 MIN_HARD_PER_MODULE = 8
 NEAR_DUPLICATE_THRESHOLD = 0.96
 
@@ -91,6 +93,14 @@ def validation_errors(questions=ALL_QUESTIONS):
             errors.append(
                 f'{label} has invalid difficulty {question.get("difficulty")!r}'
             )
+        objective = question.get('objective')
+        if objective not in OBJECTIVE_LABELS:
+            errors.append(f'{label} has invalid objective {objective!r}')
+        elif OBJECTIVE_MODULE[objective] != question.get('module'):
+            errors.append(
+                f'{label} objective {objective!r} does not belong to '
+                f'{question.get("module")!r}'
+            )
         if len(choices) != 4:
             errors.append(f'{label} has {len(choices)} choices, expected 4')
         if correct_count != 1:
@@ -150,12 +160,16 @@ def coverage_warnings(questions=ALL_QUESTIONS):
                 f'{module} has {hard_count} hard questions, '
                 f'expected at least {MIN_HARD_PER_MODULE}'
             )
+    for objective in VALID_OBJECTIVES:
+        if summary['by_objective'].get(objective, 0) == 0:
+            warnings.append(f'{objective} has no questions')
     return warnings + syllabus_warnings(questions)
 
 
 def question_bank_summary(questions=ALL_QUESTIONS, include_warnings=True):
     by_module = Counter(q.get('module') for q in questions)
     by_difficulty = Counter(q.get('difficulty') for q in questions)
+    by_objective = Counter(q.get('objective') for q in questions)
     matrix = {
         module: {
             difficulty: sum(
@@ -171,6 +185,7 @@ def question_bank_summary(questions=ALL_QUESTIONS, include_warnings=True):
         'total': len(questions),
         'by_module': by_module,
         'by_difficulty': by_difficulty,
+        'by_objective': by_objective,
         'matrix': matrix,
         'duplicates': duplicate_questions(questions),
         'errors': validation_errors(questions),
@@ -187,6 +202,7 @@ def database_questions():
         {
             'id': q.id, 'text': q.text, 'code_snippet': q.code_snippet,
             'module': q.module, 'difficulty': q.difficulty,
+            'objective': q.objective,
             'choices': [
                 {'text': c.text, 'is_correct': c.is_correct, 'explanation': c.explanation}
                 for c in q.choices.all()

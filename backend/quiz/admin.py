@@ -31,8 +31,8 @@ class ChoiceInline(admin.TabularInline):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'short_text', 'module', 'difficulty', 'updated_at')
-    list_filter = ('module', 'difficulty')
+    list_display = ('id', 'short_text', 'module', 'objective', 'difficulty', 'updated_at')
+    list_filter = ('module', 'objective', 'difficulty')
     search_fields = ('text', 'code_snippet')
     inlines = [ChoiceInline]
 

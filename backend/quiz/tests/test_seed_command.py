@@ -31,13 +31,16 @@ def test_seed_questions_update_refreshes_existing_choices():
     run_seed()
     question = Question.objects.first()
     question.difficulty = Question.DIFFICULTY_EASY
-    question.save(update_fields=['difficulty'])
+    expected_objective = ALL_QUESTIONS[0]['objective']
+    question.objective = '1.1' if expected_objective != '1.1' else '1.2'
+    question.save(update_fields=['difficulty', 'objective'])
     question.choices.all().delete()
 
     out = run_seed('--update')
 
     question.refresh_from_db()
     assert question.choices.count() == 4
+    assert question.objective == expected_objective
     assert f'updated={len(ALL_QUESTIONS)}' in out
 
 

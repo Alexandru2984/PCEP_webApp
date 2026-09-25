@@ -108,6 +108,7 @@ class Command(BaseCommand):
                     code_snippet=code_snippet,
                     difficulty=q['difficulty'],
                     module=module,
+                    objective=q['objective'],
                 )
                 self._replace_choices(question, q['choices'])
                 created += 1
@@ -118,7 +119,8 @@ class Command(BaseCommand):
                 continue
 
             question.difficulty = q['difficulty']
-            question.save(update_fields=['difficulty', 'updated_at'])
+            question.objective = q['objective']
+            question.save(update_fields=['difficulty', 'objective', 'updated_at'])
             self._replace_choices(question, q['choices'])
             updated += 1
 

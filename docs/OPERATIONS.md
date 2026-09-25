@@ -160,15 +160,20 @@ IDs must be positive JSON integers within signed 64-bit range. Omitted/null
 choices count as wrong; foreign choices and duplicate questions return 400 with
 no answer feedback. Retrying the same valid submission is safe and stateless.
 An invalid answer key returns 503 instead of an ambiguous score.
-`GET /api/search/` accepts a required 2–80 character `q`, optional valid module
-and difficulty filters, and a `limit` from 1 to 20. It performs one bounded query
-and returns only question ID, text, code, module and difficulty. Choices,
+`GET /api/search/` accepts a required 2–80 character `q`, optional valid module,
+PCEP-30-02 objective and difficulty filters, and a `limit` from 1 to 20. It
+performs one bounded query and returns only question ID, text, code, module,
+objective and difficulty. Choices,
 explanations and answer metadata are deliberately absent. A selected drill sends
 only unique IDs to `quiz-set`, which returns fresh public choices under the
 existing answer-leakage contract.
+`GET /api/stats/` reports counts for all 15 objectives, and `quiz-set` accepts the
+same objective filter. A module/objective mismatch is rejected instead of silently
+returning an empty set. The full-mock preset rejects objective filters because its
+distribution is fixed at module level.
 `GET /api/quiz-set/?preset=pcep-30-02&count=30` returns an exact 7/8/7/8
 module distribution for the 30-question, 40-minute full-mock flow. Preset
-requests reject `ids`, module or difficulty combinations, fail closed with 503
+requests reject `ids`, module, objective or difficulty combinations, fail closed with 503
 if any module lacks enough questions, and use the same public serializer as
 other question reads. The preset models PCEP-30-02 timing and syllabus item
 counts; the product discloses that its questions are single-choice while the
@@ -193,7 +198,11 @@ require four unique non-empty options, one boolean correct flag, an explanation
 per option, valid module/difficulty and a non-empty prompt. The question admin
 validates the complete inline set; the separate choice admin is view-only.
 Seed validation runs before any writes, including an explicitly requested reset.
-The syllabus audit also parses valid snippets and rejects set literals, set
+Every question has one reviewed primary syllabus objective. The audit rejects
+unknown or cross-module objectives and warns if any of the 15 objectives is empty.
+The curated position table is protected by a content digest for each module, so a
+question edit or reorder requires an explicit taxonomy review. The syllabus audit
+also parses valid snippets and rejects set literals, set
 comprehensions and `set()` calls because PCEP-30-02 defines its data-collection
 scope as lists, tuples, dictionaries and strings. Invalid snippets used for syntax
 questions retain the existing normalized-source fallback.
@@ -309,6 +318,12 @@ Migration `0006_replace_out_of_syllabus_sets` replaces two equivalent set
 questions with distinct `dict.values()` and dynamic `dict.items()` exercises from
 objective 3.3. It updates rows and choices in place so local bookmarks and saved
 exam selections keep valid IDs.
+Migration `0007_add_question_objective` assigns the reviewed objective to existing
+rows through frozen question signatures, then adds a database constraint requiring
+the objective to belong to its module. It refuses unknown production questions
+instead of assigning a guess. After migration, run `python manage.py seed_questions`
+without `--update` or `--reset`; this safely creates only the four new questions
+covering objectives 1.1 and 1.2 and preserves all existing question and choice IDs.
 
 ## Nginx production topology and hardening
 

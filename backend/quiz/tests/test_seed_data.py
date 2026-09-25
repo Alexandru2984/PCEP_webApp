@@ -4,6 +4,7 @@ from quiz.question_bank import (
     validation_errors,
 )
 from quiz.seed_data import ALL_QUESTIONS
+from quiz.syllabus import OBJECTIVE_LABELS, OBJECTIVE_MODULE
 
 
 VALID_MODULES = {'module1', 'module2', 'module3', 'module4'}
@@ -33,6 +34,8 @@ def test_every_question_has_valid_module_and_difficulty():
     for q in ALL_QUESTIONS:
         assert q['module'] in VALID_MODULES
         assert q['difficulty'] in VALID_DIFFICULTIES
+        assert q['objective'] in OBJECTIVE_LABELS
+        assert OBJECTIVE_MODULE[q['objective']] == q['module']
 
 
 def test_bank_covers_all_four_modules():
@@ -49,6 +52,8 @@ def test_question_bank_summary_counts_every_question():
     assert summary['total'] == len(ALL_QUESTIONS)
     assert sum(summary['by_module'].values()) == len(ALL_QUESTIONS)
     assert sum(summary['by_difficulty'].values()) == len(ALL_QUESTIONS)
+    assert sum(summary['by_objective'].values()) == len(ALL_QUESTIONS)
+    assert set(summary['by_objective']) == set(OBJECTIVE_LABELS)
 
 
 def test_question_bank_has_no_duplicate_prompts():

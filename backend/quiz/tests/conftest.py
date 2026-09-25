@@ -2,6 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from quiz.models import Choice, Question
+from quiz.syllabus import OBJECTIVES_BY_MODULE
 
 
 @pytest.fixture
@@ -18,12 +19,14 @@ def make_question(db):
         correct_index=0,
         text='Sample question?',
         code_snippet='print(1)',
+        objective=None,
     ):
         q = Question.objects.create(
             text=text,
             code_snippet=code_snippet,
             module=module,
             difficulty=difficulty,
+            objective=objective or OBJECTIVES_BY_MODULE[module][0],
         )
         for i in range(4):
             Choice.objects.create(

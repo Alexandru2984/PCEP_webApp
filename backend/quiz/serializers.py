@@ -28,7 +28,9 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = ['id', 'text', 'code_snippet', 'difficulty', 'module', 'choices']
+        fields = [
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'objective', 'choices'
+        ]
 
 
 class QuestionSearchSerializer(serializers.ModelSerializer):
@@ -36,7 +38,7 @@ class QuestionSearchSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = ['id', 'text', 'code_snippet', 'difficulty', 'module']
+        fields = ['id', 'text', 'code_snippet', 'difficulty', 'module', 'objective']
 
 
 class AnswerRequestSerializer(serializers.Serializer):

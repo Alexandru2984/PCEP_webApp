@@ -29,6 +29,25 @@ def test_stats_endpoint_reports_question_bank_coverage(api_client, question_bank
         'module4': 1,
     }
     assert body['by_difficulty'] == {'easy': 2, 'medium': 1, 'hard': 2}
+    assert body['by_objective'] == {
+        '1.1': 2,
+        '1.2': 0,
+        '1.3': 0,
+        '1.4': 0,
+        '1.5': 0,
+        '2.1': 1,
+        '2.2': 0,
+        '3.1': 1,
+        '3.2': 0,
+        '3.3': 0,
+        '3.4': 0,
+        '4.1': 1,
+        '4.2': 0,
+        '4.3': 0,
+        '4.4': 0,
+    }
+    assert body['objective_matrix']['1.1'] == {'easy': 1, 'medium': 0, 'hard': 1}
+    assert body['objective_matrix']['3.1'] == {'easy': 0, 'medium': 0, 'hard': 1}
     assert body['matrix']['module1'] == {'easy': 1, 'medium': 0, 'hard': 1}
     assert body['matrix']['module2'] == {'easy': 0, 'medium': 1, 'hard': 0}
     assert body['modules'][0] == {
@@ -88,6 +107,23 @@ def test_quiz_set_filters_by_difficulty(api_client, question_bank):
     assert diffs == {'hard'}
 
 
+def test_quiz_set_filters_by_objective(api_client, question_bank):
+    resp = api_client.get('/api/quiz-set/?objective=3.1&count=20')
+    assert resp.status_code == 200
+    questions = resp.json()['questions']
+    assert questions
+    assert {q['objective'] for q in questions} == {'3.1'}
+
+
+@pytest.mark.parametrize('params', [
+    {'objective': '9.9'},
+    {'module': 'module1', 'objective': '3.1'},
+])
+def test_quiz_set_rejects_invalid_objective_scope(api_client, question_bank, params):
+    resp = api_client.get('/api/quiz-set/', params)
+    assert resp.status_code == 400
+
+
 def test_quiz_set_rejects_bogus_module(api_client, question_bank):
     resp = api_client.get('/api/quiz-set/?module=module99')
     assert resp.status_code == 400
@@ -115,7 +151,7 @@ def test_quiz_set_pcep_preset_has_official_module_mix_without_answers(
     assert len({q['id'] for q in body['questions']}) == 30
     for question in body['questions']:
         assert set(question) == {
-            'id', 'text', 'code_snippet', 'difficulty', 'module', 'choices'
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'objective', 'choices'
         }
         assert all(set(choice) == {'id', 'text'} for choice in question['choices'])
 
@@ -127,6 +163,7 @@ def test_quiz_set_pcep_preset_has_official_module_mix_without_answers(
         {'preset': 'pcep-30-02', 'count': 29},
         {'preset': 'pcep-30-02', 'count': 30, 'module': 'module1'},
         {'preset': 'pcep-30-02', 'count': 30, 'difficulty': 'hard'},
+        {'preset': 'pcep-30-02', 'count': 30, 'objective': '3.1'},
         {'preset': 'pcep-30-02', 'count': 30, 'ids': '1,2'},
     ],
 )
@@ -165,7 +202,9 @@ def test_search_matches_text_and_code_without_fetching_choices(
         code_match.id,
     ]
     assert all(
-        set(result) == {'id', 'text', 'code_snippet', 'difficulty', 'module'}
+        set(result) == {
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'objective'
+        }
         for result in body['results']
     )
 
@@ -197,6 +236,7 @@ def test_search_applies_scope_and_result_limit(api_client, make_question):
             'code_snippet': wanted.code_snippet,
             'difficulty': wanted.difficulty,
             'module': wanted.module,
+            'objective': wanted.objective,
         }],
     }
 
@@ -214,6 +254,8 @@ def test_search_applies_scope_and_result_limit(api_client, make_question):
         {'q': 'valid', 'limit': 21},
         {'q': 'valid', 'module': 'module99'},
         {'q': 'valid', 'difficulty': 'extreme'},
+        {'q': 'valid', 'objective': '9.9'},
+        {'q': 'valid', 'module': 'module1', 'objective': '3.1'},
     ],
 )
 def test_search_rejects_invalid_parameters(api_client, params):
@@ -241,7 +283,7 @@ def test_daily_challenge_is_stable_balanced_and_answer_safe(
     }
     for question in body['questions']:
         assert set(question) == {
-            'id', 'text', 'code_snippet', 'difficulty', 'module', 'choices'
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'objective', 'choices'
         }
         assert all(set(choice) == {'id', 'text'} for choice in question['choices'])
 

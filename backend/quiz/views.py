@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
 from .models import Question
+from .syllabus import OBJECTIVE_LABELS, OBJECTIVE_MODULE
 from .serializers import (
     AnswerRequestSerializer,
     GradeRequestSerializer,
@@ -24,6 +25,7 @@ from .serializers import (
 
 VALID_DIFFICULTIES = {d for d, _ in Question.DIFFICULTY_CHOICES}
 VALID_MODULES = {m for m, _ in Question.MODULE_CHOICES}
+VALID_OBJECTIVES = set(OBJECTIVE_LABELS)
 PASS_THRESHOLD = 70
 SEARCH_QUERY_MIN_LENGTH = 2
 SEARCH_QUERY_MAX_LENGTH = 80
@@ -89,20 +91,27 @@ def stats(request):
     difficulties = dict(Question.DIFFICULTY_CHOICES)
     module_counts = {key: 0 for key in modules}
     difficulty_counts = {key: 0 for key in difficulties}
+    objective_counts = {key: 0 for key in OBJECTIVE_LABELS}
+    objective_matrix = {
+        objective: {difficulty: 0 for difficulty in difficulties}
+        for objective in OBJECTIVE_LABELS
+    }
     matrix = {
         module: {difficulty: 0 for difficulty in difficulties}
         for module in modules
     }
 
     rows = (
-        Question.objects.values('module', 'difficulty')
+        Question.objects.values('module', 'difficulty', 'objective')
         .annotate(total=Count('id'))
         .order_by()
     )
     for row in rows:
         module_counts[row['module']] += row['total']
         difficulty_counts[row['difficulty']] += row['total']
-        matrix[row['module']][row['difficulty']] = row['total']
+        matrix[row['module']][row['difficulty']] += row['total']
+        objective_counts[row['objective']] += row['total']
+        objective_matrix[row['objective']][row['difficulty']] += row['total']
 
     module_summaries = []
     for value, label in Question.MODULE_CHOICES:
@@ -118,6 +127,8 @@ def stats(request):
         'total': sum(module_counts.values()),
         'by_module': module_counts,
         'by_difficulty': difficulty_counts,
+        'by_objective': objective_counts,
+        'objective_matrix': objective_matrix,
         'matrix': matrix,
         'modules': module_summaries,
         'pass_threshold': PASS_THRESHOLD,
@@ -172,6 +183,19 @@ def search_questions(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         questions = questions.filter(difficulty=difficulty)
+    objective = request.query_params.get('objective')
+    if objective:
+        if objective not in VALID_OBJECTIVES:
+            return Response(
+                {'detail': f'objective must be one of {sorted(VALID_OBJECTIVES)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if module and OBJECTIVE_MODULE[objective] != module:
+            return Response(
+                {'detail': 'objective does not belong to the selected module.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        questions = questions.filter(objective=objective)
 
     data = QuestionSearchSerializer(questions.order_by('id')[:limit], many=True).data
     return Response({'count': len(data), 'results': data})
@@ -208,6 +232,7 @@ def quiz_set(request):
         count      — number of questions (default 30, clamped to [1, 100]).
         difficulty — optional: easy | medium | hard.
         module     — optional: module1 | module2 | module3 | module4.
+        objective  — optional PCEP-30-02 objective, for example 3.1.
     """
     raw = request.query_params.get('count', 30)
     try:
@@ -230,7 +255,7 @@ def quiz_set(request):
             )
         preset_count = sum(PCEP_30_02_DISTRIBUTION.values())
         conflicting = [
-            name for name in ('ids', 'module', 'difficulty')
+            name for name in ('ids', 'module', 'difficulty', 'objective')
             if name in request.query_params
         ]
         if count != preset_count or conflicting:
@@ -238,7 +263,7 @@ def quiz_set(request):
                 {
                     'detail': (
                         f'{PCEP_30_02_PRESET} requires count={preset_count} '
-                        'without ids, module or difficulty filters.'
+                        'without ids, module, objective or difficulty filters.'
                     )
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -307,6 +332,20 @@ def quiz_set(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         qs = qs.filter(module=module)
+
+    objective = request.query_params.get('objective')
+    if objective:
+        if objective not in VALID_OBJECTIVES:
+            return Response(
+                {'detail': f'objective must be one of {sorted(VALID_OBJECTIVES)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if module and OBJECTIVE_MODULE[objective] != module:
+            return Response(
+                {'detail': 'objective does not belong to the selected module.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        qs = qs.filter(objective=objective)
 
     questions = qs.order_by('?').prefetch_related('choices')[:count]
     serializer = QuestionSerializer(questions, many=True)

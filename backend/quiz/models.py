@@ -1,5 +1,7 @@
 from django.db import models
 
+from .syllabus import OBJECTIVE_CHOICES, OBJECTIVES_BY_MODULE
+
 
 class Question(models.Model):
     DIFFICULTY_EASY = 'easy'
@@ -40,15 +42,32 @@ class Question(models.Model):
         db_index=True,
         help_text="PCEP-30-02 syllabus module this question belongs to.",
     )
+    objective = models.CharField(
+        max_length=3,
+        choices=OBJECTIVE_CHOICES,
+        db_index=True,
+        help_text="Primary PCEP-30-02 syllabus objective tested by this question.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['id']
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(module='module1', objective__in=OBJECTIVES_BY_MODULE['module1'])
+                    | models.Q(module='module2', objective__in=OBJECTIVES_BY_MODULE['module2'])
+                    | models.Q(module='module3', objective__in=OBJECTIVES_BY_MODULE['module3'])
+                    | models.Q(module='module4', objective__in=OBJECTIVES_BY_MODULE['module4'])
+                ),
+                name='question_objective_matches_module',
+            ),
+        ]
 
     def __str__(self):
         preview = self.text[:60] + ('…' if len(self.text) > 60 else '')
-        return f"[{self.module}/{self.difficulty}] {preview}"
+        return f"[{self.module}/{self.objective}/{self.difficulty}] {preview}"
 
 
 class Choice(models.Model):
