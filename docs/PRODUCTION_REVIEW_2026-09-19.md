@@ -119,10 +119,15 @@ not printed or copied. No database or Docker volume was deleted.
 - Added reusable question-bank validation, database-aware audit diagnostics,
   admin inline enforcement and safe seed preflight.
 - Applied reversible question-content migrations in place without changing IDs.
-  The latest removes two equivalent, out-of-syllabus set questions and replaces
-  them with `dict.values()` and dynamic `dict.items()` exercises from objective 3.3.
-- Extended the AST-backed audit to reject set literals, set comprehensions and
-  `set()` calls outside the PCEP-30-02 collection scope.
+  Earlier migrations removed equivalent and out-of-syllabus set questions. The
+  latest replaces 19 questions that exercised language features absent from the
+  official PCEP-30-02 objectives and removes four residual references from
+  distractors or explanations. It preserves every question/choice ID and every
+  correct-option position so saved sessions remain grade-compatible.
+- Extended the AST-backed audit to reject set syntax, lambda expressions,
+  `nonlocal`, `assert`, complex literals, dictionary comprehensions, starred
+  unpacking, f-strings, `enumerate()` and `__name__` introspection. The same
+  scope guard scans prompts, options and explanations for residual references.
 - Added a reviewed primary PCEP-30-02 objective to every question. Module content
   digests prevent silent taxonomy drift; migration signatures fail closed on an
   unknown production row; a database constraint rejects cross-module objectives.
@@ -133,10 +138,11 @@ not printed or copied. No database or Docker volume was deleted.
 
 The bank now contains 305 questions and 1,220 choices. Four new questions cover
 previously empty objectives 1.1 and 1.2. The original 301 question and 1,204
-choice IDs, content and answer-key hashes matched the pre-deployment snapshot
-after migration, seeding and backend recreation. `order_by('?')` remains: at 305
-rows, it is simple and measured cost does not justify a more complex sampler.
-Revisit it if the bank grows by orders of magnitude.
+choice IDs were preserved. The scope release deliberately changed 23 reviewed
+questions in place; question and choice ID-set fingerprints remained identical
+before and after its forward/rollback/forward migration test. `order_by('?')`
+remains: at 305 rows, it is simple and measured cost does not justify a more
+complex sampler. Revisit it if the bank grows by orders of magnitude.
 
 ## 5. Frontend changes
 
@@ -288,11 +294,12 @@ Final validation on 2026-09-19:
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
 
-Continuation validation on 2026-09-26 covers 150 backend tests, 194 Vitest tests
+Continuation validation on 2026-09-26 covers 170 backend tests, 194 Vitest tests
 and 24 Playwright flows. The release also passed both dependency audits, Django's
 production deploy check, Compose/Nginx validation, a full migration/seed/audit on
-a restored database copy, public answer-leakage probes and live Chromium at 390
-and 1,440 px with zero axe violations or horizontal overflow.
+a restored database copy, a scope-migration forward/rollback/forward cycle,
+public answer-leakage probes and live Chromium at 390 and 1,440 px with zero axe
+violations or horizontal overflow.
 
 ## 12. Commits
 
@@ -335,6 +342,8 @@ and 1,440 px with zero axe violations or horizontal overflow.
 - `01d477d` — replace out-of-syllabus set questions.
 - `ed2b6b6` — add the audited syllabus-objective taxonomy.
 - `64613ad` — add objective-level practice and insights.
+- `bd920f3` — record the objective-taxonomy production release.
+- `df2171e` — align the reviewed question bank with PCEP-30-02 scope.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -357,7 +366,8 @@ added.
 
 ## 14. Deployment notes
 
-Question-content migrations through `0007_add_question_objective` are applied.
+Question-content migrations through `0008_replace_out_of_scope_constructs` are
+applied.
 The idempotent seed added exactly four rows and skipped all 301 existing rows.
 The backend image was rebuilt, and only the backend service was recreated.
 Static and frontend trees were published with atomic swaps. The Nginx vhost/snippets were
@@ -372,9 +382,12 @@ Backups and rollback artifacts are under
 `pcep-backend-rollback:20260919-pre-manifest`. The objective release additionally
 has verified backup `pcep_db_pre_objectives_20260926T201657Z.sql.gz`, rollback tag
 `pcep-backend-rollback:20260926-pre-objectives`, and frontend release
-`.frontend.previous-20260926T201930Z-836b615c`. Previous frontend/static release
-directories remain next to their live targets. Detailed commands and cautions
-are in `docs/OPERATIONS.md`.
+`.frontend.previous-20260926T201930Z-836b615c`. The scope-alignment release has
+verified backup `pcep_db_pre_scope_review_20260926T204219Z.sql.gz` (SHA-256
+`99165443c29270a20d7d1d999dc7cbd34cff6cfb343860d00cf77ad372555133`) and rollback
+tag `pcep-backend-rollback:20260926-pre-scope-review`. Previous frontend/static
+release directories remain next to their live targets. Detailed commands and
+cautions are in `docs/OPERATIONS.md`.
 
 ## 15. Breaking changes
 
