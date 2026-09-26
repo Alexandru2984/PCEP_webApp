@@ -1,4 +1,5 @@
 import ast
+import re
 from collections import Counter
 from difflib import SequenceMatcher
 
@@ -125,28 +126,108 @@ def syllabus_warnings(questions=ALL_QUESTIONS):
     warnings = []
     for index, question in enumerate(questions, start=1):
         snippet = question.get('code_snippet', '').strip()
-        if not snippet:
-            continue
-        try:
-            tree = ast.parse(snippet)
-        except (SyntaxError, ValueError):
-            continue
-        uses_set = any(
-            isinstance(node, (ast.Set, ast.SetComp))
-            or (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == 'set'
-            )
-            for node in ast.walk(tree)
+        label = f'question #{index}'
+        if 'id' in question:
+            label = f'database question id={question["id"]}'
+
+        nodes = ()
+        if snippet:
+            try:
+                nodes = tuple(ast.walk(ast.parse(snippet)))
+            except (SyntaxError, ValueError):
+                # Some questions intentionally demonstrate invalid syntax. Their
+                # explanatory text still participates in the scope audit.
+                pass
+
+        checks = (
+            (
+                any(
+                    isinstance(node, (ast.Set, ast.SetComp))
+                    or (
+                        isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id == 'set'
+                    )
+                    for node in nodes
+                ),
+                'uses sets, which are outside the PCEP-30-02 data-collection objectives',
+            ),
+            (
+                any(isinstance(node, ast.Lambda) for node in nodes),
+                'uses lambda expressions, which are outside the PCEP-30-02 function objectives',
+            ),
+            (
+                any(isinstance(node, ast.Nonlocal) for node in nodes),
+                'uses `nonlocal`, while PCEP-30-02 scope coverage stops at `global`',
+            ),
+            (
+                any(isinstance(node, ast.Assert) for node in nodes),
+                'uses `assert`/`AssertionError`, which are outside the PCEP-30-02 exception objectives',
+            ),
+            (
+                any(
+                    isinstance(node, ast.Constant)
+                    and isinstance(node.value, complex)
+                    for node in nodes
+                ),
+                'uses complex literals, while PCEP-30-02 numeric literals cover integers and floats',
+            ),
+            (
+                any(isinstance(node, ast.DictComp) for node in nodes),
+                'uses dictionary comprehensions, while PCEP-30-02 names only list comprehensions',
+            ),
+            (
+                any(isinstance(node, ast.Starred) for node in nodes),
+                'uses starred unpacking, which is outside the PCEP-30-02 collection objectives',
+            ),
+            (
+                any(isinstance(node, ast.JoinedStr) for node in nodes),
+                'uses f-strings, which are outside the PCEP-30-02 string objectives',
+            ),
+            (
+                any(
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == 'enumerate'
+                    for node in nodes
+                ),
+                'uses `enumerate()`, which is outside the PCEP-30-02 collection objectives',
+            ),
+            (
+                any(
+                    isinstance(node, ast.Attribute)
+                    and node.attr == '__name__'
+                    for node in nodes
+                ),
+                'uses `__name__` introspection, which is outside the PCEP-30-02 objectives',
+            ),
         )
-        if uses_set:
-            label = f'question #{index}'
-            if 'id' in question:
-                label = f'database question id={question["id"]}'
-            warnings.append(
-                f'{label} uses sets, which are outside the PCEP-30-02 data-collection objectives'
-            )
+        warnings.extend(f'{label} {message}' for matched, message in checks if matched)
+
+        explanatory_text = ' '.join(
+            [question.get('text', '')]
+            + [
+                f'{choice.get("text", "")} {choice.get("explanation", "")}'
+                for choice in question.get('choices', [])
+            ]
+        )
+        reference_checks = (
+            (r'\blambda\b', 'lambda expressions'),
+            (r'\bnonlocal\b', '`nonlocal`'),
+            (r'\b(?:assert|assertionerror)\b', '`assert`/`AssertionError`'),
+            (r'\bcomplex\b', 'complex numbers'),
+            (r'\bdict(?:ionary)? comprehensions?\b', 'dictionary comprehensions'),
+            (r'\bstarred unpacking\b', 'starred unpacking'),
+            (r'\bf-strings?\b', 'f-strings'),
+            (r'\benumerate\s*\(', '`enumerate()`'),
+            (r'__name__', '`__name__` introspection'),
+        )
+        warnings.extend(
+            f'{label} references {description}, which is outside the reviewed '
+            'PCEP-30-02 scope'
+            for pattern, description in reference_checks
+            if re.search(pattern, explanatory_text, flags=re.IGNORECASE)
+        )
     return warnings
 
 

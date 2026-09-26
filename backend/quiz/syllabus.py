@@ -107,10 +107,10 @@ CURATED_POSITIONS = {
 # Filled from the reviewed source bank. See ``module_signature`` and the tests;
 # changing question content requires an explicit taxonomy review.
 CURATED_MODULE_SIGNATURES = {
-    'module1': '743d57b8d42a6f06c7e9e912abf38eb73ea5129e72c833343e44cc726dca986a',
+    'module1': '5403fa0735e92558617d0af0379d046f6f612f64816f9753412fcd77542293d6',
     'module2': '02757b38fed57d6ef9af4547b75cd5afeb4d44a8eae65365666f8f12105629b1',
-    'module3': 'c4af0303c37dc1a436e2d411dc9a2eae0d7ce59e8c442edafbb951a6a3279b68',
-    'module4': 'fd9e64e7bc8632ecc9ee2435b9448a3e9ce551d2ef624d1a905fb173d08c7f0b',
+    'module3': '20650437f03178805fd5b1c91c4839904f7853194bded285be783577acb7df06',
+    'module4': 'a3d3b8764dba02f496bc9dd00e6574cdb9f42156bb40e803b1d516e2a00f5967',
 }
 
 

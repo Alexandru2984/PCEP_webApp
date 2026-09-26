@@ -94,6 +94,46 @@ def test_syllabus_audit_reports_set_usage(snippet):
     ]
 
 
+@pytest.mark.parametrize(
+    ('snippet', 'expected'),
+    [
+        ('square = lambda value: value * value', 'lambda expressions'),
+        ('def inner():\n    nonlocal value', '`nonlocal`'),
+        ('assert value > 0', '`assert`/`AssertionError`'),
+        ('number = 2j', 'complex literals'),
+        ('mapping = {value: value for value in range(3)}', 'dictionary comprehensions'),
+        ('first, *rest = [1, 2, 3]', 'starred unpacking'),
+        ("message = f'value={value}'", 'f-strings'),
+        ("pairs = enumerate('ab')", '`enumerate()`'),
+        ('name = type(1).__name__', '`__name__` introspection'),
+    ],
+)
+def test_syllabus_audit_reports_unlisted_language_features(snippet, expected):
+    warnings = syllabus_warnings([question(code_snippet=snippet)])
+    assert len(warnings) == 1
+    assert expected in warnings[0]
+
+
+@pytest.mark.parametrize(
+    ('text', 'expected'),
+    [
+        ('Does this lambda return a value?', 'lambda expressions'),
+        ('What does nonlocal change?', '`nonlocal`'),
+        ('Does assert raise AssertionError?', '`assert`/`AssertionError`'),
+        ('Is this a complex number?', 'complex numbers'),
+        ('Is this a dictionary comprehension?', 'dictionary comprehensions'),
+        ('Does starred unpacking create a list?', 'starred unpacking'),
+        ('Does this f-string interpolate?', 'f-strings'),
+        ('What does enumerate() produce?', '`enumerate()`'),
+        ('What is the value of __name__?', '`__name__` introspection'),
+    ],
+)
+def test_syllabus_audit_reports_unlisted_features_in_explanatory_text(text, expected):
+    warnings = syllabus_warnings([question(text=text)])
+    assert len(warnings) == 1
+    assert expected in warnings[0]
+
+
 def test_validation_rejects_missing_or_cross_module_objectives():
     missing = question()
     missing.pop('objective')
@@ -266,6 +306,98 @@ def test_set_replacement_migration_preserves_all_ids(make_question):
 
 
 @pytest.mark.django_db
+def test_scope_replacement_migration_preserves_question_and_choice_ids(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+
+    migration = importlib.import_module(
+        'quiz.migrations.0008_replace_out_of_scope_constructs'
+    )
+    questions = []
+    original_choice_ids = []
+    for replacement in migration.REPLACEMENTS:
+        source = replacement['old']
+        target = replacement['new']
+        source_correct = [
+            index for index, answer in enumerate(source['choices'])
+            if answer['is_correct']
+        ]
+        target_correct = [
+            index for index, answer in enumerate(target['choices'])
+            if answer['is_correct']
+        ]
+        assert source_correct == target_correct
+
+        q = make_question(module=source['module'], difficulty=source['difficulty'])
+        q.text = source['text']
+        q.code_snippet = source['code_snippet']
+        q.save()
+        for answer, expected in zip(
+            q.choices.order_by('id'), source['choices'], strict=True
+        ):
+            answer.text = expected['text']
+            answer.is_correct = expected['is_correct']
+            answer.explanation = expected['explanation']
+            answer.save(update_fields=['text', 'is_correct', 'explanation'])
+        questions.append(q)
+        original_choice_ids.append(list(q.choices.values_list('id', flat=True)))
+
+    editor = connection.schema_editor()
+    migration.replace_out_of_scope_constructs(apps, editor)
+    for q, choice_ids, replacement in zip(
+        questions, original_choice_ids, migration.REPLACEMENTS, strict=True
+    ):
+        q.refresh_from_db()
+        assert q.text == replacement['new']['text']
+        assert q.code_snippet == replacement['new']['code_snippet']
+        assert list(q.choices.values_list('id', flat=True)) == choice_ids
+        assert q.choices.get(is_correct=True).text == next(
+            answer['text']
+            for answer in replacement['new']['choices']
+            if answer['is_correct']
+        )
+
+    migration.restore_out_of_scope_constructs(apps, editor)
+    for q, choice_ids, replacement in zip(
+        questions, original_choice_ids, migration.REPLACEMENTS, strict=True
+    ):
+        q.refresh_from_db()
+        assert q.text == replacement['old']['text']
+        assert q.code_snippet == replacement['old']['code_snippet']
+        assert list(q.choices.values_list('id', flat=True)) == choice_ids
+
+
+@pytest.mark.django_db
+def test_scope_replacement_refuses_unreviewed_database_edits(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+
+    migration = importlib.import_module(
+        'quiz.migrations.0008_replace_out_of_scope_constructs'
+    )
+    source = migration.REPLACEMENTS[0]['old']
+    q = make_question(module=source['module'], difficulty=source['difficulty'])
+    q.text = source['text']
+    q.code_snippet = source['code_snippet']
+    q.save()
+    for answer, expected in zip(
+        q.choices.order_by('id'), source['choices'], strict=True
+    ):
+        answer.text = expected['text']
+        answer.is_correct = expected['is_correct']
+        answer.explanation = expected['explanation']
+        answer.save(update_fields=['text', 'is_correct', 'explanation'])
+    first_choice = q.choices.order_by('id').first()
+    first_choice.explanation = 'A production-only edit.'
+    first_choice.save(update_fields=['explanation'])
+
+    with pytest.raises(RuntimeError, match='refusing to overwrite'):
+        migration.replace_out_of_scope_constructs(apps, connection.schema_editor())
+
+
+@pytest.mark.django_db
 def test_objective_migration_assigns_frozen_taxonomy(make_question):
     import importlib
     from django.apps import apps
@@ -288,12 +420,25 @@ def test_objective_migration_assigns_frozen_taxonomy(make_question):
     assert q.objective == source['objective']
 
 
-def test_objective_migration_covers_the_complete_reviewed_bank():
+def test_migration_chain_covers_the_complete_reviewed_bank():
     import importlib
     from types import SimpleNamespace
     from quiz.seed_data import ALL_QUESTIONS
 
-    migration = importlib.import_module('quiz.migrations.0007_add_question_objective')
+    objective_migration = importlib.import_module(
+        'quiz.migrations.0007_add_question_objective'
+    )
+    scope_migration = importlib.import_module(
+        'quiz.migrations.0008_replace_out_of_scope_constructs'
+    )
+    objective_by_signature = dict(objective_migration.OBJECTIVE_BY_SIGNATURE)
+    for replacement in scope_migration.REPLACEMENTS:
+        old = SimpleNamespace(**replacement['old'])
+        new = SimpleNamespace(**replacement['new'])
+        objective_by_signature[objective_migration._signature(new)] = (
+            objective_by_signature[objective_migration._signature(old)]
+        )
+
     signatures = []
     for source in ALL_QUESTIONS:
         question = SimpleNamespace(
@@ -301,9 +446,9 @@ def test_objective_migration_covers_the_complete_reviewed_bank():
             text=source['text'],
             code_snippet=source.get('code_snippet', ''),
         )
-        signature = migration._signature(question)
+        signature = objective_migration._signature(question)
         signatures.append(signature)
-        assert migration.OBJECTIVE_BY_SIGNATURE[signature] == source['objective']
+        assert objective_by_signature[signature] == source['objective']
     assert len(signatures) == len(set(signatures)) == len(ALL_QUESTIONS)
 
 
