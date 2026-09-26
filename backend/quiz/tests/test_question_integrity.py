@@ -398,6 +398,55 @@ def test_scope_replacement_refuses_unreviewed_database_edits(make_question):
 
 
 @pytest.mark.django_db
+def test_near_duplicate_replacement_preserves_all_ids(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+
+    migration = importlib.import_module(
+        'quiz.migrations.0009_replace_near_duplicate_questions'
+    )
+    questions = []
+    choice_ids = []
+    for replacement in migration.REPLACEMENTS:
+        source = replacement['old']
+        target = replacement['new']
+        assert [a['is_correct'] for a in source['choices']] == [
+            a['is_correct'] for a in target['choices']
+        ]
+        q = make_question(module=source['module'], difficulty=source['difficulty'])
+        q.text = source['text']
+        q.code_snippet = source['code_snippet']
+        q.save()
+        for answer, expected in zip(
+            q.choices.order_by('id'), source['choices'], strict=True
+        ):
+            answer.text = expected['text']
+            answer.is_correct = expected['is_correct']
+            answer.explanation = expected['explanation']
+            answer.save(update_fields=['text', 'is_correct', 'explanation'])
+        questions.append(q)
+        choice_ids.append(list(q.choices.values_list('id', flat=True)))
+
+    editor = connection.schema_editor()
+    migration.replace_near_duplicates(apps, editor)
+    for q, ids, replacement in zip(
+        questions, choice_ids, migration.REPLACEMENTS, strict=True
+    ):
+        q.refresh_from_db()
+        assert q.code_snippet == replacement['new']['code_snippet']
+        assert list(q.choices.values_list('id', flat=True)) == ids
+
+    migration.restore_near_duplicates(apps, editor)
+    for q, ids, replacement in zip(
+        questions, choice_ids, migration.REPLACEMENTS, strict=True
+    ):
+        q.refresh_from_db()
+        assert q.code_snippet == replacement['old']['code_snippet']
+        assert list(q.choices.values_list('id', flat=True)) == ids
+
+
+@pytest.mark.django_db
 def test_objective_migration_assigns_frozen_taxonomy(make_question):
     import importlib
     from django.apps import apps
@@ -428,16 +477,18 @@ def test_migration_chain_covers_the_complete_reviewed_bank():
     objective_migration = importlib.import_module(
         'quiz.migrations.0007_add_question_objective'
     )
-    scope_migration = importlib.import_module(
-        'quiz.migrations.0008_replace_out_of_scope_constructs'
-    )
     objective_by_signature = dict(objective_migration.OBJECTIVE_BY_SIGNATURE)
-    for replacement in scope_migration.REPLACEMENTS:
-        old = SimpleNamespace(**replacement['old'])
-        new = SimpleNamespace(**replacement['new'])
-        objective_by_signature[objective_migration._signature(new)] = (
-            objective_by_signature[objective_migration._signature(old)]
-        )
+    for migration_name in (
+        'quiz.migrations.0008_replace_out_of_scope_constructs',
+        'quiz.migrations.0009_replace_near_duplicate_questions',
+    ):
+        content_migration = importlib.import_module(migration_name)
+        for replacement in content_migration.REPLACEMENTS:
+            old = SimpleNamespace(**replacement['old'])
+            new = SimpleNamespace(**replacement['new'])
+            objective_by_signature[objective_migration._signature(new)] = (
+                objective_by_signature[objective_migration._signature(old)]
+            )
 
     signatures = []
     for source in ALL_QUESTIONS:

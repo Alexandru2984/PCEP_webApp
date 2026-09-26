@@ -1,6 +1,7 @@
 from quiz.question_bank import (
     duplicate_questions,
     question_bank_summary,
+    similar_questions,
     validation_errors,
 )
 from quiz.seed_data import ALL_QUESTIONS
@@ -58,6 +59,10 @@ def test_question_bank_summary_counts_every_question():
 
 def test_question_bank_has_no_duplicate_prompts():
     assert duplicate_questions() == []
+
+
+def test_question_bank_has_no_unreviewed_near_duplicates():
+    assert similar_questions() == []
 
 
 def test_each_module_has_enough_hard_questions():

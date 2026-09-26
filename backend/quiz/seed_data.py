@@ -2301,21 +2301,28 @@ MODULE_3_EXTRA = [
              'explanation': 'Wrong. A negative step is valid and produces a reversed copy.'},
         ],
     },
-    {
-        'text': 'What does this print?',
-        'code_snippet': "d = {'a': 1, 'b': 2}\nprint(d.get('c', 0))",
-        'difficulty': 'easy',
-        'choices': [
-            {'text': '0', 'is_correct': True,
-             'explanation': "Correct. `dict.get(key, default)` returns the default when the key is missing, so 'c' (absent) yields 0."},
-            {'text': 'KeyError', 'is_correct': False,
-             'explanation': 'Wrong. `get` never raises for a missing key; only `d[key]` does. That is the whole point of `get`.'},
-            {'text': 'None', 'is_correct': False,
-             'explanation': 'Wrong. `None` is the default only when you DO NOT supply one. Here the default is 0.'},
-            {'text': 'c', 'is_correct': False,
-             'explanation': 'Wrong. `get` returns the value or default, not the key.'},
-        ],
-    },
+    {'text': 'What does this print?',
+     'code_snippet': "settings = {'mode': 'dark'}\n"
+                     "settings['size'] = 'large'\n"
+                     "del settings['mode']\n"
+                     'print(settings)',
+     'difficulty': 'easy',
+     'choices': [{'text': "{'size': 'large'}",
+                  'is_correct': True,
+                  'explanation': 'Correct. Assigning a new key adds `size`, and `del` then removes the '
+                                 'existing `mode` key.'},
+                 {'text': "{'mode': 'dark', 'size': 'large'}",
+                  'is_correct': False,
+                  'explanation': "Wrong. This shows the dictionary before the `del settings['mode']` "
+                                 'statement removes `mode`.'},
+                 {'text': "{'mode': 'large'}",
+                  'is_correct': False,
+                  'explanation': "Wrong. Assigning to `settings['size']` creates a separate key; it "
+                                 'does not replace the value under `mode`.'},
+                 {'text': 'KeyError',
+                  'is_correct': False,
+                  'explanation': 'Wrong. The `mode` key exists when `del` runs, so it is removed '
+                                 'without an exception.'}]},
     {
         'text': 'What happens here?',
         'code_snippet': 't = (1, 2, 3)\nt[0] = 9\nprint(t)',
@@ -3899,21 +3906,24 @@ MODULE_3_EXTRA3 = [
              'explanation': 'Wrong. The value 4 satisfies both conditions, so the resulting list is not empty.'},
         ],
     },
-    {
-        'text': 'What is the output?',
-        'code_snippet': 'a = [1, 2, 3]\nb = a\nb.append(4)\nprint(a)',
-        'difficulty': 'medium',
-        'choices': [
-            {'text': '[1, 2, 3, 4]', 'is_correct': True,
-             'explanation': 'Correct. `b = a` binds the same list object, so appending via b is visible through a.'},
-            {'text': '[1, 2, 3]', 'is_correct': False,
-             'explanation': 'Wrong. `b = a` does not copy; both names refer to one list.'},
-            {'text': '[4, 1, 2, 3]', 'is_correct': False,
-             'explanation': 'Wrong. `append` adds to the end, but the key point is that a and b share the list.'},
-            {'text': '[1, 2, 3, [4]]', 'is_correct': False,
-             'explanation': 'Wrong. `append(4)` adds the integer 4, not a nested list.'},
-        ],
-    },
+    {'text': 'What does this print?',
+     'code_snippet': 'values = [10, 20, 30, 40]\ndel values[1:3]\nprint(values)',
+     'difficulty': 'medium',
+     'choices': [{'text': '[10, 40]',
+                  'is_correct': True,
+                  'explanation': 'Correct. The slice `1:3` covers indices 1 and 2, so `del` removes 20 '
+                                 'and 30.'},
+                 {'text': '[10, 30, 40]',
+                  'is_correct': False,
+                  'explanation': 'Wrong. A slice stop is exclusive, but `1:3` still includes both '
+                                 'indices 1 and 2.'},
+                 {'text': '[20, 30]',
+                  'is_correct': False,
+                  'explanation': 'Wrong. Those are the elements selected by the slice; `del` removes '
+                                 'them and keeps the elements outside it.'},
+                 {'text': 'TypeError',
+                  'is_correct': False,
+                  'explanation': 'Wrong. Deleting a valid slice from a list is permitted.'}]},
     {
         'text': 'What is the output?',
         'code_snippet': 'print(sorted([3, 1, 2], reverse=True))',

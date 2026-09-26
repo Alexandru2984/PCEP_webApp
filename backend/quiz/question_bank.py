@@ -13,6 +13,51 @@ VALID_OBJECTIVES = tuple(OBJECTIVE_LABELS)
 MIN_HARD_PER_MODULE = 8
 NEAR_DUPLICATE_THRESHOLD = 0.96
 
+# These pairs intentionally share a setup so learners can contrast one changed
+# rule: alias versus slice copy, negative index versus slice step, and skipping
+# one value versus all even values. Exact prompt/code keys make any future edit
+# fall back into the review queue.
+REVIEWED_DISTINCT_PAIRS = frozenset(
+    {
+        frozenset(
+            {
+                (
+                    'What is the output?',
+                    'a = [1, 2, 3]\nb = a\nb.append(4)\nprint(len(a))',
+                ),
+                (
+                    'What is the output?',
+                    'a = [1, 2, 3]\nb = a[:]\nb.append(4)\nprint(len(a))',
+                ),
+            }
+        ),
+        frozenset(
+            {
+                (
+                    'What does this print?',
+                    'lst = [10, 20, 30, 40, 50]\nprint(lst[-2])',
+                ),
+                (
+                    'What does this print?',
+                    'lst = [10, 20, 30, 40, 50]\nprint(lst[::2])',
+                ),
+            }
+        ),
+        frozenset(
+            {
+                (
+                    'What does this print?',
+                    "for i in range(5):\n    if i == 2:\n        continue\n    print(i, end=' ')",
+                ),
+                (
+                    'What does this print?',
+                    "for i in range(5):\n    if i % 2 == 0:\n        continue\n    print(i, end=' ')",
+                ),
+            }
+        ),
+    }
+)
+
 
 def question_key(question):
     text = ' '.join(question.get('text', '').casefold().split())
@@ -63,6 +108,20 @@ def similar_questions(questions=ALL_QUESTIONS, threshold=NEAR_DUPLICATE_THRESHOL
             if first[1].get('module') != second[1].get('module'):
                 continue
             if first[2] == second[2]:
+                continue
+            review_pair = frozenset(
+                {
+                    (
+                        first[1].get('text', '').strip(),
+                        first[1].get('code_snippet', '').strip(),
+                    ),
+                    (
+                        second[1].get('text', '').strip(),
+                        second[1].get('code_snippet', '').strip(),
+                    ),
+                }
+            )
+            if review_pair in REVIEWED_DISTINCT_PAIRS:
                 continue
             similarity = SequenceMatcher(
                 None, first[3], second[3], autojunk=False
