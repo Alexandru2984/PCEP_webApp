@@ -3,6 +3,7 @@
 // by difficulty and points the learner at their weakest area.
 
 import { formatElapsed } from '../format'
+import { OBJECTIVE_LABELS, OBJECTIVE_VALUES } from '../syllabus'
 
 const MODULE_LABELS = {
   module1: 'M1 · Fundamentals',
@@ -84,7 +85,12 @@ function Breakdown({ title, rows }) {
   )
 }
 
-export default function PerformanceReport({ items, onDrillModule, selfRated = false }) {
+export default function PerformanceReport({
+  items,
+  onDrillModule,
+  onDrillObjective,
+  selfRated = false,
+}) {
   if (!items || items.length === 0) return null
 
   const moduleRows = toRows(
@@ -96,6 +102,11 @@ export default function PerformanceReport({ items, onDrillModule, selfRated = fa
     tally(items, (i) => i.question.difficulty),
     DIFFICULTY_ORDER,
     DIFFICULTY_LABELS
+  )
+  const objectiveRows = toRows(
+    tally(items, (item) => item.question.objective),
+    OBJECTIVE_VALUES,
+    OBJECTIVE_LABELS
   )
   const confidenceRows = toRows(
     tally(items, (item) => item.confidence),
@@ -116,9 +127,11 @@ export default function PerformanceReport({ items, onDrillModule, selfRated = fa
     (item) => item.confidence === 'low' && item.feedback?.is_correct
   ).length
 
-  // Weakest module worth calling out: lowest pct, tie broken by the larger
+  // Weakest available scope worth calling out: lowest pct, tie broken by the larger
   // sample so a 0/1 fluke doesn't outrank a 2/6 genuine weak spot.
-  const weakest = [...moduleRows].sort((a, b) => a.pct - b.pct || b.total - a.total)[0]
+  const focusRows = objectiveRows.length ? objectiveRows : moduleRows
+  const weakest = [...focusRows].sort((a, b) => a.pct - b.pct || b.total - a.total)[0]
+  const focusingObjective = objectiveRows.length > 0
   const hasGap =
     weakest &&
     (selfRated ? weakest.correct < weakest.total : weakest.pct < PASS_THRESHOLD)
@@ -135,8 +148,9 @@ export default function PerformanceReport({ items, onDrillModule, selfRated = fa
         {selfRated ? 'Flashcard self-rating' : 'Performance breakdown'}
       </h3>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Breakdown title="By module" rows={moduleRows} />
+        <Breakdown title="By objective" rows={objectiveRows} />
         <Breakdown title="By difficulty" rows={difficultyRows} />
         <Breakdown title="By confidence" rows={confidenceRows} />
       </div>
@@ -181,16 +195,20 @@ export default function PerformanceReport({ items, onDrillModule, selfRated = fa
               <span className="font-semibold">Focus area: </span>
               {weakest.label} — {weakest.correct}/{weakest.total} ({weakest.pct}%).{' '}
               {selfRated
-                ? 'Review the cards you marked “Review later”, then practice this module.'
+                ? `Review the cards you marked “Review later”, then practice this ${focusingObjective ? 'objective' : 'module'}.`
                 : `Drill it next to lift it above the ${PASS_THRESHOLD}% pass line.`}
             </span>
-            {onDrillModule && (
+            {(focusingObjective ? onDrillObjective : onDrillModule) && (
               <button
                 type="button"
-                onClick={() => onDrillModule(weakest.key)}
+                onClick={() =>
+                  focusingObjective
+                    ? onDrillObjective(weakest.key)
+                    : onDrillModule(weakest.key)
+                }
                 className="shrink-0 self-start rounded-lg bg-amber-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 sm:self-auto dark:bg-amber-700 dark:hover:bg-amber-700"
               >
-                Practice this module →
+                Practice this {focusingObjective ? 'objective' : 'module'} →
               </button>
             )}
           </div>
@@ -203,7 +221,7 @@ export default function PerformanceReport({ items, onDrillModule, selfRated = fa
             </span>
             {selfRated
               ? 'every card was marked “Got it”.'
-              : `every module you touched is at or above the ${PASS_THRESHOLD}% pass line.`}
+              : `every ${focusingObjective ? 'objective' : 'module'} you touched is at or above the ${PASS_THRESHOLD}% pass line.`}
           </>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiErrorMessage, searchQuestions } from '../api'
 import { publicQuestionSummary } from '../questionData'
+import { OBJECTIVE_LABELS } from '../syllabus'
 
 const MODULE_LABELS = {
   module1: 'Module 1',
@@ -9,7 +10,12 @@ const MODULE_LABELS = {
   module4: 'Module 4',
 }
 
-export default function QuestionSearch({ module = '', difficulty = '', onStart }) {
+export default function QuestionSearch({
+  module = '',
+  objective = '',
+  difficulty = '',
+  onStart,
+}) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [selected, setSelected] = useState(() => new Set())
@@ -37,7 +43,7 @@ export default function QuestionSearch({ module = '', difficulty = '', onStart }
     setError('')
     try {
       const data = await searchQuestions(
-        { query: term, module, difficulty, limit: 20 },
+        { query: term, module, objective, difficulty, limit: 20 },
         { signal: controller.signal }
       )
       if (request.current !== controller || controller.signal.aborted) return
@@ -79,7 +85,13 @@ export default function QuestionSearch({ module = '', difficulty = '', onStart }
     })
   }
 
-  const scope = [module && MODULE_LABELS[module], difficulty].filter(Boolean).join(', ')
+  const scope = [
+    module && MODULE_LABELS[module],
+    objective && OBJECTIVE_LABELS[objective],
+    difficulty,
+  ]
+    .filter(Boolean)
+    .join(', ')
 
   return (
     <section
@@ -174,7 +186,9 @@ export default function QuestionSearch({ module = '', difficulty = '', onStart }
                 />
                 <span className="min-w-0">
                   <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {MODULE_LABELS[result.module]} · {result.difficulty}
+                    {MODULE_LABELS[result.module]} ·{' '}
+                    {OBJECTIVE_LABELS[result.objective] ?? result.objective} ·{' '}
+                    {result.difficulty}
                   </span>
                   <span className="mt-1 block text-sm text-slate-800 dark:text-slate-200">
                     {result.text}

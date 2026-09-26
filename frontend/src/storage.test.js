@@ -128,6 +128,23 @@ describe('history', () => {
     })
   })
 
+  it('preserves objective-level attempt breakdowns and rejects module mismatches', () => {
+    appendAttempt(
+      attempt('objective', 1, {
+        module: 'module3',
+        objective: '3.1',
+        byObjective: { 3.1: { score: 1, total: 3 } },
+      })
+    )
+    appendAttempt(attempt('mismatch', 1, { module: 'module1', objective: '3.1' }))
+
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadHistory()[0]).toMatchObject({
+      objective: '3.1',
+      byObjective: { 3.1: { score: 1, total: 3 } },
+    })
+  })
+
   it('round-trips only valid daily challenge dates', () => {
     appendAttempt(attempt('daily', 8, { challengeDate: '2026-09-24' }))
     appendAttempt(attempt('invalid-date', 8, { challengeDate: '2026-02-29' }))
@@ -179,6 +196,21 @@ describe('settings', () => {
     }
     saveSettings(settings)
     expect(loadSettings()).toEqual(settings)
+  })
+
+  it('round-trips a valid objective scope and rejects a mismatched module', () => {
+    const settings = {
+      mode: 'practice',
+      module: 'module3',
+      objective: '3.3',
+      difficulty: 'medium',
+      count: 20,
+    }
+    saveSettings(settings)
+    expect(loadSettings()).toEqual(settings)
+
+    saveSettings({ ...settings, module: 'module2' })
+    expect(loadSettings()).toBeNull()
   })
 
   it('preserves a valid full-mock marker for exam recovery', () => {
@@ -431,6 +463,22 @@ describe('schema migration and portability', () => {
     expect(loadHistory()).toHaveLength(2)
     expect(loadBookmarks()).toHaveLength(1)
     expect(loadStudyProgress()).toHaveLength(1)
+  })
+
+  it('exports the objective-aware backup schema', () => {
+    appendAttempt(
+      attempt('objective', 1, {
+        module: 'module3',
+        objective: '3.1',
+        byObjective: { 3.1: { score: 1, total: 2 } },
+      })
+    )
+    const raw = JSON.parse(exportProgress())
+    expect(raw.version).toBe(4)
+    expect(parseProgressBackup(JSON.stringify(raw)).history[0]).toMatchObject({
+      objective: '3.1',
+      byObjective: { 3.1: { score: 1, total: 2 } },
+    })
   })
 
   it('exports notes and keeps the newest note when backups merge', () => {

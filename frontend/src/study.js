@@ -1,5 +1,6 @@
 import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
 import { validConfidence } from './confidence'
+import { validObjective } from './syllabus'
 
 export const STUDY_LIMIT = 1000
 export const DAY_MS = 24 * 60 * 60 * 1000
@@ -14,6 +15,7 @@ export function normalizeStudyRecord(record) {
     'questionId',
     'module',
     'difficulty',
+    'objective',
     'attempts',
     'correct',
     'streak',
@@ -28,6 +30,8 @@ export function normalizeStudyRecord(record) {
     !validId(record.questionId) ||
     !MODULES.includes(record.module) ||
     !DIFFICULTIES.includes(record.difficulty) ||
+    (record.objective !== undefined &&
+      !validObjective(record.objective, record.module)) ||
     !integer(record.attempts, 1, MAX_ATTEMPTS) ||
     !integer(record.correct, 0, record.attempts) ||
     !integer(record.streak, 0, record.attempts) ||
@@ -54,6 +58,7 @@ export function normalizeStudyRecord(record) {
     questionId: record.questionId,
     module: record.module,
     difficulty: record.difficulty,
+    ...(record.objective ? { objective: record.objective } : {}),
     attempts: record.attempts,
     correct: record.correct,
     streak: record.streak,
@@ -114,6 +119,11 @@ export function updateStudyRecords(records, items, now = Date.now()) {
       questionId: question.id,
       module: question.module,
       difficulty: question.difficulty,
+      ...(question.objective
+        ? { objective: question.objective }
+        : previous.objective
+          ? { objective: previous.objective }
+          : {}),
       attempts,
       correct,
       streak,

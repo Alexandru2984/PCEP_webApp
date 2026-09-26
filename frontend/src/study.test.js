@@ -62,6 +62,16 @@ describe('study schedule', () => {
     expect(JSON.stringify(records)).not.toContain('is_correct')
   })
 
+  it('keeps the objective needed for focused future review', () => {
+    const scoped = { ...question(1), objective: '1.4' }
+    const records = updateStudyRecords(
+      [],
+      [{ question: scoped, feedback: { is_correct: false } }]
+    )
+    expect(records[0]).toMatchObject({ module: 'module1', objective: '1.4' })
+    expect(normalizeStudyRecord(records[0])).toEqual(records[0])
+  })
+
   it('rejects inconsistent schedules and computes bounded mastery', () => {
     const [record] = updateStudyRecords([], [item(true)], Date.UTC(2026, 8, 20))
     expect(

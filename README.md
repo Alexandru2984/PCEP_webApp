@@ -12,8 +12,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 🔗 **Live:** [pcep.micutu.com](https://pcep.micutu.com)
 
-> Questions are organised by the four official PCEP-30-02 syllabus modules and tagged by
-> difficulty, so you can drill a weak area or take a full mixed mock exam.
+> Questions are organised by the four official PCEP-30-02 syllabus modules, all 15
+> objectives and difficulty, so you can drill a precise weak area or take a full mixed
+> mock exam.
 
 ## Screenshots
 
@@ -58,17 +59,18 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   prioritizes low-confidence answers, without accounts or tracking
 - 📅 **Daily challenge** — five deterministic questions with all four syllabus modules,
   a local completion score and the same answer-safe set throughout the Bucharest day
-- 🧩 **Filter by module & difficulty**, choose how many questions to take
+- 🧩 **Filter by module, syllabus objective & difficulty**, choose how many questions
+  to take
 - 🔎 **Search question text or Python code** and build a focused practice drill from
   up to 20 matches; search previews deliberately exclude choices and answer metadata
-- 📊 **Progress dashboard** — bounded attempt history, weighted module/difficulty
-  accuracy, confidence calibration, local-day study streaks, score trends, measured
-  response pace, separate full-mock history and separate flashcard self-ratings in
-  both reports and history (local-first)
-- 📈 **End-of-quiz report** — per-module, per-difficulty and optional confidence
-  breakdowns, decision timing and a "focus area" recommendation you can drill in one
-  click, plus a focused review queue combining misses with correct answers given at
-  low confidence
+- 📊 **Progress dashboard** — bounded attempt history, weighted module/objective/
+  difficulty accuracy, confidence calibration, local-day study streaks, score trends,
+  measured response pace, separate full-mock history and separate flashcard self-ratings
+  in both reports and history (local-first)
+- 📈 **End-of-quiz report** — per-module, per-objective, per-difficulty and optional
+  confidence breakdowns, decision timing and a precise "focus area" recommendation you
+  can drill in one click, plus a focused review queue combining misses with correct
+  answers given at low confidence
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused drill; answer one correctly and it drops off the list (local-first)
 - 🔖 **Bookmarks and portable progress** — bookmark drills plus validated,
@@ -85,8 +87,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
   and database readiness probes
-- 🔎 AST-backed question audits catch duplicates, malformed answer sets and
-  out-of-syllabus collection syntax before release
+- 🔎 AST-backed question audits catch duplicates, malformed answer sets, missing or
+  cross-module objectives and out-of-syllabus collection syntax before release
 
 ## Tech stack
 
@@ -182,10 +184,10 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 | ------ | ----------------------------- | ------------------------------------------------------------------------------------ |
 | `GET`  | `/api/live/`                  | Process liveness; deliberately independent of PostgreSQL                              |
 | `GET`  | `/api/health/`                | Readiness; returns 200 only if PostgreSQL is reachable                                |
-| `GET`  | `/api/stats/`                 | Aggregate question coverage, without question or answer data                          |
-| `GET`  | `/api/search/`                | Search text/code; bounded summary results without choices or answer metadata          |
+| `GET`  | `/api/stats/`                 | Aggregate module/objective/difficulty coverage, without question or answer data        |
+| `GET`  | `/api/search/`                | Search text/code with scope filters; no choices or answer metadata                     |
 | `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata          |
-| `GET`  | `/api/quiz-set/`              | Random public set; filters or the answer-safe `preset=pcep-30-02&count=30` full mock |
+| `GET`  | `/api/quiz-set/`              | Random public set with scope filters, or the answer-safe full-mock preset             |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
 | `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                        |

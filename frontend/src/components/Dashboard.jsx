@@ -9,6 +9,7 @@ import {
 import { formatElapsed } from '../format'
 import { performanceInsights } from '../progressInsights'
 import ProgressTools from './ProgressTools'
+import { OBJECTIVE_LABELS, OBJECTIVE_VALUES } from '../syllabus'
 
 const MODULE_LABELS = {
   '': 'All modules',
@@ -258,6 +259,7 @@ function StudyPlan({ summary, onDueReviews, adaptivePlan, onAdaptivePractice }) 
 
 export default function Dashboard({
   onDrill,
+  onDrillObjective,
   onBookmarks,
   onMistakes,
   onDueReviews,
@@ -302,6 +304,7 @@ export default function Dashboard({
   // Include mixed sessions; self-rated flashcards are kept separate from graded accuracy.
   const byModule = {}
   const byDifficulty = {}
+  const byObjective = {}
   for (const a of attempts) {
     if (a.mode === 'flashcards') continue
     const groups =
@@ -319,10 +322,19 @@ export default function Dashboard({
       level.score += row.score
       level.total += row.total
     }
+    for (const [key, row] of Object.entries(a.byObjective ?? {})) {
+      const objective = (byObjective[key] ??= { score: 0, total: 0 })
+      objective.score += row.score
+      objective.total += row.total
+    }
   }
   const modules = Object.entries(byModule).map(([key, v]) => ({
     key,
     pct: v.total > 0 ? Math.round((v.score / v.total) * 100) : 0,
+  }))
+  const objectives = OBJECTIVE_VALUES.filter((key) => byObjective[key]).map((key) => ({
+    key,
+    pct: Math.round((byObjective[key].score / byObjective[key].total) * 100),
   }))
 
   return (
@@ -409,6 +421,23 @@ export default function Dashboard({
             ))}
           </div>
         )}
+        {objectives.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Syllabus objective accuracy
+            </h3>
+            {objectives.map((objective) => (
+              <MasteryBar
+                key={objective.key}
+                label={OBJECTIVE_LABELS[objective.key] ?? objective.key}
+                pct={objective.pct}
+                onDrill={
+                  onDrillObjective ? () => onDrillObjective(objective.key) : undefined
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <StudyMomentum attempts={attempts} />
@@ -447,6 +476,9 @@ export default function Dashboard({
                   </span>
                   <span className="truncate text-slate-600 dark:text-slate-400">
                     {MODULE_LABELS[a.module] ?? a.module}
+                    {a.objective
+                      ? ` · ${OBJECTIVE_LABELS[a.objective] ?? a.objective}`
+                      : ''}
                     {a.difficulty ? ` · ${a.difficulty}` : ''}
                   </span>
                 </div>

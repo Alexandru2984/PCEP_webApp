@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import CodeBlock from './CodeBlock'
 import { submitAnswer, apiErrorMessage } from '../api'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
+import { OBJECTIVE_LABELS } from '../syllabus'
 
 // A flip-card study mode: read the snippet, reveal the answer, then self-mark
 // "Got it" or "Review later". The reveal POSTs a throwaway guess so the correct
@@ -130,6 +131,11 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        {question.objective && (
+          <p className="mb-2 text-xs font-semibold text-sky-700 dark:text-sky-300">
+            {OBJECTIVE_LABELS[question.objective] ?? question.objective}
+          </p>
+        )}
         <h2
           ref={heading}
           tabIndex={-1}

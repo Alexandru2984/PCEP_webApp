@@ -3,6 +3,7 @@ import CodeBlock from './CodeBlock'
 import BookmarkButton from './BookmarkButton'
 import QuestionNote from './QuestionNote'
 import { CONFIDENCE_LEVELS } from '../confidence'
+import { OBJECTIVE_LABELS } from '../syllabus'
 
 // CodeRunner pulls in the Pyodide worker manager — only practice/review need it,
 // so load it on demand and show the static (read-only) CodeBlock until it's ready.
@@ -50,7 +51,7 @@ export default function QuestionCard({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500 dark:text-slate-400">
         <span>
           Question{' '}
           <span className="font-semibold text-slate-700 dark:text-slate-200">
@@ -61,12 +62,19 @@ export default function QuestionCard({
             {totalQuestions}
           </span>
         </span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${
-            DIFFICULTY_BADGE[question.difficulty] ?? 'bg-slate-100 text-slate-600'
-          }`}
-        >
-          {question.difficulty}
+        <span className="flex flex-wrap justify-end gap-2">
+          {question.objective && (
+            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">
+              {OBJECTIVE_LABELS[question.objective] ?? question.objective}
+            </span>
+          )}
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium uppercase tracking-wide ${
+              DIFFICULTY_BADGE[question.difficulty] ?? 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {question.difficulty}
+          </span>
         </span>
       </div>
 

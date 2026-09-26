@@ -2,6 +2,7 @@ import { DIFFICULTIES, MODULES, publicQuestion, validId } from './questionData'
 import { CONFIDENCE_VALUES, MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
 import { PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
+import { OBJECTIVE_VALUES, validObjective } from './syllabus'
 import {
   STUDY_LIMIT,
   adaptivePracticePlan,
@@ -12,7 +13,7 @@ import {
 } from './study'
 
 const VERSION = 1
-const BACKUP_VERSION = 3
+const BACKUP_VERSION = 4
 const LIMIT = 100
 const NOTE_MAX_LENGTH = 2000
 const PROGRESS_KEY = 'pcep.progress'
@@ -71,6 +72,8 @@ export function validAttempt(a) {
     !Number.isFinite(Date.parse(a.date)) ||
     !MODES.includes(a.mode) ||
     !['', ...MODULES].includes(a.module ?? '') ||
+    !['', ...OBJECTIVE_VALUES].includes(a.objective ?? '') ||
+    (a.objective && !validObjective(a.objective, a.module || undefined)) ||
     !['', ...DIFFICULTIES].includes(a.difficulty ?? '') ||
     !integer(a.total, 1, 100) ||
     !integer(a.score, 0, a.total) ||
@@ -85,6 +88,9 @@ export function validAttempt(a) {
     return null
   const byModule = breakdown(a.byModule, MODULES, a.score, a.total)
   const byDifficulty = breakdown(a.byDifficulty, DIFFICULTIES, a.score, a.total)
+  // A recovered pre-taxonomy exam can contain legacy questions without an
+  // objective. Preserve that attempt while validating every objective row present.
+  const byObjective = breakdown(a.byObjective, OBJECTIVE_VALUES, a.score, a.total, true)
   const byConfidence = breakdown(
     a.byConfidence,
     CONFIDENCE_VALUES,
@@ -97,6 +103,7 @@ export function validAttempt(a) {
   if (
     byModule === null ||
     byDifficulty === null ||
+    byObjective === null ||
     byConfidence === null ||
     (hasResponseTiming &&
       (!integer(a.responseMsTotal, 0, 7 * 86400 * 1000) ||
@@ -109,6 +116,7 @@ export function validAttempt(a) {
     date: new Date(a.date).toISOString(),
     mode: a.mode,
     module: a.module ?? '',
+    ...(a.objective ? { objective: a.objective } : {}),
     difficulty: a.difficulty ?? '',
     score: a.score,
     total: a.total,
@@ -119,6 +127,7 @@ export function validAttempt(a) {
     ...(a.preset ? { preset: a.preset } : {}),
     ...(byModule ? { byModule } : {}),
     ...(byDifficulty ? { byDifficulty } : {}),
+    ...(byObjective ? { byObjective } : {}),
     ...(byConfidence ? { byConfidence } : {}),
     ...(hasResponseTiming
       ? { responseMsTotal: a.responseMsTotal, responseCount: a.responseCount }
@@ -223,6 +232,8 @@ function normalizeSettings(s) {
   if (
     !MODES.includes(s.mode ?? 'practice') ||
     !['', ...MODULES].includes(s.module ?? '') ||
+    !['', ...OBJECTIVE_VALUES].includes(s.objective ?? '') ||
+    (s.objective && !validObjective(s.objective, s.module || undefined)) ||
     !['', ...DIFFICULTIES].includes(s.difficulty ?? '') ||
     !integer(s.count, 1, 100) ||
     (s.preset !== undefined &&
@@ -230,12 +241,14 @@ function normalizeSettings(s) {
         s.mode !== 'exam' ||
         s.count !== PCEP_30_02_PRESET.count ||
         (s.module ?? '') !== '' ||
+        (s.objective ?? '') !== '' ||
         (s.difficulty ?? '') !== ''))
   )
     return null
   return {
     mode: s.mode ?? 'practice',
     module: s.module ?? '',
+    ...(s.objective ? { objective: s.objective } : {}),
     difficulty: s.difficulty ?? '',
     count: s.count,
     ...(s.preset ? { preset: s.preset } : {}),
@@ -489,7 +502,7 @@ export function parseProgressBackup(raw) {
   if (
     !object(data) ||
     data.type !== 'pcep-progress' ||
-    ![1, 2, BACKUP_VERSION].includes(data.version)
+    ![1, 2, 3, BACKUP_VERSION].includes(data.version)
   )
     throw new Error('Unsupported progress backup format or version.')
   const out = {}

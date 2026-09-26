@@ -2,8 +2,13 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import PerformanceReport from './PerformanceReport'
 
-const item = (module, difficulty, is_correct, extras = {}) => ({
-  question: { id: Math.random(), module, difficulty },
+const item = (module, difficulty, is_correct, extras = {}, objective = '') => ({
+  question: {
+    id: Math.random(),
+    module,
+    difficulty,
+    ...(objective ? { objective } : {}),
+  },
   feedback: { is_correct },
   ...extras,
 })
@@ -39,6 +44,20 @@ describe('PerformanceReport', () => {
     render(<PerformanceReport items={items} onDrillModule={onDrillModule} />)
     fireEvent.click(screen.getByRole('button', { name: /Practice this module/i }))
     expect(onDrillModule).toHaveBeenCalledWith('module3')
+  })
+
+  it('prefers a precise drill on the weakest syllabus objective', () => {
+    const onDrillObjective = vi.fn()
+    const items = [
+      item('module3', 'easy', false, {}, '3.1'),
+      item('module3', 'medium', false, {}, '3.1'),
+      item('module3', 'hard', true, {}, '3.3'),
+    ]
+    render(<PerformanceReport items={items} onDrillObjective={onDrillObjective} />)
+
+    expect(screen.getByText('By objective')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /Practice this objective/i }))
+    expect(onDrillObjective).toHaveBeenCalledWith('3.1')
   })
 
   it('shows no drill button when no callback is given', () => {

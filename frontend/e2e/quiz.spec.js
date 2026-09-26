@@ -18,6 +18,29 @@ test('setup screen loads and shows the question-bank snapshot', async ({ page })
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
 })
 
+test('syllabus objective filter requests and displays the precise scope', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByLabel('Module').selectOption('module3')
+  await page.getByLabel('Syllabus objective').selectOption('3.1')
+
+  const requestPromise = page.waitForRequest((request) => {
+    const url = new URL(request.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('objective')
+  })
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  const params = new URL((await requestPromise).url()).searchParams
+  expect(params.get('module')).toBe('module3')
+  expect(params.get('objective')).toBe('3.1')
+  await expect(page.getByText('3.1 · Lists')).toBeVisible()
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+})
+
 test('daily challenge is answer-safe, repeatable and visible in progress', async ({
   page,
 }) => {
@@ -128,7 +151,9 @@ test('search builds an answer-safe custom drill on mobile', async ({ page }) => 
   ).toBe(true)
 })
 
-test('practice run produces a report with a one-click module drill', async ({ page }) => {
+test('practice run produces a report with a one-click objective drill', async ({
+  page,
+}) => {
   await mockApi(page)
   await page.goto('/')
   await page.getByRole('button', { name: '10', exact: true }).click()
@@ -136,7 +161,7 @@ test('practice run produces a report with a one-click module drill', async ({ pa
   await page.getByText(/Tip: press/).waitFor()
 
   // Answer every question with option 2 — wrong in the mock — so the report
-  // has a sub-70% module and surfaces the focus-area drill.
+  // has a sub-70% objective and surfaces the most precise focus-area drill.
   for (let i = 0; i < QUESTIONS.length; i++) {
     await page.keyboard.press('2')
     const next = page.getByRole('button', { name: /Next Question|See Results/ })
@@ -146,7 +171,7 @@ test('practice run produces a report with a one-click module drill', async ({ pa
   }
 
   await expect(page.getByText('Performance breakdown')).toBeVisible()
-  const drill = page.getByRole('button', { name: /Practice this module/i })
+  const drill = page.getByRole('button', { name: /Practice this objective/i })
   await expect(drill).toBeVisible()
   await drill.click()
   // Drilling launches a fresh practice session.
@@ -244,7 +269,8 @@ test('new quiz returns to setup after a drill launched from progress', async ({
   await page.getByRole('button', { name: /Progress/ }).click()
   await page.getByRole('button', { name: 'Drill' }).click()
 
-  for (let i = 0; i < QUESTIONS.length; i++) {
+  const moduleQuestions = QUESTIONS.filter(({ module }) => module === 'module1')
+  for (let i = 0; i < moduleQuestions.length; i++) {
     await page.getByRole('button', { name: /option 1/ }).click()
     await page.getByRole('button', { name: /Next Question|See Results/ }).click()
   }

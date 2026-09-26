@@ -1,10 +1,17 @@
 // --- Fixtures ---------------------------------------------------------------
 function q(id, module, difficulty, code = 'print(1)') {
+  const objective = {
+    module1: '1.4',
+    module2: '2.1',
+    module3: '3.1',
+    module4: '4.1',
+  }[module]
   return {
     id,
     text: 'What is the output?',
     code_snippet: code,
     module,
+    objective,
     difficulty,
     choices: [1, 2, 3, 4].map((n) => ({ id: id * 10 + n, text: `option ${n}` })),
   }
@@ -25,17 +32,34 @@ export const FULL_MOCK_QUESTIONS = [
 ]
 
 const STATS = {
-  total: 301,
-  by_module: { module1: 73, module2: 73, module3: 85, module4: 70 },
-  by_difficulty: { easy: 102, medium: 122, hard: 77 },
+  total: 305,
+  by_module: { module1: 77, module2: 73, module3: 85, module4: 70 },
+  by_difficulty: { easy: 106, medium: 122, hard: 77 },
+  by_objective: {
+    1.1: 2,
+    1.2: 2,
+    1.3: 15,
+    1.4: 49,
+    1.5: 9,
+    2.1: 28,
+    2.2: 45,
+    3.1: 40,
+    3.2: 8,
+    3.3: 16,
+    3.4: 21,
+    4.1: 19,
+    4.2: 32,
+    4.3: 7,
+    4.4: 12,
+  },
   matrix: {
-    module1: { easy: 27, medium: 26, hard: 20 },
+    module1: { easy: 31, medium: 26, hard: 20 },
     module2: { easy: 22, medium: 34, hard: 17 },
     module3: { easy: 34, medium: 32, hard: 19 },
     module4: { easy: 19, medium: 30, hard: 21 },
   },
   modules: [
-    { value: 'module1', label: 'Module 1 — Fundamentals', total: 73 },
+    { value: 'module1', label: 'Module 1 — Fundamentals', total: 77 },
     { value: 'module2', label: 'Module 2 — Control Flow', total: 73 },
     { value: 'module3', label: 'Module 3 — Data Collections', total: 85 },
     { value: 'module4', label: 'Module 4 — Functions & Exceptions', total: 70 },
@@ -71,15 +95,22 @@ export async function mockApi(page) {
       })
     if (path.endsWith('/api/search/')) {
       const query = url.searchParams.get('q')?.toLowerCase() ?? ''
+      const module = url.searchParams.get('module')
+      const objective = url.searchParams.get('objective')
+      const difficulty = url.searchParams.get('difficulty')
       const results = QUESTIONS.filter(
         (question) =>
-          question.text.toLowerCase().includes(query) ||
-          question.code_snippet.toLowerCase().includes(query)
-      ).map(({ id, text, code_snippet, module, difficulty }) => ({
+          (!module || question.module === module) &&
+          (!objective || question.objective === objective) &&
+          (!difficulty || question.difficulty === difficulty) &&
+          (question.text.toLowerCase().includes(query) ||
+            question.code_snippet.toLowerCase().includes(query))
+      ).map(({ id, text, code_snippet, module, objective, difficulty }) => ({
         id,
         text,
         code_snippet,
         module,
+        objective,
         difficulty,
       }))
       return route.fulfill({ json: { count: results.length, results } })
@@ -94,9 +125,21 @@ export async function mockApi(page) {
           },
         })
       const ids = url.searchParams.get('ids')
-      const questions = ids
-        ? QUESTIONS.filter((question) => ids.split(',').map(Number).includes(question.id))
-        : QUESTIONS
+      const module = url.searchParams.get('module')
+      const objective = url.searchParams.get('objective')
+      const difficulty = url.searchParams.get('difficulty')
+      const questions = (
+        ids
+          ? QUESTIONS.filter((question) =>
+              ids.split(',').map(Number).includes(question.id)
+            )
+          : QUESTIONS
+      ).filter(
+        (question) =>
+          (!module || question.module === module) &&
+          (!objective || question.objective === objective) &&
+          (!difficulty || question.difficulty === difficulty)
+      )
       return route.fulfill({ json: { count: questions.length, questions } })
     }
 

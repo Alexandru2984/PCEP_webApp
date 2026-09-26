@@ -37,6 +37,24 @@ describe('Dashboard', () => {
     expect(onDrill).toHaveBeenCalledWith('module2')
   })
 
+  it('aggregates objective accuracy and starts an objective drill', () => {
+    const onDrillObjective = vi.fn()
+    seedHistory([
+      attempt({
+        score: 1,
+        total: 3,
+        pct: 33,
+        byObjective: { 3.1: { score: 1, total: 3 } },
+      }),
+    ])
+    render(<Dashboard onDrillObjective={onDrillObjective} />)
+
+    expect(screen.getByText('Syllabus objective accuracy')).toBeVisible()
+    expect(screen.getByText('3.1 · Lists')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Drill' }))
+    expect(onDrillObjective).toHaveBeenCalledWith('3.1')
+  })
+
   it('omits the drill control when no callback is provided', () => {
     seedHistory([attempt({ module: 'module2', score: 1, total: 4, pct: 25 })])
     render(<Dashboard />)

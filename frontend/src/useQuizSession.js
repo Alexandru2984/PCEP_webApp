@@ -20,7 +20,7 @@ import {
   updateMistakes,
   updateStudyProgress,
 } from './storage'
-import { publicQuestion, validateFeedback } from './questionData'
+import { publicApiQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
 import { MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
@@ -190,11 +190,17 @@ export default function useQuizSession() {
       if (!current(controller)) return
       if (!Array.isArray(data?.questions) || !data.questions.length)
         throw new Error('No questions match these filters. Try loosening them.')
-      const questions = data.questions.map(publicQuestion)
+      const questions = data.questions.map(publicApiQuestion)
       if (
         questions.length > 100 ||
         questions.some((q) => !q) ||
-        new Set(questions.map((q) => q.id)).size !== questions.length
+        new Set(questions.map((q) => q.id)).size !== questions.length ||
+        questions.some(
+          (question) =>
+            (config.module && question.module !== config.module) ||
+            (config.objective && question.objective !== config.objective) ||
+            (config.difficulty && question.difficulty !== config.difficulty)
+        )
       )
         throw new Error('The server returned invalid questions. Please retry.')
       if (
@@ -285,7 +291,9 @@ export default function useQuizSession() {
     const score = items.filter((i) => i.feedback?.is_correct).length
     const breakdown = (key) =>
       items.reduce((groups, item) => {
-        const group = (groups[item.question[key]] ??= { score: 0, total: 0 })
+        const value = item.question[key]
+        if (!value) return groups
+        const group = (groups[value] ??= { score: 0, total: 0 })
         group.total++
         if (item.feedback?.is_correct) group.score++
         return groups
@@ -307,6 +315,7 @@ export default function useQuizSession() {
       date: new Date().toISOString(),
       mode: state.lastConfig?.mode ?? 'practice',
       module: state.lastConfig?.module ?? '',
+      objective: state.lastConfig?.objective ?? '',
       difficulty: state.lastConfig?.difficulty ?? '',
       score,
       total,
@@ -315,6 +324,7 @@ export default function useQuizSession() {
       bestStreak: getStreakStats(items).best,
       byModule: breakdown('module'),
       byDifficulty: breakdown('difficulty'),
+      byObjective: breakdown('objective'),
       ...(Object.keys(byConfidence).length ? { byConfidence } : {}),
       ...(validDateKey(state.lastConfig?.challengeDate)
         ? { challengeDate: state.lastConfig.challengeDate }
@@ -440,6 +450,7 @@ export default function useQuizSession() {
     return startQuiz({
       mode: 'practice',
       module: '',
+      objective: '',
       difficulty: '',
       count: Math.min(50, ids.length),
       source,
@@ -473,11 +484,14 @@ export default function useQuizSession() {
       startQuiz({
         mode: 'practice',
         module: '',
+        objective: '',
         difficulty: '',
         count: 5,
         source: 'daily',
       }),
     startModuleDrill: (module) =>
-      startQuiz({ mode: 'practice', module, difficulty: '', count: 20 }),
+      startQuiz({ mode: 'practice', module, objective: '', difficulty: '', count: 20 }),
+    startObjectiveDrill: (objective) =>
+      startQuiz({ mode: 'practice', module: '', objective, difficulty: '', count: 20 }),
   }
 }

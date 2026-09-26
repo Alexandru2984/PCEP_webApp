@@ -14,6 +14,7 @@ const results = [
     text: 'Which slice creates a copy?',
     code_snippet: 'items[:]',
     module: 'module3',
+    objective: '3.1',
     difficulty: 'easy',
   },
   {
@@ -21,6 +22,7 @@ const results = [
     text: 'What does this slicing expression return?',
     code_snippet: 'items[1:3]',
     module: 'module3',
+    objective: '3.1',
     difficulty: 'medium',
   },
 ]
@@ -41,7 +43,13 @@ describe('QuestionSearch', () => {
 
     await screen.findByText('Which slice creates a copy?')
     expect(searchQuestions).toHaveBeenCalledWith(
-      { query: 'slice', module: 'module3', difficulty: 'medium', limit: 20 },
+      {
+        query: 'slice',
+        module: 'module3',
+        objective: '',
+        difficulty: 'medium',
+        limit: 20,
+      },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
     fireEvent.click(screen.getByLabelText(/Which slice creates a copy/))

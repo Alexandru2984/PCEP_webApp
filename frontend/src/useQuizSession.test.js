@@ -23,6 +23,7 @@ const question = {
   text: 'Question?',
   code_snippet: '',
   module: 'module1',
+  objective: '1.4',
   difficulty: 'easy',
   choices: [
     { id: 11, text: 'One' },
@@ -44,6 +45,12 @@ const fullMockQuestions = Object.entries(PCEP_30_02_PRESET.distribution).flatMap
         ...question,
         id,
         module,
+        objective: {
+          module1: '1.4',
+          module2: '2.1',
+          module3: '3.1',
+          module4: '4.1',
+        }[module],
         choices: [
           { id: id * 10 + 1, text: 'One' },
           { id: id * 10 + 2, text: 'Two' },
@@ -87,6 +94,7 @@ describe('quiz session requests', () => {
     expect(loadHistory()[0]).toMatchObject({
       mode: 'practice',
       challengeDate: '2026-09-24',
+      byObjective: { 1.4: { score: 1, total: 1 } },
     })
     act(() => result.current.resetToSetup())
     expect(result.current.lastConfig).toBeNull()
@@ -381,5 +389,33 @@ describe('quiz session requests', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
     expect(result.current.phase).toBe('answering')
+  })
+
+  it('starts an objective drill and rejects a response outside that scope', async () => {
+    const scopedQuestion = {
+      ...question,
+      module: 'module3',
+      objective: '3.1',
+    }
+    fetchQuizSet.mockResolvedValueOnce({ questions: [scopedQuestion] })
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startObjectiveDrill('3.1'))
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'practice',
+        module: '',
+        objective: '3.1',
+        count: 20,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('answering')
+
+    act(() => result.current.resetToSetup())
+    fetchQuizSet.mockResolvedValueOnce({ questions: [question] })
+    await act(async () => result.current.startObjectiveDrill('3.1'))
+    expect(result.current.phase).toBe('error')
+    expect(result.current.error).toMatch(/invalid questions/i)
   })
 })

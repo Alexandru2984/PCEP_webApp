@@ -8,12 +8,20 @@ const api = axios.create({
 })
 
 export const fetchQuizSet = (
-  { count = 30, module = '', difficulty = '', ids = [], preset = '' } = {},
+  {
+    count = 30,
+    module = '',
+    objective = '',
+    difficulty = '',
+    ids = [],
+    preset = '',
+  } = {},
   options = {}
 ) => {
   const params = new URLSearchParams({ count: String(count) })
   if (preset) params.set('preset', preset)
   if (module) params.set('module', module)
+  if (objective) params.set('objective', objective)
   if (difficulty) params.set('difficulty', difficulty)
   if (ids.length) params.set('ids', ids.join(','))
   return api.get(`/quiz-set/?${params.toString()}`, options).then((r) => r.data)
@@ -26,11 +34,12 @@ export const fetchDailyChallenge = (options = {}) =>
   api.get('/daily/', options).then((r) => r.data)
 
 export const searchQuestions = (
-  { query, module = '', difficulty = '', limit = 20 },
+  { query, module = '', objective = '', difficulty = '', limit = 20 },
   options = {}
 ) => {
   const params = new URLSearchParams({ q: query, limit: String(limit) })
   if (module) params.set('module', module)
+  if (objective) params.set('objective', objective)
   if (difficulty) params.set('difficulty', difficulty)
   return api.get(`/search/?${params.toString()}`, options).then((r) => r.data)
 }

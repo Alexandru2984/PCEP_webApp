@@ -39,10 +39,70 @@ describe('QuizSetup — practice your mistakes', () => {
     expect(onStart).toHaveBeenCalledWith({
       mode: 'exam',
       module: '',
+      objective: '',
       difficulty: '',
       count: 30,
       preset: 'pcep-30-02',
     })
+  })
+
+  it('starts a quiz scoped to a syllabus objective and available difficulty', () => {
+    const onStart = vi.fn()
+    const stats = {
+      total: 2,
+      by_module: { module3: 2 },
+      by_difficulty: { hard: 1, medium: 1 },
+      by_objective: { 3.3: 2 },
+      matrix: { module3: { easy: 0, medium: 1, hard: 1 } },
+      objective_matrix: { 3.3: { easy: 0, medium: 1, hard: 1 } },
+      modules: [
+        {
+          value: 'module3',
+          label: 'Module 3 — Data Collections',
+          total: 2,
+          easy: 0,
+          medium: 1,
+          hard: 1,
+        },
+      ],
+    }
+    render(
+      <QuizSetup {...baseProps} stats={stats} statsLoading={false} onStart={onStart} />
+    )
+
+    fireEvent.change(screen.getByLabelText('Module'), {
+      target: { value: 'module3' },
+    })
+    expect(screen.queryByRole('option', { name: /1\.4 ·/ })).toBeNull()
+    fireEvent.change(screen.getByLabelText('Syllabus objective'), {
+      target: { value: '3.3' },
+    })
+    fireEvent.change(screen.getByLabelText('Difficulty'), {
+      target: { value: 'hard' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Start practice with 1' }))
+
+    expect(onStart).toHaveBeenCalledWith({
+      mode: 'practice',
+      module: 'module3',
+      objective: '3.3',
+      difficulty: 'hard',
+      count: 1,
+    })
+  })
+
+  it('clears an objective when the learner switches to another module', () => {
+    render(<QuizSetup {...baseProps} />)
+    fireEvent.change(screen.getByLabelText('Module'), {
+      target: { value: 'module3' },
+    })
+    fireEvent.change(screen.getByLabelText('Syllabus objective'), {
+      target: { value: '3.1' },
+    })
+    fireEvent.change(screen.getByLabelText('Module'), {
+      target: { value: 'module4' },
+    })
+    expect(screen.getByLabelText('Syllabus objective')).toHaveValue('')
   })
 
   it('offers the mistakes drill with a count and fires the callback', () => {

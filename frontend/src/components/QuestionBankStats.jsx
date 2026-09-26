@@ -11,6 +11,7 @@ export default function QuestionBankStats({
   loading,
   error,
   selectedModule,
+  selectedObjective,
   selectedDifficulty,
 }) {
   if (loading) {
@@ -74,7 +75,12 @@ export default function QuestionBankStats({
 
   if (!stats) return null
 
-  const scopeTotal = getScopeTotal(stats, selectedModule, selectedDifficulty)
+  const scopeTotal = getScopeTotal(
+    stats,
+    selectedModule,
+    selectedDifficulty,
+    selectedObjective
+  )
   const hardTotal = stats.by_difficulty?.hard ?? 0
   const passThreshold = stats.pass_threshold ?? 70
   const maxModuleTotal = Math.max(...stats.modules.map((m) => m.total), 1)

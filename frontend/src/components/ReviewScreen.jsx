@@ -7,6 +7,7 @@ import QuestionNote from './QuestionNote'
 import { formatElapsed } from '../format'
 import { validConfidence } from '../confidence'
 import { PCEP_30_02_PRESET } from '../exam'
+import { OBJECTIVE_LABELS } from '../syllabus'
 
 // Same dynamic specifier as QuestionCard, so the runner ships as one shared
 // chunk. The static CodeBlock stands in until it loads.
@@ -46,6 +47,11 @@ function ReviewItem({ index, item, selfRated }) {
           <span className={pill}>
             {MODULE_LABELS[question.module] ?? question.module}
           </span>
+          {question.objective && (
+            <span className={pill}>
+              {OBJECTIVE_LABELS[question.objective] ?? question.objective}
+            </span>
+          )}
           <span className={`${pill} uppercase tracking-wide`}>{question.difficulty}</span>
           {validConfidence(confidence) && (
             <span
@@ -151,6 +157,7 @@ export default function ReviewScreen({
   total,
   onRestart,
   onDrillModule,
+  onDrillObjective,
   elapsedLabel,
   streakStats,
   mode = 'practice',
@@ -317,6 +324,7 @@ export default function ReviewScreen({
       <PerformanceReport
         items={items}
         onDrillModule={onDrillModule}
+        onDrillObjective={onDrillObjective}
         selfRated={selfRated}
       />
 

@@ -68,6 +68,7 @@ export default function QuizContainer() {
     startSearchDrill,
     startDailyChallenge,
     startModuleDrill,
+    startObjectiveDrill,
   } = useQuizSession()
   const [view, setView] = useState('setup')
   const returnToSetup = () => {
@@ -175,6 +176,7 @@ export default function QuizContainer() {
           <Suspense fallback={<LoadingCard />}>
             <Dashboard
               onDrill={startModuleDrill}
+              onDrillObjective={startObjectiveDrill}
               onBookmarks={startBookmarksQuiz}
               onMistakes={startMistakesQuiz}
               onDueReviews={startDueReviewsQuiz}
@@ -275,6 +277,7 @@ export default function QuizContainer() {
           total={questions.length}
           onRestart={returnToSetup}
           onDrillModule={startModuleDrill}
+          onDrillObjective={startObjectiveDrill}
           elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
           streakStats={getStreakStats(history)}
           mode={lastConfig?.mode}

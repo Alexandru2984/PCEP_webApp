@@ -3,6 +3,7 @@ import { getScopeTotal } from '../questionStats'
 import QuestionBankStats from './QuestionBankStats'
 import QuestionSearch from './QuestionSearch'
 import { examDurationLabel, PCEP_30_02_PRESET } from '../exam'
+import { OBJECTIVE_MODULE, objectivesForModule } from '../syllabus'
 
 const MODULES = [
   { value: '', label: 'All modules' },
@@ -62,10 +63,14 @@ export default function QuizSetup({
 }) {
   const [mode, setMode] = useState(initial?.mode ?? 'practice')
   const [module, setModule] = useState(initial?.module ?? '')
+  const [objective, setObjective] = useState(initial?.objective ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? '')
   const [count, setCount] = useState(initial?.count ?? 30)
   const canUseStats = stats && !statsLoading && !statsError
-  const scopeTotal = canUseStats ? getScopeTotal(stats, module, difficulty) : null
+  const scopeTotal = canUseStats
+    ? getScopeTotal(stats, module, difficulty, objective)
+    : null
+  const objectiveOptions = objectivesForModule(module)
   const effectiveCount =
     scopeTotal && scopeTotal > 0 ? Math.min(count, scopeTotal) : count
   const isEmptyScope = canUseStats && scopeTotal === 0
@@ -238,6 +243,7 @@ export default function QuizSetup({
                 onStart({
                   mode: 'exam',
                   module: '',
+                  objective: '',
                   difficulty: '',
                   count: PCEP_30_02_PRESET.count,
                   preset: PCEP_30_02_PRESET.value,
@@ -251,19 +257,42 @@ export default function QuizSetup({
         </section>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col text-sm">
           <span className="mb-1 font-medium text-slate-700 dark:text-slate-300">
             Module
           </span>
           <select
             value={module}
-            onChange={(e) => setModule(e.target.value)}
+            onChange={(e) => {
+              const nextModule = e.target.value
+              setModule(nextModule)
+              if (objective && OBJECTIVE_MODULE[objective] !== nextModule)
+                setObjective('')
+            }}
             className={selectClass}
           >
             {MODULES.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col text-sm">
+          <span className="mb-1 font-medium text-slate-700 dark:text-slate-300">
+            Syllabus objective
+          </span>
+          <select
+            value={objective}
+            onChange={(e) => setObjective(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Any objective</option>
+            {objectiveOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
@@ -286,7 +315,7 @@ export default function QuizSetup({
           </select>
         </label>
 
-        <div className="flex flex-col text-sm sm:col-span-2">
+        <div className="flex flex-col text-sm sm:col-span-2 lg:col-span-3">
           <span className="mb-1 font-medium text-slate-700 dark:text-slate-300">
             Questions: {count}
           </span>
@@ -326,7 +355,9 @@ export default function QuizSetup({
       <button
         type="button"
         disabled={isEmptyScope}
-        onClick={() => onStart({ mode, module, difficulty, count: effectiveCount })}
+        onClick={() =>
+          onStart({ mode, module, objective, difficulty, count: effectiveCount })
+        }
         className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-sky-700 dark:hover:bg-sky-800 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
       >
         {isEmptyScope
@@ -341,13 +372,15 @@ export default function QuizSetup({
         loading={statsLoading}
         error={statsError}
         selectedModule={module}
+        selectedObjective={objective}
         selectedDifficulty={difficulty}
       />
 
       {onSearchDrill && (
         <QuestionSearch
-          key={`${module}:${difficulty}`}
+          key={`${module}:${objective}:${difficulty}`}
           module={module}
+          objective={objective}
           difficulty={difficulty}
           onStart={onSearchDrill}
         />

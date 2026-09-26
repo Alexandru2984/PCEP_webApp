@@ -1,3 +1,5 @@
+import { validObjective } from './syllabus'
+
 export const MODULES = ['module1', 'module2', 'module3', 'module4']
 export const DIFFICULTIES = ['easy', 'medium', 'hard']
 export const validId = (value) => Number.isSafeInteger(value) && value > 0
@@ -6,6 +8,7 @@ const text = (value, max, empty = false) =>
 
 // A whitelist also prevents answer metadata entering local question backups.
 export function publicQuestion(q) {
+  const objective = q?.objective
   if (
     !q ||
     !validId(q.id) ||
@@ -13,6 +16,7 @@ export function publicQuestion(q) {
     !text(q.code_snippet ?? '', 20_000, true) ||
     !MODULES.includes(q.module) ||
     !DIFFICULTIES.includes(q.difficulty) ||
+    (objective !== undefined && !validObjective(objective, q.module)) ||
     !Array.isArray(q.choices) ||
     q.choices.length < 2 ||
     q.choices.length > 6
@@ -26,12 +30,25 @@ export function publicQuestion(q) {
     code_snippet: q.code_snippet ?? '',
     module: q.module,
     difficulty: q.difficulty,
+    ...(objective ? { objective } : {}),
     choices: q.choices.map(({ id, text }) => ({ id, text })),
   }
 }
 
+export function publicApiQuestion(q) {
+  const question = publicQuestion(q)
+  return question?.objective ? question : null
+}
+
 export function publicQuestionSummary(q) {
-  const allowed = new Set(['id', 'text', 'code_snippet', 'module', 'difficulty'])
+  const allowed = new Set([
+    'id',
+    'text',
+    'code_snippet',
+    'module',
+    'difficulty',
+    'objective',
+  ])
   if (
     !q ||
     Object.keys(q).some((key) => !allowed.has(key)) ||
@@ -39,7 +56,8 @@ export function publicQuestionSummary(q) {
     !text(q.text, 5000) ||
     !text(q.code_snippet ?? '', 20_000, true) ||
     !MODULES.includes(q.module) ||
-    !DIFFICULTIES.includes(q.difficulty)
+    !DIFFICULTIES.includes(q.difficulty) ||
+    !validObjective(q.objective, q.module)
   )
     return null
   return {
@@ -48,6 +66,7 @@ export function publicQuestionSummary(q) {
     code_snippet: q.code_snippet ?? '',
     module: q.module,
     difficulty: q.difficulty,
+    objective: q.objective,
   }
 }
 
