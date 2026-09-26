@@ -123,14 +123,20 @@ not printed or copied. No database or Docker volume was deleted.
   them with `dict.values()` and dynamic `dict.items()` exercises from objective 3.3.
 - Extended the AST-backed audit to reject set literals, set comprehensions and
   `set()` calls outside the PCEP-30-02 collection scope.
+- Added a reviewed primary PCEP-30-02 objective to every question. Module content
+  digests prevent silent taxonomy drift; migration signatures fail closed on an
+  unknown production row; a database constraint rejects cross-module objectives.
+- Added answer-safe objective filters to quiz/search and objective aggregates to
+  the existing one-query stats endpoint. All 15 objectives now have coverage.
 - Added bounded database startup, connection health checks, short connect
   timeout, ManifestStaticFilesStorage, structured Gunicorn logs and request IDs.
 
-The bank remains 301 questions and 1,204 choices. Question IDs and the answer-key
-hash matched the pre-deployment snapshot after migration and backend recreation.
-`order_by('?')` remains: at 301 rows it is simple and measured cost does not
-justify a more complex sampler. Revisit it if the bank grows by orders of
-magnitude.
+The bank now contains 305 questions and 1,220 choices. Four new questions cover
+previously empty objectives 1.1 and 1.2. The original 301 question and 1,204
+choice IDs, content and answer-key hashes matched the pre-deployment snapshot
+after migration, seeding and backend recreation. `order_by('?')` remains: at 305
+rows, it is simple and measured cost does not justify a more complex sampler.
+Revisit it if the bank grows by orders of magnitude.
 
 ## 5. Frontend changes
 
@@ -143,6 +149,11 @@ Storage uses a versioned, bounded record with legacy migration and defensive
 normalization. Corrupt, disabled or quota-limited storage shows a recovery
 warning instead of crashing. Dashboard calculations include mixed sessions and
 keep self-rated flashcards separate from graded accuracy.
+
+Quiz setup, search, question cards, flashcards and review now expose the official
+objective. Attempt history and the portable backup schema retain validated
+objective breakdowns while accepting pre-taxonomy local data. Reports and the
+dashboard identify the weakest objective and launch a precisely filtered drill.
 
 The Pyodide manager bounds startup at 30 seconds, a run at eight seconds, source
 at 20,000 characters, output at 10,000 characters and active/queued jobs at
@@ -205,6 +216,8 @@ assistive-technology certification.
   marker through crash recovery. Dashboard history then reports latest, best and
   passed full mocks separately from custom exams, without storing answer data.
 - Focus-area drill actions from reports and preserved mistake drills.
+- Fifteen-objective PCEP-30-02 filtering, coverage, attempt history and
+  one-click weak-objective drills without exposing answer metadata.
 
 ## 9. Performance
 
@@ -212,8 +225,9 @@ The stats endpoint now performs one grouped query. Questions prefetch choices;
 no N+1 path was introduced. API payloads are capped and public answer data stays
 minimal. Pyodide remains lazy and same-origin. Hashed frontend/admin assets are
 compressed and immutable; unversioned shell, worker, manifest and runtime entry
-points revalidate. A production build is approximately 234 KB JavaScript
-(77 KB gzip) and 36 KB CSS (7 KB gzip), excluding the lazy Pyodide runtime.
+points revalidate. The current main production bundle is approximately 270 KB
+JavaScript (86.5 KB gzip) and 46.5 KB CSS (8.4 KB gzip), excluding lazy chunks
+and the Pyodide runtime.
 
 The release process retains older lazy chunks so tabs open across deployment do
 not fail. The service worker cleans old named caches and waits for the user to
@@ -274,10 +288,11 @@ Final validation on 2026-09-19:
   browser errors. Three Cloudflare-injected scripts were blocked by CSP as
   described above.
 
-Continuation validation on 2026-09-25 covers 139 backend tests, 183 Vitest tests
-and 23 Playwright flows, including the answer-safe daily challenge, confidence
-insights, PWA installation, focused review, flashcard self-rating semantics and
-the exact PCEP-30-02 full-mock contract.
+Continuation validation on 2026-09-26 covers 150 backend tests, 194 Vitest tests
+and 24 Playwright flows. The release also passed both dependency audits, Django's
+production deploy check, Compose/Nginx validation, a full migration/seed/audit on
+a restored database copy, public answer-leakage probes and live Chromium at 390
+and 1,440 px with zero axe violations or horizontal overflow.
 
 ## 12. Commits
 
@@ -297,6 +312,29 @@ the exact PCEP-30-02 full-mock contract.
 - `6653dc7` — fingerprint production Django admin assets.
 - `deb1040` — preserve public readability during atomic swaps.
 - `de47bec` — serve the web manifest with the correct media type.
+- `2504a0a` — synchronize production architecture and review.
+- `69cd630` — resume interrupted exam sessions safely.
+- `24ef2bc` — add the scheduled review engine.
+- `45e27a2` — add transparent adaptive practice.
+- `f089220` — add study momentum insights.
+- `fa72eb8` — return new-quiz actions to setup.
+- `1c2291e` — detect and replace a semantic duplicate.
+- `b51789b` — detect equivalent practice items.
+- `f419d4d` — add answer-safe question-search drills.
+- `55df548` — contain search previews on mobile.
+- `c17b5f3` — add bounded private personal notes.
+- `f1c5826` — add confidence and response-time insights.
+- `aec7817` — add the answer-safe daily challenge.
+- `b5f859f` — add PWA install guidance.
+- `d4305dd` — add focused answer review.
+- `5462959` — distinguish flashcard self-ratings.
+- `cfeffa1` — add the exact PCEP full-mock preset.
+- `3389750` — track full-mock progress.
+- `dcb7cbf` — harden saved-attempt recovery.
+- `13325ea` — add safe release-retention previews.
+- `01d477d` — replace out-of-syllabus set questions.
+- `ed2b6b6` — add the audited syllabus-objective taxonomy.
+- `64613ad` — add objective-level practice and insights.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -308,9 +346,10 @@ added.
 2. Disable or correctly scope Cloudflare JavaScript detection, then repeat the
    public console/CSP check. Review the dashboard's cache rules and tunnel
    hostname ownership directly.
-3. Add concept tags only with a curated taxonomy and coverage audit; use them to
-   drive search and weak-topic reports. Current adaptive practice deliberately
-   uses only validated performance, due-date, confidence and difficulty signals.
+3. Add finer concept tags only with a controlled vocabulary and coverage audit.
+   Official-objective filters and weak-area reports now cover the stable syllabus
+   layer; current adaptive ranking remains deliberately explainable through
+   performance, due-date, confidence and difficulty signals.
 4. Add external uptime/error monitoring for liveness, readiness and release
    version, without collecting learner behavior or personal data.
 5. Re-evaluate PostgreSQL random ordering only when bank size or measured query
@@ -318,19 +357,22 @@ added.
 
 ## 14. Deployment notes
 
-Question-content migrations through `0006_replace_out_of_syllabus_sets` are
-applied. The backend image was
-rebuilt and only the backend service was recreated for deployment. Static and
-frontend trees were published with atomic swaps. The Nginx vhost/snippets were
+Question-content migrations through `0007_add_question_objective` are applied.
+The idempotent seed added exactly four rows and skipped all 301 existing rows.
+The backend image was rebuilt, and only the backend service was recreated.
+Static and frontend trees were published with atomic swaps. The Nginx vhost/snippets were
 installed only after validation and reloaded gracefully. The safe SEO generator
-and pages were installed/regenerated without an application restart. No new
+and pages were installed/regenerated without an Nginx reload. No new
 required production environment variable was introduced.
 
 Backups and rollback artifacts are under
 `/home/micu/backups/pcep/security-20260918`; the verified database backup is
 `pcep_db_20260918-233147.sql.gz`. Retained backend rollback tags include
 `pcep-backend-rollback:20260918` and
-`pcep-backend-rollback:20260919-pre-manifest`. Previous frontend/static release
+`pcep-backend-rollback:20260919-pre-manifest`. The objective release additionally
+has verified backup `pcep_db_pre_objectives_20260926T201657Z.sql.gz`, rollback tag
+`pcep-backend-rollback:20260926-pre-objectives`, and frontend release
+`.frontend.previous-20260926T201930Z-836b615c`. Previous frontend/static release
 directories remain next to their live targets. Detailed commands and cautions
 are in `docs/OPERATIONS.md`.
 
