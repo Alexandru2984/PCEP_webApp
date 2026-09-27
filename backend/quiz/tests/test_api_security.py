@@ -32,6 +32,17 @@ def test_grade_rejects_ambiguous_or_out_of_range_ids(api_client, question_id):
     assert response.status_code == 400
 
 
+def test_grade_indexes_nested_validation_errors(api_client):
+    response = api_client.post('/api/grade/', {'answers': [
+        {'question_id': '1', 'choice_id': None},
+    ]}, format='json')
+
+    assert response.status_code == 400
+    assert set(response.json()['answers']) == {'0'}
+    assert 'question_id' in response.json()['answers']['0']
+    assert 'results' not in response.json()
+
+
 @pytest.mark.parametrize('body', [None, [], 'text', 1, {}, {'answers': None},
                                       {'answers': {}}, {'answers': [None]}, {'answers': [True]}])
 def test_grade_rejects_malformed_bodies(api_client, body):

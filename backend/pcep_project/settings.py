@@ -175,4 +175,7 @@ REST_FRAMEWORK = {
     # proxy hop so throttling keys on the real visitor IP and can't be evaded
     # by spoofing an X-Forwarded-For prefix.
     'NUM_PROXIES': 1,
+    # Keep nested-list validation errors addressable by item index. This is
+    # DRF 3.18's format and avoids ambiguous positional placeholders.
+    'LIST_SERIALIZER_ERRORS_AS_DICT': True,
 }
