@@ -377,6 +377,15 @@ replacement. Live probes then confirmed matching frontend/backend revision
 requests, zero axe violations or horizontal overflow at 390 px, a no-store
 service worker, valid Nginx/Compose configuration and no new backend errors.
 
+The controlled-PWA-update follow-up passes 218 Vitest tests across 28 files,
+lint, formatting, the production build and all 25 Playwright flows. Regression
+coverage proves that a waiting worker is discovered without activating itself
+and receives `SKIP_WAITING` only from the Reload action. The public generated
+worker contains one message-gated skip call, one `clients.claim()` call and no
+unconditional activation. Live Chromium confirmed the new release, an active
+controller, zero sensitive cache entries, zero axe violations or horizontal
+overflow at 390 px and a working offline reload.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -440,6 +449,8 @@ service worker, valid Nginx/Compose configuration and no new backend errors.
 - `ee424e5` — protect persistent Docker volumes as externally managed data.
 - `f9da41f` — record the analytics and external-volume hardening release.
 - `0d92a2d` — expose validated frontend and backend release revisions.
+- `e36ffd8` — record the release-observability deployment.
+- `4969d39` — activate PWA updates only after the learner requests reload.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -549,6 +560,16 @@ both it and preceding `index-kkG5iDqv.js` returned 200 publicly after the atomic
 swap. Only the backend container was recreated. PostgreSQL and Nginx were not
 restarted, no migration ran and no required secret or environment setting was
 added; the release values are embedded by the documented Make targets.
+
+The controlled-PWA-update release has frontend rollback root
+`.frontend.previous-20260927T180922Z-5a705a9c` and external backup
+`frontend.20260927T180922Z-5a705a9c`. Its entry chunk `index-DnHg66tv.js` has
+SHA-256 `b311a190a309ecc1aab620826d85c381c4767b3d6f8e634b9de0e151f63e7990`;
+both it and preceding `index-CzyLBNqR.js` returned 200 publicly after the swap.
+The public service worker matched the deployed file byte-for-byte and retained
+`no-cache, no-store, must-revalidate`. This was a frontend-only atomic publish:
+the healthy backend remains on release `0d92a2d8a4a0`, and PostgreSQL, Docker
+services and Nginx were not restarted.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same

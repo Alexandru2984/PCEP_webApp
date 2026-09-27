@@ -55,7 +55,8 @@ make compose-build
 # Check the candidate/migration plan before this controlled single-service replacement.
 docker compose up -d --no-deps backend
 curl -fsS https://pcep.micutu.com/api/health/
-curl -fsSI https://pcep.micutu.com/api/live/ | grep -i '^x-pcep-release:'
+curl -fsS -D - -o /dev/null https://pcep.micutu.com/api/live/ \
+  | grep -i '^x-pcep-release:'
 docker compose exec backend python manage.py check --deploy --fail-level WARNING
 docker compose exec backend python manage.py audit_questions --database --fail-on-warnings
 ```
