@@ -1,10 +1,16 @@
 // Public app shell only. Feedback is deliberately excluded from all caches.
 export const pwaOptions = {
-  registerType: 'autoUpdate',
+  // Keep a new shell waiting until the learner chooses to reload. Activating a
+  // different bundle in the middle of an exam can otherwise break lazy imports.
+  registerType: 'prompt',
   injectRegister: 'script',
   manifest: false,
   includeManifestIcons: false,
   workbox: {
+    skipWaiting: false,
+    // Once the waiting worker is explicitly activated, controllerchange lets the
+    // page reload exactly once under the new shell.
+    clientsClaim: true,
     globPatterns: ['**/*.{js,css,html,svg,webmanifest}'],
     globIgnores: ['**/pyodide/**'],
     inlineWorkboxRuntime: true,

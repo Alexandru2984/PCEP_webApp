@@ -3,6 +3,11 @@ import { pwaOptions } from '../pwa.config'
 
 describe('public-only service worker policy', () => {
   const { workbox } = pwaOptions
+  it('keeps updates waiting until the learner requests activation', () => {
+    expect(pwaOptions.registerType).toBe('prompt')
+    expect(workbox.skipWaiting).toBe(false)
+    expect(workbox.clientsClaim).toBe(true)
+  })
   it('never treats API, admin, study pages or analytics as SPA navigation', () => {
     for (const path of [
       '/api/grade/',

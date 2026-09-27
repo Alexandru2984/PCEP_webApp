@@ -29,6 +29,31 @@ describe('application recovery', () => {
       else delete navigator.serviceWorker
     }
   })
+  it('detects a waiting worker and activates it only after the reload action', async () => {
+    const waiting = { postMessage: vi.fn() }
+    const registration = new EventTarget()
+    registration.waiting = waiting
+    registration.installing = null
+    const serviceWorker = new EventTarget()
+    serviceWorker.controller = {}
+    serviceWorker.ready = Promise.resolve(registration)
+    const previous = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker')
+    Object.defineProperty(navigator, 'serviceWorker', {
+      value: serviceWorker,
+      configurable: true,
+    })
+    try {
+      render(<RuntimeStatus />)
+      const reload = await screen.findByRole('button', { name: 'Reload app' })
+      expect(waiting.postMessage).not.toHaveBeenCalled()
+
+      fireEvent.click(reload)
+      expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' })
+    } finally {
+      if (previous) Object.defineProperty(navigator, 'serviceWorker', previous)
+      else delete navigator.serviceWorker
+    }
+  })
   it('offers the browser install prompt with accurate offline scope', async () => {
     const prompt = vi.fn().mockResolvedValue(undefined)
     const event = new Event('beforeinstallprompt', { cancelable: true })

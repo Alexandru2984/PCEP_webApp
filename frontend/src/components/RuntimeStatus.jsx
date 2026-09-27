@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const INSTALL_DISMISSED_KEY = 'pcep.install-dismissed'
 
 export default function RuntimeStatus() {
   const [offline, setOffline] = useState(() => navigator.onLine === false)
   const [updated, setUpdated] = useState(false)
+  const waitingWorker = useRef(null)
+  const reloadAfterActivation = useRef(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [installDismissed, setInstallDismissed] = useState(() => {
     try {
@@ -26,8 +28,36 @@ export default function RuntimeStatus() {
     const warn = () => setStorageWarning(true)
     const serviceWorker = navigator.serviceWorker
     let controlled = !!serviceWorker?.controller
-    const updateAvailable = () => {
-      if (controlled) setUpdated(true)
+    let registration
+    let installingWorker
+    let disposed = false
+
+    const workerInstalled = () => {
+      if (installingWorker?.state !== 'installed' || !serviceWorker?.controller) return
+      waitingWorker.current = registration?.waiting ?? installingWorker
+      setUpdated(true)
+    }
+    const watchInstallingWorker = () => {
+      installingWorker?.removeEventListener('statechange', workerInstalled)
+      installingWorker = registration?.installing
+      installingWorker?.addEventListener('statechange', workerInstalled)
+      workerInstalled()
+    }
+    const watchRegistration = (nextRegistration) => {
+      if (disposed || !nextRegistration) return
+      registration = nextRegistration
+      registration.addEventListener('updatefound', watchInstallingWorker)
+      if (registration.waiting && serviceWorker?.controller) {
+        waitingWorker.current = registration.waiting
+        setUpdated(true)
+      }
+      watchInstallingWorker()
+    }
+    const controllerChanged = () => {
+      if (controlled) {
+        if (reloadAfterActivation.current) window.location.reload()
+        else setUpdated(true)
+      }
       controlled = true
     }
     const offerInstall = (event) => {
@@ -40,16 +70,34 @@ export default function RuntimeStatus() {
     window.addEventListener('pcep-storage-warning', warn)
     window.addEventListener('beforeinstallprompt', offerInstall)
     window.addEventListener('appinstalled', installed)
-    serviceWorker?.addEventListener('controllerchange', updateAvailable)
+    serviceWorker?.addEventListener('controllerchange', controllerChanged)
+    serviceWorker?.ready?.then(watchRegistration).catch(() => {})
     return () => {
+      disposed = true
       window.removeEventListener('online', update)
       window.removeEventListener('offline', update)
       window.removeEventListener('pcep-storage-warning', warn)
       window.removeEventListener('beforeinstallprompt', offerInstall)
       window.removeEventListener('appinstalled', installed)
-      serviceWorker?.removeEventListener('controllerchange', updateAvailable)
+      serviceWorker?.removeEventListener('controllerchange', controllerChanged)
+      registration?.removeEventListener('updatefound', watchInstallingWorker)
+      installingWorker?.removeEventListener('statechange', workerInstalled)
     }
   }, [])
+
+  const applyUpdate = () => {
+    const worker = waitingWorker.current
+    if (!worker) {
+      window.location.reload()
+      return
+    }
+    try {
+      reloadAfterActivation.current = true
+      worker.postMessage({ type: 'SKIP_WAITING' })
+    } catch {
+      reloadAfterActivation.current = false
+    }
+  }
 
   const installApp = async () => {
     const event = installPrompt
@@ -83,7 +131,7 @@ export default function RuntimeStatus() {
           <span>An app update is ready. Finish your session before reloading.</span>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={applyUpdate}
             className="rounded-lg border border-sky-700 px-3"
           >
             Reload app

@@ -426,11 +426,14 @@ of complete accessibility certification.
 is precached. Runtime caching accepts HTTP 200 same-origin `/pyodide/` files in
 `pyodide-runtime-0.29.4`; opaque responses and API feedback are excluded.
 API/admin/static/media, study pages, analytics, asset/runtime paths and
-robots/sitemap are exempt from offline SPA navigation fallback. A controller
-update shows a notice; reload is the user's action after finishing the session.
-Active tabs are not automatically reloaded. The download script validates every
-pinned core file and stages downloads before replacing build inputs, preserving
-an older runtime on failure. No answer database is downloaded for offline use.
+robots/sitemap are exempt from offline SPA navigation fallback. A newly installed
+worker remains waiting and shows a notice; the Reload action sends the worker's
+`SKIP_WAITING` message after the learner finishes the session. The worker claims
+the page only after that explicit activation, then the page reloads under the new
+shell. Active tabs are not automatically reloaded. The download script validates
+every pinned core file and stages downloads before replacing build inputs,
+preserving an older runtime on failure. No answer database is downloaded for
+offline use.
 Existing Umami tracking respects Do Not Track and excludes URL query/hash data
 ([tracker configuration](https://docs.umami.is/docs/tracker-configuration));
 no new analytics service or user identifier was added.

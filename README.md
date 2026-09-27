@@ -82,7 +82,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   install action; a service worker precaches the public shell and caches the Pyodide
   runtime. API answers and study pages are excluded, and the UI explains that new
   questions and feedback still need a connection. Offline mode never downloads the
-  answer bank.
+  answer bank. App-shell updates wait for a learner-approved reload so an active exam
+  is not replaced mid-session.
 - ✅ Scored against the official **70% pass threshold**
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
