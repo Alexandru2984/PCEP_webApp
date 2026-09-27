@@ -367,6 +367,16 @@ The three legacy persistent volumes are now declared external under configurable
 names. Compose resolves to the existing database/static/media mounts without
 warnings, and teardown cannot delete those volumes with `-v`.
 
+The release-observability release passes 178 backend tests and 216 Vitest tests
+across 28 files, plus lint, formatting, the production build and all 25
+Playwright flows. Python production/development and npm dependency audits report
+no known vulnerabilities. The backend candidate passed Django's deploy check,
+had no pending migrations and audited all 308 live questions read-only before
+replacement. Live probes then confirmed matching frontend/backend revision
+`0d92a2d8a4a0`, zero pre-submission answer fields, successful answer and grading
+requests, zero axe violations or horizontal overflow at 390 px, a no-store
+service worker, valid Nginx/Compose configuration and no new backend errors.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -428,6 +438,8 @@ warnings, and teardown cannot delete those volumes with `-v`.
 - `1caacf5` — record the progress-tools and content-audit production release.
 - `389962e` — mark the same-origin analytics script as an external Vite input.
 - `ee424e5` — protect persistent Docker volumes as externally managed data.
+- `f9da41f` — record the analytics and external-volume hardening release.
+- `0d92a2d` — expose validated frontend and backend release revisions.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -512,7 +524,7 @@ previous backend image is tagged
 `pcep-backend-rollback:20260927T141628Z-pre-syntax-audit`; the verified database
 backup is `pcep_db_pre_syntax_audit_20260927T141628Z.sql.gz` with SHA-256
 `7579fb8a3ef20fbe5e12a81d881b4b8c051e11f299203540d81d3e574dafe3a6`.
-Production now runs backend image
+That deployment used backend image
 `sha256:20b99cf0b20d271b465d8136538b8036a87e5a203a69fbef961bbb63998a164a`.
 Candidate and deployed-container checks audited the live database read-only;
 startup applied no migrations. Public probes verified edge/origin pages,
@@ -520,6 +532,23 @@ liveness, readiness, 308-question stats, pre-answer field secrecy,
 post-submission feedback, redirects, security headers and cache policies. Only
 the backend container was recreated; PostgreSQL and Nginx were not restarted,
 and no environment variable or schema change was introduced.
+
+The release-observability deployment has verified database backup
+`pcep_db_pre_release_observability_20260927T175748Z.sql.gz` with SHA-256
+`8b6e9ba96f9040a6449e79184c173797b50efe48e5a9ddf1653d8e07ffae58dd`
+and rollback tag
+`pcep-backend-rollback:20260927T175748Z-pre-release-observability`. Production
+now runs backend image
+`sha256:db9e94943104f6a50c3c0e797387b7a6ff91b94101233a77b19e6d5ae505921f`.
+The frontend rollback root is
+`.frontend.previous-20260927T175942Z-83644f8b`, with external backup
+`frontend.20260927T175942Z-83644f8b`. Its entry chunk
+`index-CzyLBNqR.js` has SHA-256
+`9d877958fa6eceb869149f2c0694930eb1906e9cbcd04dfa3bb0cd09482158f5`;
+both it and preceding `index-kkG5iDqv.js` returned 200 publicly after the atomic
+swap. Only the backend container was recreated. PostgreSQL and Nginx were not
+restarted, no migration ran and no required secret or environment setting was
+added; the release values are embedded by the documented Make targets.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
