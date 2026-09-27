@@ -47,6 +47,20 @@ def test_validation_reports_empty_and_duplicate_options():
                                            'empty text', 'empty explanation'))
 
 
+def test_validation_rejects_short_or_editorial_explanations():
+    short = question()
+    short['choices'][1]['explanation'] = 'Wrong. No.'
+    editorial = question()
+    editorial['choices'][2]['explanation'] = (
+        'Wrong. Wait, let me recompute this distractor before publishing it.'
+    )
+
+    errors = ' '.join(validation_errors([short, editorial]))
+
+    assert 'fewer than 20 characters' in errors
+    assert 'contains an editorial artifact' in errors
+
+
 def test_python_option_case_is_semantically_significant():
     q = question()
     q['choices'][0]['text'] = 'True'

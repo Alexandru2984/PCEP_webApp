@@ -12,6 +12,18 @@ VALID_DIFFICULTIES = ('easy', 'medium', 'hard')
 VALID_OBJECTIVES = tuple(OBJECTIVE_LABELS)
 MIN_HARD_PER_MODULE = 8
 NEAR_DUPLICATE_THRESHOLD = 0.96
+MIN_EXPLANATION_LENGTH = 20
+EDITORIAL_ARTIFACT_PATTERN = re.compile(
+    r'\b(?:todo|fixme|tbd)\b|'
+    r'\bwait,?\s+let me\b|'
+    r'\bmarking correct\b|'
+    r'\boriginal intent\b|'
+    r'\breal answer is\b|'
+    r'\bdistractor fails?\b|'
+    r'\bas an ai\b|'
+    r'\blorem ipsum\b',
+    flags=re.IGNORECASE,
+)
 
 # These snippets are deliberately invalid because the question asks learners to
 # identify the syntax failure. Match both prompt and source exactly so an
@@ -207,8 +219,19 @@ def validation_errors(questions=ALL_QUESTIONS):
                 errors.append(f'{label} choice #{choice_index} exceeds 500 characters')
             if type(choice.get('is_correct')) is not bool:
                 errors.append(f'{label} choice #{choice_index} has a non-boolean answer flag')
-            if not choice.get('explanation', '').strip():
+            explanation = choice.get('explanation', '').strip()
+            if not explanation:
                 errors.append(f'{label} choice #{choice_index} has empty explanation')
+            elif len(explanation) < MIN_EXPLANATION_LENGTH:
+                errors.append(
+                    f'{label} choice #{choice_index} explanation has fewer than '
+                    f'{MIN_EXPLANATION_LENGTH} characters'
+                )
+            if EDITORIAL_ARTIFACT_PATTERN.search(explanation):
+                errors.append(
+                    f'{label} choice #{choice_index} explanation contains an '
+                    'editorial artifact'
+                )
 
     return errors
 

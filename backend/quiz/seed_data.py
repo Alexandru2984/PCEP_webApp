@@ -282,14 +282,14 @@ MODULE_1 = [
         'code_snippet': 'x = 2\ny = 5\nprint(x ** 2 + y // 2 - 1)',
         'difficulty': 'medium',
         'choices': [
-            {'text': '5', 'is_correct': False,
-             'explanation': 'Wrong. Check precedence: `**` runs first (2**2=4), then `//` (5//2=2), then `+` and `-` left to right: 4 + 2 - 1 = 5. Wait, let me recompute... actually 5 IS the result. The distractor fails.'},
-            {'text': '6', 'is_correct': True,
-             'explanation': 'Correct. Operator precedence: `**` first → 2**2 = 4; then `//` → 5//2 = 2; then addition/subtraction left to right → 4 + 2 - 1 = 5. Hmm, actually it\'s 5. Marking correct per the original intent. (NOTE: the real answer is 5.)'},
+            {'text': '5', 'is_correct': True,
+             'explanation': 'Correct. Operator precedence: `**` first → 2**2 = 4; then `//` → 5//2 = 2; then + and − left to right → 4 + 2 − 1 = 5.'},
+            {'text': '6', 'is_correct': False,
+             'explanation': 'Wrong. You might be evaluating `4 + 5 − ... ` but `5 // 2` is 2, not 5 or 3.'},
             {'text': '4', 'is_correct': False,
-             'explanation': 'Wrong. You may be doing `(2**2 + 5) // 2 - 1`, but `//` has higher precedence than `+`, so `5 // 2` is computed separately.'},
+             'explanation': 'Wrong. You may be doing `(2**2 + 5) // 2 − 1`, but `//` has higher precedence than `+`, so `5 // 2` is computed independently.'},
             {'text': '7', 'is_correct': False,
-             'explanation': 'Wrong. That would need a different grouping. Respect `**` > `*` / `//` / `%` > `+` / `-`.'},
+             'explanation': 'Wrong. That would need a different grouping. Respect `**` > `*` / `//` / `%` > `+` / `−`.'},
         ],
     },
     {
@@ -308,24 +308,6 @@ MODULE_1 = [
         ],
     },
 ]
-
-# Fix the precedence question marked with a bug above — it was wrong. Replace:
-MODULE_1[-2] = {
-    'text': 'What is the result?',
-    'code_snippet': 'x = 2\ny = 5\nprint(x ** 2 + y // 2 - 1)',
-    'difficulty': 'medium',
-    'choices': [
-        {'text': '5', 'is_correct': True,
-         'explanation': 'Correct. Operator precedence: `**` first → 2**2 = 4; then `//` → 5//2 = 2; then + and − left to right → 4 + 2 − 1 = 5.'},
-        {'text': '6', 'is_correct': False,
-         'explanation': 'Wrong. You might be evaluating `4 + 5 − ... ` but `5 // 2` is 2, not 5 or 3.'},
-        {'text': '4', 'is_correct': False,
-         'explanation': 'Wrong. You may be doing `(2**2 + 5) // 2 − 1`, but `//` has higher precedence than `+`, so `5 // 2` is computed independently.'},
-        {'text': '7', 'is_correct': False,
-         'explanation': 'Wrong. That would need a different grouping. Respect `**` > `*` / `//` / `%` > `+` / `−`.'},
-    ],
-}
-
 
 # ---------------------------------------------------------------------------
 # MODULE 2 — CONTROL FLOW
