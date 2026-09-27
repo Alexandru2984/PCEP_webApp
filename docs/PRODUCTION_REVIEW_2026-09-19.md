@@ -346,6 +346,11 @@ history, mistakes and review scheduling are written as one progress snapshot;
 a simulated quota failure preserves the entire preceding snapshot while the
 completed report remains available in memory.
 
+The exam-recovery follow-up passes 205 Vitest tests, lint, formatting, the
+production build and all 25 Playwright flows. A quota-failure regression proves
+that a graded exam keeps its recovery snapshot until the combined progress
+snapshot has been stored successfully.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -399,6 +404,8 @@ completed report remains available in memory.
 - `493d368` — validate and retry question-bank stats snapshots.
 - `245ef3c` — record the stats-resilience frontend release.
 - `fffea9e` — persist each completed session as one atomic progress snapshot.
+- `410efa6` — record the atomic-session frontend release.
+- `a6ecdd3` — retain exam recovery when final progress cannot be persisted.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -466,7 +473,15 @@ the preceding entry chunk remains publicly available for open tabs. Public and
 origin homepages, readiness, the 308-question stats snapshot, redirect, security
 headers, immutable asset caching and no-store service-worker caching were
 verified. This release required no backend restart, database change or Nginx
-reload.
+reload. The exam-recovery follow-up has rollback root
+`.frontend.previous-20260927T140817Z-98b02c88` and external backup
+`frontend.20260927T140817Z-98b02c88`. Its entry chunk `index-DUQElxwR.js`
+matches the validated build by SHA-256
+(`10e12e0a209a253c8ed1ffffb9c6564bc871d7dadcc196abf0c4251860932b73`), and the
+preceding chunk remains public. Public/origin homepages, readiness, the
+308-question snapshot and service-worker cache policy passed after publication;
+both containers stayed healthy. No backend restart, database change or Nginx
+reload was required.
 
 ## 15. Breaking changes
 
