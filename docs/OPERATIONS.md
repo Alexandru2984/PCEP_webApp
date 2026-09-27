@@ -385,7 +385,10 @@ The question audit canonicalizes valid Python snippets through the standard AST
 before duplicate comparison. This catches semantically identical questions that
 differ only in quote style or harmless formatting. Intentionally invalid teaching
 snippets fall back to normalized source comparison and are not rejected merely for
-being invalid Python.
+being invalid Python. Every explanation must also contain at least 20 non-whitespace
+characters. Strong editorial markers such as TODO/FIXME text, self-correction notes,
+"original intent" or a failed-distractor remark are integrity errors in both seed and
+database audit modes, so drafting artifacts cannot silently reach answer feedback.
 
 Migration `0004_replace_duplicate_exception_question` replaces one duplicate
 exception question with a distinct `try/except/else` exercise. It updates the

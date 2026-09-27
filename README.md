@@ -89,8 +89,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
   and database readiness probes
-- 🔎 AST-backed question audits catch duplicates, malformed answer sets, missing or
-  cross-module objectives and out-of-syllabus collection syntax before release
+- 🔎 AST-backed question audits catch duplicates, malformed answer sets, short or
+  editorial explanations, missing/cross-module objectives and out-of-syllabus syntax
+  before release
 
 ## Tech stack
 

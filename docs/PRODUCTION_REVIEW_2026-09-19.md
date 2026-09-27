@@ -503,6 +503,13 @@ in total. Browser coverage verifies post-submit feedback recovery, a clean next
 question, no answer metadata in the stored public question list, mobile fit, axe and
 existing exam ownership transfer.
 
+The explanation-quality follow-up removes a dead, factually wrong draft that the
+seed module used to replace in memory immediately after declaration. The final bank
+is unchanged, but there is now one canonical source entry. Seed and database audits
+also reject explanations shorter than 20 characters and strong editorial drafting
+markers. All 189 backend tests, the 308-question seed audit, Django checks and a
+read-only live database audit pass; the live bank already had zero violations.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -589,6 +596,7 @@ existing exam ownership transfer.
 - `2040b48` — pin CI actions and stop persisting checkout credentials.
 - `94c6291` — resume interrupted Practice sessions without leaking future answers.
 - `d21757e` — document Practice recovery and its storage boundary.
+- `e8fc01e` — reject short/editorial explanations and remove a dead draft question.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
