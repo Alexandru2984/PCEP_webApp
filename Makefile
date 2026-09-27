@@ -9,8 +9,11 @@ BACKUP_ROOT ?= /home/micu/backups/pcep
 RELEASE_KEEP ?= 5
 RELEASE ?= $(shell git describe --always --dirty --abbrev=12 --match '__pcep_no_matching_tag__' 2>/dev/null || printf development)
 BACKEND_DEPLOY_FLAGS ?=
+TRIVY_IMAGE ?= ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+TRIVY_CACHE ?= /tmp/pcep-trivy-cache
+BACKEND_IMAGE ?= pcep_webapp-backend:latest
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend audit-image build build-frontend fetch-pyodide django-check compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -18,6 +21,7 @@ help:
 		'  install          Install backend dev deps and frontend deps' \
 		'  test             Run backend and frontend checks' \
 		'  audit            Run Python/npm dependency audits and question audit' \
+		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  build            Build the frontend production bundle' \
 		'  django-check     Run Django production deploy checks' \
 		'  compose-build    Rebuild the backend image with its release revision' \
@@ -53,6 +57,14 @@ audit-backend:
 
 audit-frontend:
 	cd frontend && $(NPM) audit --audit-level=moderate
+
+audit-image:
+	mkdir -p "$(TRIVY_CACHE)"
+	docker run --rm \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "$(TRIVY_CACHE):/root/.cache/" \
+		"$(TRIVY_IMAGE)" image --scanners vuln --severity HIGH,CRITICAL \
+		--ignore-unfixed --exit-code 1 --no-progress "$(BACKEND_IMAGE)"
 
 build: build-frontend
 

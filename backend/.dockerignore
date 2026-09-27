@@ -17,4 +17,8 @@ media/
 *.log
 .pytest_cache/
 .coverage
+pytest.ini
+requirements-dev.txt
+pcep_project/test_settings.py
+quiz/tests/
 .DS_Store

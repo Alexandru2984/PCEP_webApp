@@ -1,10 +1,11 @@
-FROM python:3.12-slim AS dependencies
+ARG PYTHON_IMAGE=python:3.12.14-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+FROM ${PYTHON_IMAGE} AS dependencies
 ENV PIP_NO_CACHE_DIR=1
 WORKDIR /build
 COPY requirements.txt .
 RUN pip wheel --only-binary=:all: --wheel-dir /wheels -r requirements.txt
 
-FROM python:3.12-slim
+FROM ${PYTHON_IMAGE}
 ARG PCEP_RELEASE=development
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

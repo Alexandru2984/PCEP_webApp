@@ -167,6 +167,7 @@ checks supplement manual review; they are not a blanket accessibility certificat
 make test
 make audit
 make django-check
+make compose-build && make audit-image
 
 # Backend — 188 tests (API/security, integrity, startup, release and SEO behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
@@ -182,7 +183,9 @@ cd frontend && npm run e2e
 ```
 
 CI runs all of the above on every push and pull request, plus
-`manage.py check --deploy` against a production-like config.
+`manage.py check --deploy` against a production-like config. Its pinned Trivy
+scan fails on HIGH/CRITICAL operating-system or Python findings that have a
+vendor fix, while still reporting separately tracked findings without a patch.
 
 Production builds identify themselves without analytics or an extra API call:
 the frontend revision is shown in the footer and Django API responses include the

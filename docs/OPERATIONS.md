@@ -33,10 +33,19 @@ make install
 make test
 make audit
 make django-check
+make compose-build
+make audit-image
 ```
 
 `make test` runs the local SQLite-backed backend test suite plus the frontend
 unit/lint/format/build checks. CI runs the backend suite against PostgreSQL.
+The pinned image scan covers Debian and installed Python packages and fails on
+fixable HIGH/CRITICAL findings. Unfixed vendor findings remain visible in a full
+Trivy report and are reviewed separately rather than permanently breaking CI.
+The runtime base pins both Python 3.12.14 and the official multi-architecture
+image digest. Update the version and digest together only after rebuilding,
+scanning and running the backend suite. Test code, pytest configuration and
+development requirements are excluded from the production build context.
 
 ## Backend Deploy
 

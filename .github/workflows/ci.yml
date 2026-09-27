@@ -203,3 +203,6 @@ jobs:
 
       - name: Build hardened backend image
         run: docker compose build backend
+
+      - name: Scan backend image for fixable high-severity vulnerabilities
+        run: make audit-image
