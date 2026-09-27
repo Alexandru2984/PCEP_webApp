@@ -41,32 +41,33 @@ unit/lint/format/build checks. CI runs the backend suite against PostgreSQL.
 ## Backend Deploy
 
 ```bash
-set -euo pipefail
-umask 077
-stamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p /home/micu/backups/pcep
-chmod 700 /home/micu/backups/pcep
-docker tag "$(docker inspect pcep_backend --format '{{.Image}}')" "pcep-backend-rollback:${stamp}"
-docker exec pcep_db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
-  | gzip > "/home/micu/backups/pcep/pcep_db_${stamp}.sql.gz"
-gzip -t "/home/micu/backups/pcep/pcep_db_${stamp}.sql.gz"
-
-make compose-build
-# Check the candidate/migration plan before this controlled single-service replacement.
-docker compose up -d --no-deps backend
-curl -fsS https://pcep.micutu.com/api/health/
-curl -fsS -D - -o /dev/null https://pcep.micutu.com/api/live/ \
-  | grep -i '^x-pcep-release:'
-docker compose exec backend python manage.py check --deploy --fail-level WARNING
-docker compose exec backend python manage.py audit_questions --database --fail-on-warnings
+make deploy-backend
 ```
 
-`make compose-build` and `make deploy-frontend` inject the current Git revision
-into their artifacts. Override `RELEASE=<bounded-label>` only for an intentional
-release label. API responses expose the backend revision in `X-PCEP-Release`;
-the frontend revision appears in the footer, which makes partial deploys and stale
-PWA tabs immediately distinguishable. Responses generated directly by Nginx (for
-example, an over-limit request) do not carry the Django release header.
+The deployment command refuses tracked uncommitted changes. Before building, it
+verifies the live container, tags its exact image for rollback and streams a
+gzip-compressed PostgreSQL dump into a mode-`0600` file. It validates the dump
+header and checksum, then builds the candidate with the Git revision, runs
+Django deploy checks and refuses pending migrations. Only then does it recreate
+the backend service, wait for its Compose healthcheck, audit the live question
+bank read-only and verify readiness plus `X-PCEP-Release` through the public
+domain. A failure before replacement leaves the running container untouched;
+the rollback tag and dump are printed as soon as they are safe.
+
+For a reviewed release that intentionally contains migrations, inspect them and
+run `make deploy-backend BACKEND_DEPLOY_FLAGS=--allow-migrations`. This records
+the plan and lets the existing fail-fast entrypoint apply it. Never use that flag
+merely to bypass an unexpected pending migration.
+
+`make compose-build`, `make deploy-backend` and `make deploy-frontend` inject the
+current Git revision into their artifacts. Override `RELEASE=<bounded-label>`
+only for an intentional release label. Use `make deploy-backend` for production;
+running `make compose-build` first can displace the untagged live image before a
+rollback snapshot exists. API responses expose the backend revision in
+`X-PCEP-Release`; the frontend revision appears in the footer, which makes
+partial deploys and stale PWA tabs immediately distinguishable. Responses
+generated directly by Nginx (for example, an over-limit request) do not carry
+the Django release header.
 
 Never reset/reseed the live bank during routine deployment: question IDs are
 referenced by local progress. Startup runs pending migrations and collectstatic.

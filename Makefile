@@ -8,8 +8,9 @@ FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
 RELEASE_KEEP ?= 5
 RELEASE ?= $(shell git describe --always --dirty --abbrev=12 --match '__pcep_no_matching_tag__' 2>/dev/null || printf development)
+BACKEND_DEPLOY_FLAGS ?=
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -20,6 +21,7 @@ help:
 		'  build            Build the frontend production bundle' \
 		'  django-check     Run Django production deploy checks' \
 		'  compose-build    Rebuild the backend image with its release revision' \
+		'  deploy-backend   Backup, validate and deploy one backend release' \
 		'  compose-up       Start db + backend' \
 		'  seed-reset       Reset and seed production DB in backend container' \
 		'  deploy-frontend  Backup and publish frontend/dist to FRONTEND_ROOT' \
@@ -67,6 +69,9 @@ django-check:
 
 compose-build:
 	PCEP_RELEASE="$(RELEASE)" $(COMPOSE) build backend
+
+deploy-backend:
+	"$(PYTHON_BIN)" scripts/deploy_backend.py --backup-root "$(BACKUP_ROOT)" --release "$(RELEASE)" $(BACKEND_DEPLOY_FLAGS)
 
 compose-up:
 	$(COMPOSE) up -d
