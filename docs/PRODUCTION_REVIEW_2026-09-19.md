@@ -47,7 +47,7 @@ address, replaces forwarding headers, and Django trusts exactly one proxy hop.
   question repeatedly. It now requires 1–100 unique positive 64-bit integer
   IDs, rejects ambiguous JSON values and foreign choices, and preserves order.
 - Django 5.1.15 and DRF 3.15.2 had nine audited advisories; the Node tree had ten
-  moderate/high findings. Django is now 5.2.17 LTS, DRF is 3.17.2, and both
+  moderate/high findings. Django is now 5.2.17 LTS, DRF is 3.18.1, and both
   Python and npm audits report no known vulnerabilities.
 - Public frontend requests could race, duplicate submissions and discard a
   recoverable exam after grading failure. Request guards, cancellation,
@@ -77,6 +77,9 @@ central headers and CSP; dotfile blocking; real missing-asset 404s; restricted
 analytics proxy routes; fingerprinted Django admin static files; non-root
 read-only backend execution; dropped Linux capabilities; `no-new-privileges`;
 PID, memory and temporary-filesystem limits; and verified dependency downloads.
+The production Python base is pinned by patch version and multi-architecture
+digest, development/test files are excluded from its context, and CI now scans
+the built OS and Python packages with a digest-pinned Trivy release.
 
 The CSP keeps `wasm-unsafe-eval`, which Pyodide needs, and does not grant
 `unsafe-eval` or `unsafe-inline`. API responses use `default-src 'none'`.
@@ -103,6 +106,13 @@ Remaining security work:
   not a simple check constraint.
 - DRF's memory throttle remains per process. The shared Nginx limit closes the
   production gap, but deployments that bypass Nginx must supply a shared cache.
+- A full Trivy 0.74.0 scan reports 44 HIGH package occurrences across eight
+  unique Debian 13 CVEs. None has a vendor-fixed version, none affects an
+  installed Python package and there are zero CRITICAL findings. The current
+  non-root, read-only, capability-free runtime limits exposure. Debian 12
+  Bookworm was evaluated and rejected because the equivalent base reported 55
+  HIGH and five CRITICAL findings, also without vendor fixes. CI blocks new
+  fixable HIGH/CRITICAL findings; the unfixed set still requires periodic review.
 
 No secrets were added to Git. The production `.env` remains mode 0600 and was
 not printed or copied. No database or Docker volume was deleted.
@@ -455,6 +465,16 @@ reviewed flag. Nine focused regressions cover ordering, image identity, dump
 privacy/integrity, migration semantics and dirty-tree refusal; the complete
 backend suite now passes 188 tests.
 
+The container security follow-up pins Python 3.12.14's official image digest,
+removes tests and development configuration from the runtime context and adds a
+digest-pinned Trivy scan to the ops CI job. The exact candidate and deployed
+images pass Django's production check and have zero fixable HIGH/CRITICAL OS or
+Python findings. `actionlint`, Compose validation and the new Make target pass.
+The first automated release attempt stopped before replacing production when its
+candidate-revision probe lacked Django initialization; the live container stayed
+healthy. The corrected probe is regression-tested, and the subsequent complete
+release validated the rollback-first behavior end to end.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -534,6 +554,9 @@ backend suite now passes 188 tests.
 - `3d00516` — refresh supported Python dependencies and pin the DRF error contract.
 - `2aa0bf7` — record the backend dependency release.
 - `98db7a9` — automate rollback-safe backend releases.
+- `19754d5` — record rollback-safe backend releases.
+- `5085601` — pin and scan the backend runtime image.
+- `9d8ad66` — initialize Django for exact candidate revision checks.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -724,6 +747,20 @@ The rollback-safe deployment command is host-side operational tooling and did
 not require another container replacement, database change or Nginx reload.
 Future routine backend releases should use `make deploy-backend`; the standalone
 build target remains available for local and CI image validation.
+
+The container-hardening release runs backend revision `9d8ad66c11dc` in image
+`sha256:7a2c74dd5c5e4a0a5a0defe72692c3c0a46a4e12d50d0510a8ffebf32093439d`.
+The exact preceding image is retained as
+`pcep-backend-rollback:20260927T232725Z-release-3d00516c0af7`. The verified
+mode-`0600` database dump is `pcep_db_20260927T232725Z.sql.gz` with SHA-256
+`73b6f1b0ae12f6a462af66c7af193207ed8cf40cd5d5a63baffdfe969dc22fa1`.
+The automated workflow confirmed the candidate revision and deploy settings,
+found no pending migration, recreated only the backend, waited for readiness,
+confirmed migration state, audited all 308 live questions and matched the public
+release header. A separate public smoke test found no pre-answer fields and
+normal post-answer feedback; the exact live image passed Trivy and contains no
+test suite or development settings. PostgreSQL and Nginx were not restarted,
+no schema or environment setting changed, and privileged `nginx -t` passed.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
