@@ -445,6 +445,16 @@ image also passed deploy and migration checks before replacement. Public probes
 verified release `3d00516c0af7`, readiness, pre-answer secrecy, post-answer
 feedback and the indexed validation response; live Nginx validation passed.
 
+The backend release workflow now enforces the recovery order that the dependency
+rollout exposed: it verifies and tags the exact running image, creates and
+validates a private atomic database dump, and only then allows a candidate build.
+It checks the embedded revision, Django production settings and migration state
+before replacement, then waits for health, confirms migrations, audits the live
+bank and verifies the public revision. Pending migrations require an explicit
+reviewed flag. Nine focused regressions cover ordering, image identity, dump
+privacy/integrity, migration semantics and dirty-tree refusal; the complete
+backend suite now passes 188 tests.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -522,6 +532,8 @@ feedback and the indexed validation response; live Nginx validation passed.
 - `11d8c34` — refresh supported frontend dependencies and ESLint 10.
 - `f239514` — record the frontend dependency release.
 - `3d00516` — refresh supported Python dependencies and pin the DRF error contract.
+- `2aa0bf7` — record the backend dependency release.
+- `98db7a9` — automate rollback-safe backend releases.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -707,6 +719,11 @@ non-root image. Startup found no migration to apply. Only the backend container
 was recreated; PostgreSQL and Nginx were not restarted, no schema changed and no
 new environment setting was introduced. The live database audit, public API
 smoke tests and privileged `nginx -t` all passed after replacement.
+
+The rollback-safe deployment command is host-side operational tooling and did
+not require another container replacement, database change or Nginx reload.
+Future routine backend releases should use `make deploy-backend`; the standalone
+build target remains available for local and CI image validation.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
