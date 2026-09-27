@@ -18,8 +18,9 @@ const LIMIT = 100
 const NOTE_MAX_LENGTH = 2000
 const PROGRESS_KEY = 'pcep.progress'
 const ACTIVE_EXAM_KEY = 'pcep.activeExam'
+const ACTIVE_PRACTICE_KEY = 'pcep.activePractice'
 const SETTINGS_KEY = 'pcep.settings'
-const VERSIONED_KEYS = [PROGRESS_KEY, ACTIVE_EXAM_KEY, SETTINGS_KEY]
+const VERSIONED_KEYS = [PROGRESS_KEY, ACTIVE_EXAM_KEY, ACTIVE_PRACTICE_KEY, SETTINGS_KEY]
 const BACKUP_MAX_BYTES = 8 * 1024 * 1024
 const ACTIVE_EXAM_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const ACTIVE_EXAM_MAX_DURATION_MS = MAX_RESPONSE_MS
@@ -456,6 +457,198 @@ export function clearActiveExam(expectedSessionId) {
   }
   try {
     localStorage.removeItem(ACTIVE_EXAM_KEY)
+    return true
+  } catch {
+    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    return false
+  }
+}
+
+function normalizePracticeConfig(value, questionCount) {
+  const config = normalizeSettings(value)
+  if (config?.mode !== 'practice' || config.count !== questionCount) return null
+  const allowedSources = [
+    'adaptive',
+    'bookmarks',
+    'daily',
+    'due-reviews',
+    'mistakes',
+    'search',
+  ]
+  if (value.source !== undefined && !allowedSources.includes(value.source)) return null
+  if (
+    (value.source === 'daily' && !validDateKey(value.challengeDate)) ||
+    (value.source !== 'daily' && value.challengeDate !== undefined)
+  )
+    return null
+  return {
+    ...config,
+    ...(value.source ? { source: value.source } : {}),
+    ...(value.challengeDate ? { challengeDate: value.challengeDate } : {}),
+  }
+}
+
+function normalizeStoredFeedback(value, question, pickedChoiceId) {
+  const allowed = new Set([
+    'is_correct',
+    'correct_choice_id',
+    'explanation',
+    'correct_explanation',
+  ])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    typeof value.is_correct !== 'boolean' ||
+    !question.choices.some((choice) => choice.id === value.correct_choice_id) ||
+    value.is_correct !== (pickedChoiceId === value.correct_choice_id) ||
+    typeof value.explanation !== 'string' ||
+    value.explanation.length > 20_000 ||
+    typeof value.correct_explanation !== 'string' ||
+    value.correct_explanation.length > 20_000
+  )
+    return null
+  return {
+    is_correct: value.is_correct,
+    correct_choice_id: value.correct_choice_id,
+    explanation: value.explanation,
+    correct_explanation: value.correct_explanation,
+  }
+}
+
+function normalizePracticeItem(value, question) {
+  const allowed = new Set([
+    'question',
+    'pickedChoiceId',
+    'feedback',
+    'confidence',
+    'responseMs',
+  ])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    publicQuestion(value.question)?.id !== question.id ||
+    !question.choices.some((choice) => choice.id === value.pickedChoiceId) ||
+    (value.confidence !== null && !validConfidence(value.confidence)) ||
+    !integer(value.responseMs, 0, MAX_RESPONSE_MS)
+  )
+    return null
+  const feedback = normalizeStoredFeedback(value.feedback, question, value.pickedChoiceId)
+  return feedback
+    ? {
+        question,
+        pickedChoiceId: value.pickedChoiceId,
+        feedback,
+        confidence: value.confidence,
+        responseMs: value.responseMs,
+      }
+    : null
+}
+
+function normalizeActivePractice(value, now = Date.now()) {
+  const allowed = new Set([
+    'config',
+    'questions',
+    'startedAt',
+    'index',
+    'phase',
+    'history',
+    'confidence',
+    'sessionId',
+  ])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    !Array.isArray(value.questions) ||
+    value.questions.length < 1 ||
+    value.questions.length > LIMIT
+  )
+    return null
+  const normalizedQuestions = value.questions.map(publicQuestion)
+  if (
+    normalizedQuestions.some((question) => !question) ||
+    new Set(normalizedQuestions.map((question) => question.id)).size !==
+      normalizedQuestions.length
+  )
+    return null
+  const config = normalizePracticeConfig(value.config, normalizedQuestions.length)
+  if (
+    !config ||
+    !integer(value.startedAt, 1, Number.MAX_SAFE_INTEGER) ||
+    value.startedAt > now + 5 * 60 * 1000 ||
+    now - value.startedAt > ACTIVE_EXAM_MAX_AGE_MS ||
+    !integer(value.index, 0, normalizedQuestions.length - 1) ||
+    !['answering', 'reviewing'].includes(value.phase) ||
+    !Array.isArray(value.history) ||
+    !SESSION_ID_PATTERN.test(value.sessionId ?? '') ||
+    (value.confidence !== null && !validConfidence(value.confidence))
+  )
+    return null
+  const expectedHistoryLength = value.index + (value.phase === 'reviewing' ? 1 : 0)
+  if (value.history.length !== expectedHistoryLength) return null
+  const history = value.history.map((item, index) =>
+    normalizePracticeItem(item, normalizedQuestions[index])
+  )
+  if (history.some((item) => !item)) return null
+  return {
+    config,
+    questions: normalizedQuestions,
+    startedAt: value.startedAt,
+    index: value.index,
+    phase: value.phase,
+    history,
+    confidence: value.phase === 'answering' ? value.confidence : null,
+    sessionId: value.sessionId,
+  }
+}
+
+export function loadActivePractice() {
+  const saved = read(ACTIVE_PRACTICE_KEY, null)
+  if (newerSchema(saved)) {
+    warnNewerSchema()
+    return null
+  }
+  const normalized =
+    saved?.version === VERSION ? normalizeActivePractice(saved.data) : null
+  if (!normalized) {
+    try {
+      localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+    } catch {
+      /* unavailable */
+    }
+  }
+  return normalized
+}
+export function saveActivePractice(practice, expectedSessionId = practice?.sessionId) {
+  if (newerSchema(read(ACTIVE_PRACTICE_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
+  const normalized = normalizeActivePractice(practice)
+  const existing = loadActivePractice()
+  if (
+    normalized &&
+    existing &&
+    (!expectedSessionId || existing.sessionId !== expectedSessionId)
+  ) {
+    window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
+    return false
+  }
+  return normalized
+    ? write(ACTIVE_PRACTICE_KEY, { version: VERSION, data: normalized })
+    : false
+}
+export function clearActivePractice(expectedSessionId) {
+  if (newerSchema(read(ACTIVE_PRACTICE_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
+  const existing = loadActivePractice()
+  if (existing && existing.sessionId !== expectedSessionId) {
+    window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
+    return false
+  }
+  try {
+    localStorage.removeItem(ACTIVE_PRACTICE_KEY)
     return true
   } catch {
     window.dispatchEvent(new CustomEvent('pcep-storage-warning'))

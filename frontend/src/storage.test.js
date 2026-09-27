@@ -17,6 +17,9 @@ import {
   loadActiveExam,
   saveActiveExam,
   clearActiveExam,
+  loadActivePractice,
+  saveActivePractice,
+  clearActivePractice,
   clearStudyProgress,
   loadDueReviews,
   loadAdaptivePlan,
@@ -70,6 +73,31 @@ const activeExam = (override = {}) => {
     ...override,
   }
 }
+const practiceFeedback = (correct = true) => ({
+  is_correct: correct,
+  correct_choice_id: 11,
+  explanation: correct ? 'Correct explanation' : 'Picked explanation',
+  correct_explanation: 'Correct explanation',
+})
+const activePractice = (override = {}) => ({
+  config: { mode: 'practice', module: '', difficulty: '', count: 2 },
+  questions: [question(1), question(2)],
+  startedAt: Date.now(),
+  sessionId: 'practice-a',
+  index: 1,
+  phase: 'answering',
+  history: [
+    {
+      question: question(1),
+      pickedChoiceId: 11,
+      feedback: practiceFeedback(),
+      confidence: 'high',
+      responseMs: 4200,
+    },
+  ],
+  confidence: 'low',
+  ...override,
+})
 
 // localStorage is reset by the global afterEach in src/test/setup.js, but reset
 // here too so each case is independent regardless of run order.
@@ -406,6 +434,113 @@ describe('active exam recovery', () => {
     expect(warning).toHaveBeenCalledTimes(3)
 
     window.removeEventListener('pcep-storage-version-warning', warning)
+  })
+})
+
+describe('active practice recovery', () => {
+  it('round-trips submitted feedback while stripping answer data from future questions', () => {
+    const practice = activePractice({
+      questions: [
+        question(1),
+        {
+          ...question(2),
+          correct_choice_id: 21,
+          choices: question(2).choices.map((choice) => ({
+            ...choice,
+            is_correct: choice.id === 21,
+            explanation: 'UNSUBMITTED_SECRET',
+          })),
+        },
+      ],
+    })
+
+    expect(saveActivePractice(practice)).toBe(true)
+    const raw = localStorage.getItem('pcep.activePractice')
+    expect(raw).not.toContain('UNSUBMITTED_SECRET')
+    expect(loadActivePractice()).toMatchObject({
+      index: 1,
+      phase: 'answering',
+      confidence: 'low',
+      history: [
+        {
+          pickedChoiceId: 11,
+          feedback: { is_correct: true, correct_choice_id: 11 },
+          confidence: 'high',
+          responseMs: 4200,
+        },
+      ],
+    })
+  })
+
+  it.each([
+    { history: [] },
+    { index: 0 },
+    { phase: 'submitting-answer' },
+    { confidence: 'certain' },
+    {
+      history: [
+        {
+          question: question(2),
+          pickedChoiceId: 21,
+          feedback: { ...practiceFeedback(), correct_choice_id: 21 },
+          confidence: null,
+          responseMs: 10,
+        },
+      ],
+    },
+    {
+      history: [
+        {
+          question: question(1),
+          pickedChoiceId: 12,
+          feedback: practiceFeedback(),
+          confidence: null,
+          responseMs: 10,
+        },
+      ],
+    },
+    {
+      history: [
+        {
+          question: question(1),
+          pickedChoiceId: 11,
+          feedback: { ...practiceFeedback(), debug: true },
+          confidence: null,
+          responseMs: 10,
+        },
+      ],
+    },
+  ])('rejects malformed practice recovery data: %j', (override) => {
+    expect(saveActivePractice(activePractice(override))).toBe(false)
+    expect(loadActivePractice()).toBeNull()
+  })
+
+  it('expires old practice data and preserves a replacement owned by another tab', () => {
+    localStorage.setItem(
+      'pcep.activePractice',
+      JSON.stringify({
+        version: 1,
+        data: activePractice({ startedAt: Date.now() - 24 * 60 * 60 * 1000 - 1 }),
+      })
+    )
+    expect(loadActivePractice()).toBeNull()
+
+    const first = activePractice()
+    expect(saveActivePractice(first)).toBe(true)
+    const replacement = { ...first, sessionId: 'practice-replacement' }
+    expect(saveActivePractice(replacement, first.sessionId)).toBe(true)
+    expect(clearActivePractice(first.sessionId)).toBe(false)
+    expect(loadActivePractice().sessionId).toBe('practice-replacement')
+  })
+
+  it('protects practice recovery written by a newer app version', () => {
+    const future = JSON.stringify({ version: 2, data: { future: true } })
+    localStorage.setItem('pcep.activePractice', future)
+    expect(hasNewerStoredSchema()).toBe(true)
+    expect(loadActivePractice()).toBeNull()
+    expect(saveActivePractice(activePractice())).toBe(false)
+    expect(clearActivePractice()).toBe(false)
+    expect(localStorage.getItem('pcep.activePractice')).toBe(future)
   })
 })
 

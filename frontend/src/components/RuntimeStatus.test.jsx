@@ -23,7 +23,14 @@ describe('application recovery', () => {
     render(<RuntimeStatus />)
     fireEvent(window, new CustomEvent('pcep-active-exam-conflict'))
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'The active exam changed in another tab'
+      'The active quiz changed in another tab'
+    )
+  })
+  it('announces when another tab takes over active practice', () => {
+    render(<RuntimeStatus />)
+    fireEvent(window, new CustomEvent('pcep-active-practice-conflict'))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The active quiz changed in another tab'
     )
   })
   it('announces a worker update without reloading an active session', () => {

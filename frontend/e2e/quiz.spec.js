@@ -380,6 +380,9 @@ test('bookmarks persist across reload and start a targeted drill', async ({ page
   await page.getByRole('button', { name: /Start practice/ }).click()
   await page.getByRole('button', { name: '☆ Bookmark' }).click()
   await page.reload()
+  await page.getByRole('button', { name: 'Resume practice' }).click()
+  await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
+  await page.getByRole('button', { name: 'Quit' }).click()
   const drill = page.getByRole('button', { name: /Practice bookmarks/ })
   await expect(drill).toBeVisible()
   await drill.click()
@@ -544,6 +547,61 @@ test('an interrupted exam restores answers, flags, position and deadline', async
   )
 })
 
+test('an interrupted practice restores submitted feedback without future answer keys', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Start practice/ }).click()
+  await page.getByRole('button', { name: 'High' }).click()
+  await page.getByRole('button', { name: /option 1/ }).click()
+  await expect(page.getByRole('heading', { name: 'Correct!' })).toBeVisible()
+
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activePractice')).data
+  )
+  expect(saved).toMatchObject({
+    index: 0,
+    phase: 'reviewing',
+    history: [
+      {
+        pickedChoiceId: 11,
+        confidence: 'high',
+        feedback: { is_correct: true, correct_choice_id: 11 },
+      },
+    ],
+  })
+  expect(JSON.stringify(saved.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Resume saved practice' })).toBeVisible()
+  await expect(page.getByText(/1\/4 completed/)).toBeVisible()
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+
+  await page.getByRole('button', { name: 'Resume practice' }).click()
+  await expect(page.getByRole('heading', { name: 'Correct!' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'High' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await page.getByRole('button', { name: /Next Question/ }).click()
+  await expect(page.getByText('Question 2 of 4')).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByText(/1\/4 completed/)).toBeVisible()
+  await expect(page.getByText(/Continue from question 2/)).toBeVisible()
+  await page.getByRole('button', { name: 'Resume practice' }).click()
+  await expect(page.getByText('Question 2 of 4')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Correct!' })).toHaveCount(0)
+})
+
 test('resuming an exam in another tab transfers recovery ownership', async ({
   page,
   context,
@@ -568,7 +626,7 @@ test('resuming an exam in another tab transfers recovery ownership', async ({
 
   await expect(page.getByRole('heading', { name: 'Resume saved exam' })).toBeVisible()
   await expect(
-    page.getByRole('alert').filter({ hasText: 'active exam changed in another tab' })
+    page.getByRole('alert').filter({ hasText: 'active quiz changed in another tab' })
   ).toBeVisible()
   expect(
     await page.evaluate(

@@ -7,7 +7,7 @@ export default function RuntimeStatus() {
   const [offline, setOffline] = useState(() => navigator.onLine === false)
   const [updated, setUpdated] = useState(false)
   const [versionWarning, setVersionWarning] = useState(hasNewerStoredSchema)
-  const [examConflict, setExamConflict] = useState(false)
+  const [sessionConflict, setSessionConflict] = useState(false)
   const waitingWorker = useRef(null)
   const reloadAfterActivation = useRef(false)
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -30,7 +30,7 @@ export default function RuntimeStatus() {
     const update = () => setOffline(navigator.onLine === false)
     const warn = () => setStorageWarning(true)
     const warnVersion = () => setVersionWarning(true)
-    const warnExamConflict = () => setExamConflict(true)
+    const warnSessionConflict = () => setSessionConflict(true)
     const detectVersion = () => {
       if (hasNewerStoredSchema()) warnVersion()
     }
@@ -77,7 +77,8 @@ export default function RuntimeStatus() {
     window.addEventListener('offline', update)
     window.addEventListener('pcep-storage-warning', warn)
     window.addEventListener('pcep-storage-version-warning', warnVersion)
-    window.addEventListener('pcep-active-exam-conflict', warnExamConflict)
+    window.addEventListener('pcep-active-exam-conflict', warnSessionConflict)
+    window.addEventListener('pcep-active-practice-conflict', warnSessionConflict)
     window.addEventListener('storage', detectVersion)
     window.addEventListener('beforeinstallprompt', offerInstall)
     window.addEventListener('appinstalled', installed)
@@ -89,7 +90,8 @@ export default function RuntimeStatus() {
       window.removeEventListener('offline', update)
       window.removeEventListener('pcep-storage-warning', warn)
       window.removeEventListener('pcep-storage-version-warning', warnVersion)
-      window.removeEventListener('pcep-active-exam-conflict', warnExamConflict)
+      window.removeEventListener('pcep-active-exam-conflict', warnSessionConflict)
+      window.removeEventListener('pcep-active-practice-conflict', warnSessionConflict)
       window.removeEventListener('storage', detectVersion)
       window.removeEventListener('beforeinstallprompt', offerInstall)
       window.removeEventListener('appinstalled', installed)
@@ -204,12 +206,12 @@ export default function RuntimeStatus() {
           Reload this tab before continuing.
         </p>
       )}
-      {examConflict && (
+      {sessionConflict && (
         <p
           role="alert"
           className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
-          The active exam changed in another tab. This tab stopped writing its recovery
+          The active quiz changed in another tab. This tab stopped writing its recovery
           copy; continue in one tab only.
         </p>
       )}

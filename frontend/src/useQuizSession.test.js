@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchDailyChallenge, fetchQuizSet, gradeAnswers, submitAnswer } from './api'
 import {
   loadActiveExam,
+  loadActivePractice,
   loadHistory,
   loadStudyProgress,
   saveActiveExam,
+  saveActivePractice,
   updateStudyProgress,
 } from './storage'
 import useQuizSession from './useQuizSession'
@@ -28,6 +30,14 @@ const question = {
   choices: [
     { id: 11, text: 'One' },
     { id: 12, text: 'Two' },
+  ],
+}
+const secondQuestion = {
+  ...question,
+  id: 2,
+  choices: [
+    { id: 21, text: 'One' },
+    { id: 22, text: 'Two' },
   ],
 }
 const feedback = {
@@ -275,6 +285,90 @@ describe('quiz session requests', () => {
     expect(result.current.history).toEqual([])
     await act(async () => result.current.handleSelect(11))
     expect(result.current.phase).toBe('reviewing')
+  })
+
+  it('recovers practice at the submitted feedback and completes it exactly once', async () => {
+    fetchQuizSet.mockResolvedValueOnce({ questions: [question, secondQuestion] })
+    submitAnswer
+      .mockResolvedValueOnce(feedback)
+      .mockResolvedValueOnce({ ...feedback, correct_choice_id: 21 })
+    const first = renderHook(useQuizSession)
+
+    await act(async () => first.result.current.startQuiz(config))
+    act(() => first.result.current.handleConfidence('high'))
+    await act(async () => first.result.current.handleSelect(11))
+    expect(loadActivePractice()).toMatchObject({
+      index: 0,
+      phase: 'reviewing',
+      history: [{ pickedChoiceId: 11, confidence: 'high' }],
+    })
+    first.unmount()
+
+    const resumed = renderHook(useQuizSession)
+    expect(resumed.result.current.resumablePractice).toMatchObject({
+      index: 0,
+      phase: 'reviewing',
+    })
+    act(() => resumed.result.current.resumePractice())
+    expect(resumed.result.current.phase).toBe('reviewing')
+    expect(resumed.result.current.feedback).toMatchObject({ correct_choice_id: 11 })
+    act(() => resumed.result.current.handleNext())
+    expect(resumed.result.current.index).toBe(1)
+    await act(async () => resumed.result.current.handleSelect(21))
+    act(() => resumed.result.current.handleNext())
+
+    expect(resumed.result.current.phase).toBe('done')
+    expect(loadActivePractice()).toBeNull()
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadHistory()[0]).toMatchObject({ score: 2, total: 2 })
+  })
+
+  it('keeps future practice answer keys out of recovery and clears it on quit', async () => {
+    fetchQuizSet.mockResolvedValueOnce({
+      questions: [
+        question,
+        {
+          ...secondQuestion,
+          correct_choice_id: 21,
+          choices: secondQuestion.choices.map((choice) => ({
+            ...choice,
+            is_correct: choice.id === 21,
+            explanation: 'UNSUBMITTED_SECRET',
+          })),
+        },
+      ],
+    })
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+
+    const raw = localStorage.getItem('pcep.activePractice')
+    expect(raw).not.toContain('UNSUBMITTED_SECRET')
+    expect(raw).not.toContain('correct_choice_id')
+    act(() => result.current.resetToSetup())
+    expect(loadActivePractice()).toBeNull()
+  })
+
+  it('stops a stale practice tab after another tab claims its recovery copy', async () => {
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+    const firstOwner = loadActivePractice()
+    const claimed = { ...firstOwner, sessionId: 'practice-in-another-tab' }
+    expect(saveActivePractice(claimed, firstOwner.sessionId)).toBe(true)
+
+    act(() =>
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'pcep.activePractice',
+          newValue: localStorage.getItem('pcep.activePractice'),
+        })
+      )
+    )
+
+    expect(result.current.phase).toBe('setup')
+    expect(result.current.resumablePractice).toMatchObject({
+      sessionId: 'practice-in-another-tab',
+    })
+    expect(loadActivePractice().sessionId).toBe('practice-in-another-tab')
   })
 
   it('records optional confidence and time to answer without answer metadata', async () => {

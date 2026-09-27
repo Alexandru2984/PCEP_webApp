@@ -8,7 +8,9 @@ import {
 } from './api'
 import {
   clearActiveExam,
+  clearActivePractice,
   loadActiveExam,
+  loadActivePractice,
   loadAdaptivePlan,
   loadBookmarks,
   loadDueReviews,
@@ -16,6 +18,7 @@ import {
   loadSettings,
   recordCompletedSession,
   saveActiveExam,
+  saveActivePractice,
   saveSettings,
 } from './storage'
 import { publicApiQuestion, validateFeedback } from './questionData'
@@ -24,7 +27,7 @@ import { MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
 import { EXAM_SECONDS_PER_QUESTION, PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
 
-function emptyState(lastConfig = null, resumableExam = null) {
+function emptyState(lastConfig = null, resumableExam = null, resumablePractice = null) {
   return {
     phase: 'setup',
     questions: [],
@@ -35,7 +38,9 @@ function emptyState(lastConfig = null, resumableExam = null) {
     history: [],
     lastConfig,
     resumableExam,
+    resumablePractice,
     examProgress: null,
+    practiceSessionId: null,
     startedAt: 0,
     elapsedMs: 0,
     submitting: false,
@@ -43,7 +48,7 @@ function emptyState(lastConfig = null, resumableExam = null) {
   }
 }
 function initialState() {
-  return emptyState(loadSettings(), loadActiveExam())
+  return emptyState(loadSettings(), loadActiveExam(), loadActivePractice())
 }
 
 export function sessionReducer(state, event) {
@@ -56,6 +61,7 @@ export function sessionReducer(state, event) {
         questions: event.questions,
         startedAt: event.now,
         examProgress: event.examProgress,
+        practiceSessionId: event.practiceSessionId,
         phase:
           event.config.mode === 'exam'
             ? 'exam'
@@ -79,10 +85,32 @@ export function sessionReducer(state, event) {
           sessionId: event.exam.sessionId,
         },
       }
+    case 'resume-practice': {
+      const currentItem = event.practice.history[event.practice.index]
+      return {
+        ...emptyState(event.practice.config),
+        phase: event.practice.phase,
+        questions: event.practice.questions,
+        index: event.practice.index,
+        selectedChoiceId: currentItem?.pickedChoiceId ?? null,
+        confidence:
+          event.practice.phase === 'answering'
+            ? event.practice.confidence
+            : (currentItem?.confidence ?? null),
+        feedback: currentItem?.feedback ?? null,
+        history: event.practice.history,
+        startedAt: event.practice.startedAt,
+        practiceSessionId: event.practice.sessionId,
+      }
+    }
     case 'discard-resume':
       return { ...state, resumableExam: null }
+    case 'discard-practice-resume':
+      return { ...state, resumablePractice: null }
     case 'storage-conflict':
       return emptyState(state.lastConfig, event.exam)
+    case 'practice-storage-conflict':
+      return emptyState(state.lastConfig, state.resumableExam, event.practice)
     case 'load-error':
       return { ...state, phase: 'error', error: event.error }
     case 'answering':
@@ -137,7 +165,8 @@ export function sessionReducer(state, event) {
     case 'reset':
       return emptyState(
         'config' in event ? event.config : state.lastConfig,
-        event.exam ?? null
+        event.exam ?? null,
+        event.practice ?? null
       )
     default:
       return state
@@ -189,6 +218,67 @@ export default function useQuizSession() {
       window.removeEventListener('pcep-active-exam-conflict', stopStaleExam)
     }
   }, [state.examProgress?.sessionId, state.phase])
+  useEffect(() => {
+    const sessionId = state.practiceSessionId
+    if (
+      !['answering', 'reviewing', 'submitting-answer'].includes(state.phase) ||
+      !sessionId
+    )
+      return
+    const stopStalePractice = () => {
+      const currentPractice = loadActivePractice()
+      if (currentPractice?.sessionId === sessionId) return
+      request.current?.abort()
+      request.current = null
+      dispatch({ type: 'practice-storage-conflict', practice: currentPractice })
+    }
+    const changedInAnotherTab = (event) => {
+      if (event.key !== 'pcep.activePractice') return
+      const currentPractice = loadActivePractice()
+      if (currentPractice?.sessionId === sessionId) return
+      window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
+    }
+    window.addEventListener('storage', changedInAnotherTab)
+    window.addEventListener('pcep-active-practice-conflict', stopStalePractice)
+    return () => {
+      window.removeEventListener('storage', changedInAnotherTab)
+      window.removeEventListener('pcep-active-practice-conflict', stopStalePractice)
+    }
+  }, [state.phase, state.practiceSessionId])
+  useEffect(() => {
+    if (
+      !['answering', 'reviewing'].includes(state.phase) ||
+      state.lastConfig?.mode !== 'practice' ||
+      !state.practiceSessionId
+    )
+      return
+    const saved = saveActivePractice({
+      config: state.lastConfig,
+      questions: state.questions,
+      startedAt: state.startedAt,
+      index: state.index,
+      phase: state.phase,
+      history: state.history,
+      confidence: state.phase === 'answering' ? state.confidence : null,
+      sessionId: state.practiceSessionId,
+    })
+    const currentPractice = loadActivePractice()
+    if (
+      !saved &&
+      currentPractice &&
+      currentPractice.sessionId !== state.practiceSessionId
+    )
+      window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
+  }, [
+    state.confidence,
+    state.history,
+    state.index,
+    state.lastConfig,
+    state.phase,
+    state.practiceSessionId,
+    state.questions,
+    state.startedAt,
+  ])
 
   const begin = () => {
     if (request.current) return null
@@ -241,9 +331,11 @@ export default function useQuizSession() {
           questions.length > 5)
       )
         throw new Error('The server returned an invalid daily challenge. Please retry.')
-      const sessionConfig = isDaily
-        ? { ...config, count: questions.length, challengeDate: data.date }
-        : config
+      const sessionConfig = {
+        ...config,
+        count: questions.length,
+        ...(isDaily ? { challengeDate: data.date } : {}),
+      }
       const now = Date.now()
       const examProgress =
         sessionConfig.mode === 'exam'
@@ -257,6 +349,8 @@ export default function useQuizSession() {
               deadline: now + questions.length * EXAM_SECONDS_PER_QUESTION * 1000,
             }
           : null
+      const practiceSessionId =
+        sessionConfig.mode === 'practice' ? crypto.randomUUID() : null
       if (examProgress) {
         const saved = saveActiveExam({
           config: sessionConfig,
@@ -270,7 +364,14 @@ export default function useQuizSession() {
           return
         }
       }
-      dispatch({ type: 'start', config: sessionConfig, questions, now, examProgress })
+      dispatch({
+        type: 'start',
+        config: sessionConfig,
+        questions,
+        now,
+        examProgress,
+        practiceSessionId,
+      })
     } catch (error) {
       if (current(controller))
         dispatch({ type: 'load-error', error: apiErrorMessage(error) })
@@ -322,6 +423,13 @@ export default function useQuizSession() {
       const currentExam = loadActiveExam()
       if (currentExam && currentExam.sessionId !== state.examProgress?.sessionId) {
         window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
+        return false
+      }
+    }
+    if (state.lastConfig?.mode === 'practice') {
+      const currentPractice = loadActivePractice()
+      if (currentPractice && currentPractice.sessionId !== state.practiceSessionId) {
+        window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
         return false
       }
     }
@@ -388,6 +496,13 @@ export default function useQuizSession() {
       if (!clearActiveExam(sessionId)) {
         const currentExam = loadActiveExam()
         if (currentExam && currentExam.sessionId !== sessionId) return false
+      }
+    }
+    if (saved && state.lastConfig?.mode === 'practice') {
+      const sessionId = state.practiceSessionId
+      if (!clearActivePractice(sessionId)) {
+        const currentPractice = loadActivePractice()
+        if (currentPractice && currentPractice.sessionId !== sessionId) return false
       }
     }
     dispatch({ type: 'done', items, elapsed })
@@ -458,7 +573,13 @@ export default function useQuizSession() {
     request.current?.abort()
     request.current = null
     if (state.phase === 'exam') clearActiveExam(state.examProgress?.sessionId)
-    dispatch({ type: 'reset', config: loadSettings(), exam: loadActiveExam() })
+    if (state.practiceSessionId) clearActivePractice(state.practiceSessionId)
+    dispatch({
+      type: 'reset',
+      config: loadSettings(),
+      exam: loadActiveExam(),
+      practice: loadActivePractice(),
+    })
   }
   const resumeExam = () => {
     const exam = loadActiveExam()
@@ -478,6 +599,32 @@ export default function useQuizSession() {
     if (clearActiveExam(state.resumableExam?.sessionId))
       dispatch({ type: 'discard-resume' })
     else dispatch({ type: 'storage-conflict', exam: loadActiveExam() })
+  }
+  const resumePractice = () => {
+    const practice = loadActivePractice()
+    if (!practice) {
+      dispatch({ type: 'discard-practice-resume' })
+      return
+    }
+    const claimed = { ...practice, sessionId: crypto.randomUUID() }
+    if (!saveActivePractice(claimed, practice.sessionId)) {
+      dispatch({
+        type: 'practice-storage-conflict',
+        practice: loadActivePractice(),
+      })
+      return
+    }
+    finished.current = false
+    dispatch({ type: 'resume-practice', practice: claimed })
+  }
+  const discardSavedPractice = () => {
+    if (clearActivePractice(state.resumablePractice?.sessionId))
+      dispatch({ type: 'discard-practice-resume' })
+    else
+      dispatch({
+        type: 'practice-storage-conflict',
+        practice: loadActivePractice(),
+      })
   }
   const saveExamProgress = (progress) => {
     if (state.phase !== 'exam') return false
@@ -530,6 +677,8 @@ export default function useQuizSession() {
     resetToSetup,
     resumeExam,
     discardSavedExam,
+    resumePractice,
+    discardSavedPractice,
     saveExamProgress,
     startMistakesQuiz,
     startBookmarksQuiz,
