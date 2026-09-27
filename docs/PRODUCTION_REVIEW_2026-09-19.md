@@ -386,6 +386,16 @@ unconditional activation. Live Chromium confirmed the new release, an active
 controller, zero sensitive cache entries, zero axe violations or horizontal
 overflow at 390 px and a working offline reload.
 
+The cross-version-storage follow-up passes 222 Vitest tests across 28 files,
+lint, formatting, the production build and all 25 Playwright flows. Progress,
+settings and active-exam snapshots with a newer schema are preserved across
+stale-tab reads, writes and clears; the UI identifies the conflict on startup or
+after a cross-tab storage event. A live transition probe kept the preceding app
+shell loaded while the new worker entered `waiting`, confirmed no automatic
+reload, and observed navigation only after the Reload action. Fresh live Chromium
+then verified release `e8c15d24af42`, an active controller, zero axe violations
+and no horizontal overflow at 390 px.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -451,6 +461,8 @@ overflow at 390 px and a working offline reload.
 - `0d92a2d` — expose validated frontend and backend release revisions.
 - `e36ffd8` — record the release-observability deployment.
 - `4969d39` — activate PWA updates only after the learner requests reload.
+- `3e030b3` — record the controlled PWA update release.
+- `e8c15d2` — preserve local data written with a newer storage schema.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -570,6 +582,14 @@ The public service worker matched the deployed file byte-for-byte and retained
 `no-cache, no-store, must-revalidate`. This was a frontend-only atomic publish:
 the healthy backend remains on release `0d92a2d8a4a0`, and PostgreSQL, Docker
 services and Nginx were not restarted.
+
+The cross-version-storage release has frontend rollback root
+`.frontend.previous-20260927T181624Z-a5c6082b` and external backup
+`frontend.20260927T181624Z-a5c6082b`. Its entry chunk `index-vuzCFG8p.js` has
+SHA-256 `1a22857c17bfedc1de04878c1f84d98f526d345623fc6800a9a69da909727285`;
+both it and preceding `index-DnHg66tv.js` returned 200 publicly after the swap.
+This was another frontend-only atomic publish. The backend remained healthy on
+release `0d92a2d8a4a0`; PostgreSQL, Docker services and Nginx were not restarted.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
