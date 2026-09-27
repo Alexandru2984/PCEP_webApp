@@ -434,6 +434,17 @@ security finding to resolve. The validated entry remains 277.89 KB / 88.61 KB
 gzip. Fresh live Chromium verified release `11d8c34b956e`, answer-safe quiz fetch,
 post-submit feedback, zero axe violations, no mobile overflow and an active worker.
 
+The supported Python dependency refresh moves DRF to 3.18.1,
+`django-cors-headers` to 4.9.0, `psycopg2-binary` to 2.9.13, pytest to 9.1.1 and
+pytest-django to 4.14.0 while retaining Django 5.2 LTS, Gunicorn 23 and
+django-environ 0.11. The DRF 3.18 indexed nested-list error format is explicit
+and regression-tested, and upcoming DRF removal warnings now fail the suite.
+All 179 backend tests, both Python dependency audits, the 308-question audit,
+Django's production deploy check and Compose validation pass. The candidate
+image also passed deploy and migration checks before replacement. Public probes
+verified release `3d00516c0af7`, readiness, pre-answer secrecy, post-answer
+feedback and the indexed validation response; live Nginx validation passed.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -509,6 +520,8 @@ post-submit feedback, zero axe violations, no mobile overflow and an active work
 - `76a10d5` — synchronize progress UI and protect concurrent note drafts.
 - `1ae62bd` — record the progress synchronization release.
 - `11d8c34` — refresh supported frontend dependencies and ESLint 10.
+- `f239514` — record the frontend dependency release.
+- `3d00516` — refresh supported Python dependencies and pin the DRF error contract.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -679,6 +692,21 @@ The public, live-root and validated-build service workers match at SHA-256
 The backend and PostgreSQL stayed healthy and privileged `nginx -t` passed. No
 backend restart, database change, migration, environment change or Nginx reload
 was required.
+
+The supported Python dependency release runs backend revision
+`3d00516c0af7` in image
+`sha256:8f048f1a6a1acc2d0d55ee1cfe8aaa3d3e0498a275fe708aceec00d617d3c49c`.
+The verified pre-deploy dump is
+`pcep_db_20260928-020852.sql.gz` (SHA-256
+`cbda97ed3a6185a50994e24247b8b5c9d38b409419357fe749ba077834b1a718`),
+stored with mode `0600`. Because BuildKit had already replaced the local
+candidate tag before the previous image was tagged, rollback release
+`0d92a2d8a4a0` was rebuilt from that exact Git tree as
+`pcep-backend-rollback:20260928-020834-release-0d92a2d8a4a0` and verified as a
+non-root image. Startup found no migration to apply. Only the backend container
+was recreated; PostgreSQL and Nginx were not restarted, no schema changed and no
+new environment setting was introduced. The live database audit, public API
+smoke tests and privileged `nginx -t` all passed after replacement.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
