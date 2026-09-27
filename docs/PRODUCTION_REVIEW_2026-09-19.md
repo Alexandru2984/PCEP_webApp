@@ -359,6 +359,14 @@ vulnerabilities. Regression coverage verifies honest reset/export failure
 states and rejects every unparsable Python snippet except the two exact reviewed
 syntax-error teaching cases.
 
+The same-origin Umami route remains intentionally enabled with Do Not Track and
+query/hash exclusion. Adding Vite's `vite-ignore` marker identifies the classic
+proxied script as an external build input; Vite removes the marker from output,
+keeps `/u/script.js` intact and no longer emits the misleading bundle warning.
+The three legacy persistent volumes are now declared external under configurable
+names. Compose resolves to the existing database/static/media mounts without
+warnings, and teardown cannot delete those volumes with `-v`.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -417,6 +425,9 @@ syntax-error teaching cases.
 - `c85c291` — record the exam-recovery frontend release.
 - `e33e5fd` — report progress reset and export failures accurately.
 - `7a5e4dd` — reject unreviewed invalid Python snippets during content audits.
+- `1caacf5` — record the progress-tools and content-audit production release.
+- `389962e` — mark the same-origin analytics script as an external Vite input.
+- `ee424e5` — protect persistent Docker volumes as externally managed data.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -509,6 +520,14 @@ liveness, readiness, 308-question stats, pre-answer field secrecy,
 post-submission feedback, redirects, security headers and cache policies. Only
 the backend container was recreated; PostgreSQL and Nginx were not restarted,
 and no environment variable or schema change was introduced.
+
+The analytics build marker has no runtime deployment requirement because Vite
+removes it from `dist/index.html`; the verified output still loads the same
+`/u/script.js` with the existing privacy attributes. The external-volume
+declaration resolves to the three existing `pcep_webapp_*` volumes and live
+container mountpoints. No volume, container or data was recreated for that
+configuration change. Fresh installations must create the named volumes once,
+as documented in README and the operations runbook.
 
 ## 15. Breaking changes
 
