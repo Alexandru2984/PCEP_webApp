@@ -8,6 +8,7 @@ import {
   loadStudySummary,
 } from '../storage'
 import useQuizSession from '../useQuizSession'
+import useProgressSync from '../useProgressSync'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
 import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
@@ -38,6 +39,7 @@ function LoadingCard() {
 }
 
 export default function QuizContainer() {
+  useProgressSync()
   const {
     phase,
     questions,

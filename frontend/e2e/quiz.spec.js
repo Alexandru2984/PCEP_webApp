@@ -578,6 +578,36 @@ test('resuming an exam in another tab transfers recovery ownership', async ({
   await secondTab.close()
 })
 
+test('progress completed in another tab refreshes the open dashboard', async ({
+  page,
+  context,
+}) => {
+  await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Progress' }).click()
+  await expect(page.getByText(/No attempts yet/)).toBeVisible()
+
+  const studyTab = await context.newPage()
+  await mockApi(studyTab)
+  await studyTab.goto('/')
+  await studyTab.getByRole('button', { name: /Start practice/ }).click()
+  for (let index = 0; index < QUESTIONS.length; index += 1) {
+    await studyTab.getByRole('button', { name: /option 1/ }).click()
+    await studyTab
+      .getByRole('button', {
+        name: index === QUESTIONS.length - 1 ? /See Results/ : /Next Question/,
+      })
+      .click()
+  }
+  await expect(studyTab.getByRole('heading', { name: 'Quiz complete' })).toBeVisible()
+
+  await expect(page.getByText('Attempts').locator('..').getByText('1')).toBeVisible()
+  await expect(
+    page.getByText('Graded questions').locator('..').getByText('4')
+  ).toBeVisible()
+  await studyTab.close()
+})
+
 test('progress backup exports and imports with a preview', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')

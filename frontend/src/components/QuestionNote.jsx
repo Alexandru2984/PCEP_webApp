@@ -1,19 +1,34 @@
 import { useState } from 'react'
 import { loadNote, saveNote } from '../storage'
+import useProgressSync from '../useProgressSync'
 
 const MAX_LENGTH = 2000
+const sameNote = (first, second) =>
+  (first?.text ?? null) === (second?.text ?? null) &&
+  (first?.updatedAt ?? null) === (second?.updatedAt ?? null)
 
 export default function QuestionNote({ questionId, className = '' }) {
-  const [note, setNote] = useState(() => loadNote(questionId))
+  useProgressSync()
+  const note = loadNote(questionId)
+  const [baseNote, setBaseNote] = useState(null)
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(() => note?.text ?? '')
+  const [draft, setDraft] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   const save = () => {
     try {
+      const current = loadNote(questionId)
+      if (!sameNote(current, baseNote)) {
+        setBaseNote(current)
+        setError(
+          'This note changed in another tab. Your draft is preserved; review it and save again to replace the newer note.'
+        )
+        setMessage('')
+        return
+      }
       const saved = saveNote(questionId, draft)
-      setNote(saved)
+      setBaseNote(saved)
       setDraft(saved?.text ?? '')
       setEditing(false)
       setError('')
@@ -26,6 +41,7 @@ export default function QuestionNote({ questionId, className = '' }) {
 
   const cancel = () => {
     setDraft(note?.text ?? '')
+    setBaseNote(note)
     setEditing(false)
     setError('')
   }
@@ -45,6 +61,8 @@ export default function QuestionNote({ questionId, className = '' }) {
           <button
             type="button"
             onClick={() => {
+              setBaseNote(note)
+              setDraft(note?.text ?? '')
               setEditing(true)
               setMessage('')
             }}

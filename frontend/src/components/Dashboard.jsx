@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   loadAdaptivePlan,
   loadBookmarks,
@@ -6,6 +5,7 @@ import {
   loadMistakes,
   loadStudySummary,
 } from '../storage'
+import useProgressSync from '../useProgressSync'
 import { formatElapsed } from '../format'
 import { performanceInsights } from '../progressInsights'
 import ProgressTools from './ProgressTools'
@@ -265,9 +265,9 @@ export default function Dashboard({
   onDueReviews,
   onAdaptivePractice,
 }) {
-  const [attempts, setAttempts] = useState(loadHistory)
-  const refresh = () => setAttempts(loadHistory())
-  const tools = <ProgressTools key="progress-tools" onChange={refresh} />
+  useProgressSync()
+  const attempts = loadHistory()
+  const tools = <ProgressTools key="progress-tools" />
   const bookmarks = loadBookmarks().length
   const mistakes = loadMistakes().length
   const study = loadStudySummary()

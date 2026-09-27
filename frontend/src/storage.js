@@ -233,6 +233,7 @@ function saveProgress(data) {
   } catch {
     /* unavailable */
   }
+  window.dispatchEvent(new CustomEvent('pcep-progress-change'))
   return true
 }
 

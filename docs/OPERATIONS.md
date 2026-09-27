@@ -328,6 +328,13 @@ read and clear, and shows a reload warning immediately or after a cross-tab stor
 change. This prevents an older cached bundle from deleting data written by a newer
 release.
 
+Current-version progress writes emit an in-tab change signal, while other tabs use
+the browser's `storage` event. Setup counters, the open dashboard and bookmark
+controls therefore refresh without polling or a page reload. A personal note that
+changes elsewhere refreshes while it is only being viewed. If the learner already
+has that note open for editing, Save preserves the draft and reports the conflict;
+a second deliberate Save may replace the newer stored note.
+
 The Python runner limits source to 20,000 characters, output/tracebacks to
 10,000 characters, queued/running jobs to four, startup to 30 seconds and each
 execution to eight seconds. Timeout terminates the worker; later Run recreates

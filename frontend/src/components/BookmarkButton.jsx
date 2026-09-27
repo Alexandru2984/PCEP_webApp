@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { loadBookmarks, toggleBookmark } from '../storage'
+import useProgressSync from '../useProgressSync'
 
 export default function BookmarkButton({ question }) {
-  const [saved, setSaved] = useState(() =>
-    loadBookmarks().some((q) => q.id === question.id)
-  )
+  useProgressSync()
+  const saved = loadBookmarks().some((q) => q.id === question.id)
   const [error, setError] = useState(null)
   const toggle = () => {
     try {
-      setSaved(toggleBookmark(question).some((q) => q.id === question.id))
+      toggleBookmark(question)
       setError(null)
     } catch (error) {
       setError(error.message)

@@ -56,7 +56,7 @@ export default function ProgressTools({ onChange }) {
     try {
       importProgress(preview)
       setPreview(null)
-      onChange()
+      onChange?.()
       setMessage('Backup merged. Existing progress was preserved.')
       setError(null)
     } catch (error) {
@@ -71,7 +71,7 @@ export default function ProgressTools({ onChange }) {
     )
       return
     if (clear()) {
-      onChange()
+      onChange?.()
       setMessage(`Saved ${label} cleared.`)
       setError(null)
     } else {

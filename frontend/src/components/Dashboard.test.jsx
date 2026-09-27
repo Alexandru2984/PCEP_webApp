@@ -27,6 +27,37 @@ describe('Dashboard', () => {
     expect(screen.getByText(/No attempts yet/i)).toBeInTheDocument()
   })
 
+  it('refreshes when another tab changes progress storage', () => {
+    render(<Dashboard />)
+    expect(screen.getByText(/No attempts yet/i)).toBeInTheDocument()
+    localStorage.setItem(
+      'pcep.progress',
+      JSON.stringify({
+        version: 1,
+        data: {
+          history: [attempt({ score: 8, total: 10, pct: 80 })],
+          mistakes: [],
+          bookmarks: [],
+          study: [],
+          notes: [],
+        },
+      })
+    )
+
+    fireEvent(
+      window,
+      new StorageEvent('storage', {
+        key: 'pcep.progress',
+        newValue: localStorage.getItem('pcep.progress'),
+      })
+    )
+
+    expect(screen.getByText('Attempts').previousElementSibling).toHaveTextContent('1')
+    expect(screen.getByText('Graded accuracy').previousElementSibling).toHaveTextContent(
+      '80%'
+    )
+  })
+
   it('drills the module from its mastery row', () => {
     const onDrill = vi.fn()
     seedHistory([attempt({ module: 'module2', score: 1, total: 4, pct: 25 })])
