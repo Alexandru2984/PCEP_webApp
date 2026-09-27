@@ -186,6 +186,13 @@ state change. Selecting a confidence level and immediately answering with
 `1`–`4` or `A`–`D` therefore records the chosen confidence instead of submitting
 through a stale pre-selection callback.
 
+Practice sessions now survive reloads with a strictly validated, local-only
+snapshot. Recovery restores the current question, optional confidence and any
+feedback already returned for submitted answers. Future questions are normalized
+through the public-question whitelist, so their answer keys and explanations never
+enter the snapshot. Resuming rotates ownership between tabs; stale tabs stop their
+in-flight answer request and cannot overwrite or delete the active copy.
+
 The question-bank snapshot is now normalized before it reaches the setup UI.
 Module, difficulty and objective totals must agree with both coverage matrices
 and the four module summaries, so a partial or malformed API response produces a
@@ -207,9 +214,14 @@ visible, uses a real deadline, gives one low-time announcement and prevents a
 timer/manual-submit race. Submission confirmation wraps and restores focus;
 failed grading keeps the attempt and offers retry.
 
-The recovery screen follows that same wall-clock deadline while it remains open,
+The exam recovery screen follows that same wall-clock deadline while it remains open,
 refreshes after browser suspension, switches expired attempts to a clear grading
 action and requires confirmation before deleting the saved attempt.
+
+Practice recovery uses the same explicit resume/discard pattern and remains usable
+at 360 px. If the learner had already submitted the current answer, its feedback and
+confidence return without another request; otherwise the unanswered card returns
+cleanly. Both recovery cards passed axe checks.
 
 Question and result headings receive focus after navigation. Code blocks scroll
 without expanding the viewport. Actions, feedback, empty states, offline state,
@@ -256,6 +268,8 @@ assistive-technology certification.
 - Focus-area drill actions from reports and preserved mistake drills.
 - Fifteen-objective PCEP-30-02 filtering, coverage, attempt history and
   one-click weak-objective drills without exposing answer metadata.
+- Reload-safe Practice sessions with post-submission feedback recovery, 24-hour
+  expiry, strict schema validation and cross-tab ownership transfer.
 
 ## 9. Performance
 
@@ -481,6 +495,14 @@ Checkout credentials are no longer persisted because no job writes to Git.
 `actionlint` passes, all workflow permissions remain read-only and adjacent
 version comments preserve a reviewable update path.
 
+The Practice-recovery follow-up passes 248 Vitest tests across 30 files, lint,
+formatting and the production build. All 25 unaffected Playwright flows passed in
+the full run; the three flows whose old refresh assumptions correctly encountered
+the new recovery card were updated and passed targeted reruns, for 28 covered flows
+in total. Browser coverage verifies post-submit feedback recovery, a clean next
+question, no answer metadata in the stored public question list, mobile fit, axe and
+existing exam ownership transfer.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -565,6 +587,7 @@ version comments preserve a reviewable update path.
 - `9d8ad66` — initialize Django for exact candidate revision checks.
 - `26ba462` — record the container security release.
 - `2040b48` — pin CI actions and stop persisting checkout credentials.
+- `94c6291` — resume interrupted Practice sessions without leaking future answers.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.

@@ -305,7 +305,9 @@ Confidence calibration compares aggregate high-confidence misses and
 low-confidence successes. Flashcards count as study activity but are excluded from
 performance, confidence calibration and pace because their result is self-rated.
 
-## Active exam recovery
+## Active session recovery
+
+### Exams
 
 An in-progress exam is stored separately under the versioned
 `pcep.activeExam` key. It contains only sanitized public questions, the learner's
@@ -335,11 +337,34 @@ duplicate flags, invalid timestamps and extra top-level fields. Abandoned data
 expires 24 hours after its deadline. Storage failure uses the existing persistence
 warning and never blocks the live in-memory exam.
 
-Progress, settings and active-exam writes refuse to replace a storage schema with
-a higher version number. A stale tab also leaves newer recovery data untouched on
-read and clear, and shows a reload warning immediately or after a cross-tab storage
-change. This prevents an older cached bundle from deleting data written by a newer
-release.
+### Practice
+
+An in-progress Practice session is stored separately under the versioned
+`pcep.activePractice` key. The snapshot contains sanitized public questions,
+current position, confidence, start time and an opaque ownership ID. Completed
+items may contain feedback because the learner has already submitted those exact
+answers. Every unanswered question passes through the public-question whitelist,
+so its correct choice, explanations and correctness flags are never stored.
+Practice recovery is local to the browser and is excluded from progress exports.
+
+The snapshot is updated after a confidence change, successful submission or move
+to the next question. Reload offers an explicit Resume or confirmed Discard;
+resuming submitted feedback does not repeat the API request. Successful completion
+records one normal attempt and removes the snapshot, while Quit discards it. Strict
+validation binds every completed item to the corresponding question and choice,
+checks correctness against the returned correct choice, bounds explanations and
+response times, rejects unknown fields and expires snapshots after 24 hours.
+
+Resuming rotates the Practice session ID. A stale tab detects the ownership change,
+aborts an answer request in flight, returns to the recovery screen and cannot
+overwrite or clear the new owner's copy. Browser storage failure raises the normal
+persistence warning but does not block the in-memory session.
+
+Progress, settings and active-session writes refuse to replace a storage schema
+with a higher version number. A stale tab also leaves newer recovery data untouched
+on read and clear, and shows a reload warning immediately or after a cross-tab
+storage change. This prevents an older cached bundle from deleting data written by
+a newer release.
 
 Current-version progress writes emit an in-tab change signal, while other tabs use
 the browser's `storage` event. Setup counters, the open dashboard and bookmark

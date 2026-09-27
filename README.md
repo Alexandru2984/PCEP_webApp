@@ -51,9 +51,10 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   [PCEP-30-02](https://pythoninstitute.org/pcep) full-mock preset with 30 questions,
   40 minutes and the official 7/8/7/8 module item distribution; the UI clearly notes
   that this trainer does not reproduce the official interactive item formats.
-- 💾 **Crash-safe exam recovery** — an interrupted exam restores its live deadline,
-  current question, selected answers and flags from a validated local-only copy;
-  discarding it requires explicit confirmation
+- 💾 **Crash-safe session recovery** — an interrupted exam restores its live deadline,
+  selections and flags, while Practice resumes at the current question or already
+  submitted feedback. Both use validated local-only copies, require confirmation before
+  discard and keep answer keys out of every unanswered question.
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
   due-review drills, per-question mastery and transparent adaptive practice that also
   prioritizes low-confidence answers, without accounts or tracking
