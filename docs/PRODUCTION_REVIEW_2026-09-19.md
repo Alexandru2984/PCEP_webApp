@@ -340,6 +340,12 @@ Its live browser probe injected one 503 for `/api/stats/`, observed the recovery
 message, retried against the real production API and rendered the validated 308
 question snapshot at 390 px with no unexpected application errors or overflow.
 
+The atomic-session release passes 204 Vitest tests, lint, formatting, the
+production build and all 25 Playwright flows. Regression coverage verifies that
+history, mistakes and review scheduling are written as one progress snapshot;
+a simulated quota failure preserves the entire preceding snapshot while the
+completed report remains available in memory.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -391,6 +397,8 @@ question snapshot at 390 px with no unexpected application errors or overflow.
 - `4d90431` — keep keyboard-submitted confidence metadata current.
 - `bb9b04c` — record the keyboard-confidence frontend release.
 - `493d368` — validate and retry question-bank stats snapshots.
+- `245ef3c` — record the stats-resilience frontend release.
+- `fffea9e` — persist each completed session as one atomic progress snapshot.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -449,7 +457,16 @@ change or Nginx reload. The stats-resilience frontend release has rollback root
 `.frontend.previous-20260927T135508Z-dd77b23c` and external backup
 `frontend.20260927T135508Z-dd77b23c`; the new and preceding hashed entry chunks
 were both verified publicly. It also required no backend restart, database
-change or Nginx reload.
+change or Nginx reload. The atomic-session release has rollback root
+`.frontend.previous-20260927T140411Z-f2512df3` and external backup
+`frontend.20260927T140411Z-f2512df3`. The published entry chunk
+`index-CRCXmYW7.js` matches the validated build by SHA-256
+(`0d725ef4d7c105df85404ebc8cffd3e0c162ef7a38e67880c0deda351977a9f2`), while
+the preceding entry chunk remains publicly available for open tabs. Public and
+origin homepages, readiness, the 308-question stats snapshot, redirect, security
+headers, immutable asset caching and no-store service-worker caching were
+verified. This release required no backend restart, database change or Nginx
+reload.
 
 ## 15. Breaking changes
 
