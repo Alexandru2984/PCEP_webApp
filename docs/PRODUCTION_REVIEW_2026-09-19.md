@@ -351,6 +351,14 @@ production build and all 25 Playwright flows. A quota-failure regression proves
 that a graded exam keeps its recovery snapshot until the combined progress
 snapshot has been stored successfully.
 
+The progress-tools and content-audit release passes 177 backend tests, 207
+Vitest tests across 27 files, lint, formatting, production build and all 25
+Playwright flows. Seed and live-database audits pass for 308 questions; Python
+production/development and npm dependency audits report no known
+vulnerabilities. Regression coverage verifies honest reset/export failure
+states and rejects every unparsable Python snippet except the two exact reviewed
+syntax-error teaching cases.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -406,6 +414,9 @@ snapshot has been stored successfully.
 - `fffea9e` — persist each completed session as one atomic progress snapshot.
 - `410efa6` — record the atomic-session frontend release.
 - `a6ecdd3` — retain exam recovery when final progress cannot be persisted.
+- `c85c291` — record the exam-recovery frontend release.
+- `e33e5fd` — report progress reset and export failures accurately.
+- `7a5e4dd` — reject unreviewed invalid Python snippets during content audits.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -481,7 +492,23 @@ matches the validated build by SHA-256
 preceding chunk remains public. Public/origin homepages, readiness, the
 308-question snapshot and service-worker cache policy passed after publication;
 both containers stayed healthy. No backend restart, database change or Nginx
-reload was required.
+reload was required. The progress-tools/content-audit release has frontend
+rollback root `.frontend.previous-20260927T141722Z-7a254166` and external backup
+`frontend.20260927T141722Z-7a254166`. Its entry chunk `index-kkG5iDqv.js`
+matches the validated build by SHA-256
+(`2faee9bc9f70e97031d7204825033d8352c022c1d729f063abb207e478786dee`). The
+previous backend image is tagged
+`pcep-backend-rollback:20260927T141628Z-pre-syntax-audit`; the verified database
+backup is `pcep_db_pre_syntax_audit_20260927T141628Z.sql.gz` with SHA-256
+`7579fb8a3ef20fbe5e12a81d881b4b8c051e11f299203540d81d3e574dafe3a6`.
+Production now runs backend image
+`sha256:20b99cf0b20d271b465d8136538b8036a87e5a203a69fbef961bbb63998a164a`.
+Candidate and deployed-container checks audited the live database read-only;
+startup applied no migrations. Public probes verified edge/origin pages,
+liveness, readiness, 308-question stats, pre-answer field secrecy,
+post-submission feedback, redirects, security headers and cache policies. Only
+the backend container was recreated; PostgreSQL and Nginx were not restarted,
+and no environment variable or schema change was introduced.
 
 ## 15. Breaking changes
 
