@@ -407,6 +407,14 @@ horizontal overflow at 390 px and an active service worker with no waiting updat
 Public API probes again found zero answer fields before submission and normal
 feedback after submission.
 
+The in-flight-grading follow-up passes 228 Vitest tests across 28 files, lint,
+formatting, the production build and all 26 Playwright flows. A cross-tab owner
+change now aborts any pending grading request, and a direct ownership check before
+result persistence covers delayed or missed storage events. A live two-tab probe
+held the first tab's grading request open while the second tab resumed the exam;
+release `3714babc2946` returned the stale tab to recovery, preserved the new owner
+and left local attempt history empty.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -476,6 +484,8 @@ feedback after submission.
 - `e8c15d2` — preserve local data written with a newer storage schema.
 - `ed5e2eb` — record the cross-version storage release.
 - `dc03ce0` — prevent stale tabs from overwriting active exams.
+- `ca59a7a` — record the active-exam ownership release.
+- `3714bab` — cancel stale cross-tab grading before it can persist.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -614,6 +624,16 @@ The public, live-root and validated-build service workers match at SHA-256
 This was a frontend-only atomic publish. The backend remained healthy on release
 `0d92a2d8a4a0`; PostgreSQL, Docker services and Nginx were not restarted, and
 no migration or environment change was required. Privileged `nginx -t` passed.
+
+The in-flight-grading release has frontend rollback root
+`.frontend.previous-20260927T183928Z-5f82b196` and external backup
+`frontend.20260927T183928Z-5f82b196`. Its entry chunk `index-DFDJJr0q.js` has
+SHA-256 `1b4674ca20f95db6ef3d81eccf338a9ab88ce97629dc385077a5d8a1b4b7d68e`;
+both it and preceding `index-BNeBr8ht.js` returned 200 publicly after the swap.
+The live and validated-build service workers match at SHA-256
+`15b726ff743866ed176d10b61d9b1a1a5ec4e039f22ffad8e1c2721e4b2194ca`.
+The backend and PostgreSQL remained healthy, and neither was recreated. No
+migration, environment change or Nginx reload was required.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
