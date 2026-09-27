@@ -313,6 +313,12 @@ duplicate flags, invalid timestamps and extra top-level fields. Abandoned data
 expires 24 hours after its deadline. Storage failure uses the existing persistence
 warning and never blocks the live in-memory exam.
 
+Progress, settings and active-exam writes refuse to replace a storage schema with
+a higher version number. A stale tab also leaves newer recovery data untouched on
+read and clear, and shows a reload warning immediately or after a cross-tab storage
+change. This prevents an older cached bundle from deleting data written by a newer
+release.
+
 The Python runner limits source to 20,000 characters, output/tracebacks to
 10,000 characters, queued/running jobs to four, startup to 30 seconds and each
 execution to eight seconds. Timeout terminates the worker; later Run recreates

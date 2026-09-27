@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { hasNewerStoredSchema } from '../storage'
 
 const INSTALL_DISMISSED_KEY = 'pcep.install-dismissed'
 
 export default function RuntimeStatus() {
   const [offline, setOffline] = useState(() => navigator.onLine === false)
   const [updated, setUpdated] = useState(false)
+  const [versionWarning, setVersionWarning] = useState(hasNewerStoredSchema)
   const waitingWorker = useRef(null)
   const reloadAfterActivation = useRef(false)
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -26,6 +28,10 @@ export default function RuntimeStatus() {
   useEffect(() => {
     const update = () => setOffline(navigator.onLine === false)
     const warn = () => setStorageWarning(true)
+    const warnVersion = () => setVersionWarning(true)
+    const detectVersion = () => {
+      if (hasNewerStoredSchema()) warnVersion()
+    }
     const serviceWorker = navigator.serviceWorker
     let controlled = !!serviceWorker?.controller
     let registration
@@ -68,6 +74,8 @@ export default function RuntimeStatus() {
     window.addEventListener('online', update)
     window.addEventListener('offline', update)
     window.addEventListener('pcep-storage-warning', warn)
+    window.addEventListener('pcep-storage-version-warning', warnVersion)
+    window.addEventListener('storage', detectVersion)
     window.addEventListener('beforeinstallprompt', offerInstall)
     window.addEventListener('appinstalled', installed)
     serviceWorker?.addEventListener('controllerchange', controllerChanged)
@@ -77,6 +85,8 @@ export default function RuntimeStatus() {
       window.removeEventListener('online', update)
       window.removeEventListener('offline', update)
       window.removeEventListener('pcep-storage-warning', warn)
+      window.removeEventListener('pcep-storage-version-warning', warnVersion)
+      window.removeEventListener('storage', detectVersion)
       window.removeEventListener('beforeinstallprompt', offerInstall)
       window.removeEventListener('appinstalled', installed)
       serviceWorker?.removeEventListener('controllerchange', controllerChanged)
@@ -179,6 +189,15 @@ export default function RuntimeStatus() {
         >
           You are offline. New quizzes and answer feedback need a connection. Keep your
           exam open and retry grading when you reconnect.
+        </p>
+      )}
+      {versionWarning && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          Saved quiz data was created by a newer app version and has been protected.
+          Reload this tab before continuing.
         </p>
       )}
       {storageWarning && (

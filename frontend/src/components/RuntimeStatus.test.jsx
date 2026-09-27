@@ -9,6 +9,16 @@ describe('application recovery', () => {
     fireEvent(window, new CustomEvent('pcep-storage-warning'))
     expect(screen.getByRole('alert')).toHaveTextContent('Progress could not be saved')
   })
+  it('warns when another app version owns newer saved data', () => {
+    localStorage.setItem(
+      'pcep.activeExam',
+      JSON.stringify({ version: 2, data: { future: true } })
+    )
+    render(<RuntimeStatus />)
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Saved quiz data was created by a newer app version'
+    )
+  })
   it('announces a worker update without reloading an active session', () => {
     const serviceWorker = new EventTarget()
     serviceWorker.controller = {}

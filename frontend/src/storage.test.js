@@ -27,6 +27,7 @@ import {
   loadNote,
   saveNote,
   clearNotes,
+  hasNewerStoredSchema,
 } from './storage'
 
 const question = (id) => ({
@@ -106,6 +107,19 @@ describe('history', () => {
   it('falls back to [] when the stored value is corrupt', () => {
     localStorage.setItem('pcep.history', '{not valid json')
     expect(loadHistory()).toEqual([])
+  })
+
+  it('does not overwrite progress created by a newer storage schema', () => {
+    const future = JSON.stringify({ version: 2, data: { future: true } })
+    localStorage.setItem('pcep.progress', future)
+    const warning = vi.fn()
+    window.addEventListener('pcep-storage-version-warning', warning)
+
+    appendAttempt(attempt('old-tab-write'))
+    expect(localStorage.getItem('pcep.progress')).toBe(future)
+    expect(warning).toHaveBeenCalledOnce()
+
+    window.removeEventListener('pcep-storage-version-warning', warning)
   })
 
   it('validates confidence summaries and measured response timing', () => {
@@ -225,6 +239,14 @@ describe('settings', () => {
     saveSettings(settings)
     expect(loadSettings()).toEqual(settings)
   })
+
+  it('does not overwrite settings created by a newer storage schema', () => {
+    const future = JSON.stringify({ version: 2, data: { future: true } })
+    localStorage.setItem('pcep.settings', future)
+
+    expect(saveSettings({ mode: 'practice', count: 10 })).toBe(false)
+    expect(localStorage.getItem('pcep.settings')).toBe(future)
+  })
 })
 
 describe('personal notes', () => {
@@ -334,6 +356,22 @@ describe('active exam recovery', () => {
     expect(clearActiveExam()).toBe(true)
     expect(loadActiveExam()).toBeNull()
     expect(loadHistory()).toEqual([attempt('kept')])
+  })
+
+  it('never reads, overwrites or clears a recovery snapshot from a newer schema', () => {
+    const future = JSON.stringify({ version: 2, data: { future: true } })
+    localStorage.setItem('pcep.activeExam', future)
+    const warning = vi.fn()
+    window.addEventListener('pcep-storage-version-warning', warning)
+
+    expect(hasNewerStoredSchema()).toBe(true)
+    expect(loadActiveExam()).toBeNull()
+    expect(saveActiveExam(activeExam())).toBe(false)
+    expect(clearActiveExam()).toBe(false)
+    expect(localStorage.getItem('pcep.activeExam')).toBe(future)
+    expect(warning).toHaveBeenCalledTimes(3)
+
+    window.removeEventListener('pcep-storage-version-warning', warning)
   })
 })
 

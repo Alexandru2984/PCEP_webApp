@@ -18,6 +18,8 @@ const LIMIT = 100
 const NOTE_MAX_LENGTH = 2000
 const PROGRESS_KEY = 'pcep.progress'
 const ACTIVE_EXAM_KEY = 'pcep.activeExam'
+const SETTINGS_KEY = 'pcep.settings'
+const VERSIONED_KEYS = [PROGRESS_KEY, ACTIVE_EXAM_KEY, SETTINGS_KEY]
 const BACKUP_MAX_BYTES = 8 * 1024 * 1024
 const ACTIVE_EXAM_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const ACTIVE_EXAM_MAX_DURATION_MS = MAX_RESPONSE_MS
@@ -44,6 +46,12 @@ function write(key, value) {
     return false
   }
 }
+const newerSchema = (value) =>
+  Number.isSafeInteger(value?.version) && value.version > VERSION
+const warnNewerSchema = () =>
+  window.dispatchEvent(new CustomEvent('pcep-storage-version-warning'))
+export const hasNewerStoredSchema = () =>
+  VERSIONED_KEYS.some((key) => newerSchema(read(key, null)))
 
 function breakdown(value, keys, score, total, allowPartial = false) {
   if (value == null) return undefined
@@ -210,8 +218,8 @@ function loadProgress() {
 }
 function saveProgress(data) {
   const existing = read(PROGRESS_KEY, null)
-  if (existing?.version > VERSION) {
-    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+  if (newerSchema(existing)) {
+    warnNewerSchema()
     return false
   }
   if (!write(PROGRESS_KEY, { version: VERSION, data })) return false
@@ -255,11 +263,16 @@ function normalizeSettings(s) {
   }
 }
 export function loadSettings() {
-  const saved = read('pcep.settings', null)
+  const saved = read(SETTINGS_KEY, null)
   return normalizeSettings(saved?.version === VERSION ? saved.data : saved)
 }
-export const saveSettings = (settings) =>
-  write('pcep.settings', { version: VERSION, data: settings })
+export function saveSettings(settings) {
+  if (newerSchema(read(SETTINGS_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
+  return write(SETTINGS_KEY, { version: VERSION, data: settings })
+}
 export const loadTheme = () => {
   const theme = read('pcep.theme', null)
   return ['light', 'dark'].includes(theme) ? theme : null
@@ -386,6 +399,10 @@ function normalizeActiveExam(value, now = Date.now()) {
 
 export function loadActiveExam() {
   const saved = read(ACTIVE_EXAM_KEY, null)
+  if (newerSchema(saved)) {
+    warnNewerSchema()
+    return null
+  }
   const normalized = saved?.version === VERSION ? normalizeActiveExam(saved.data) : null
   if (!normalized) {
     try {
@@ -397,12 +414,20 @@ export function loadActiveExam() {
   return normalized
 }
 export function saveActiveExam(exam) {
+  if (newerSchema(read(ACTIVE_EXAM_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
   const normalized = normalizeActiveExam(exam)
   return normalized
     ? write(ACTIVE_EXAM_KEY, { version: VERSION, data: normalized })
     : false
 }
 export function clearActiveExam() {
+  if (newerSchema(read(ACTIVE_EXAM_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
   try {
     localStorage.removeItem(ACTIVE_EXAM_KEY)
     return true
