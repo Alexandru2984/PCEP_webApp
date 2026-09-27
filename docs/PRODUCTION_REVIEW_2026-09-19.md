@@ -424,6 +424,16 @@ Save before replacement. Fresh live Chromium verified release `76a10d5f0b14`, a
 dashboard update after another tab completed a session, protected concurrent note
 editing, zero axe violations and no horizontal overflow at 390 px.
 
+The supported-dependency refresh keeps React 18, Vite 6 and Vitest 4 while
+updating compatible frontend packages and moving the development linter from the
+unsupported ESLint 9 line to ESLint 10. `npm ci`, 232 Vitest tests, lint,
+formatting, the production build and all 27 Playwright flows pass; `npm audit`
+reports zero vulnerabilities. Axios remains exactly at audited 1.18.0 because
+1.20.0 alone increased the entry bundle by about 5.9 KB / 1.9 KB gzip with no
+security finding to resolve. The validated entry remains 277.89 KB / 88.61 KB
+gzip. Fresh live Chromium verified release `11d8c34b956e`, answer-safe quiz fetch,
+post-submit feedback, zero axe violations, no mobile overflow and an active worker.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -497,6 +507,8 @@ editing, zero axe violations and no horizontal overflow at 390 px.
 - `3714bab` — cancel stale cross-tab grading before it can persist.
 - `ae3c5c0` — record the cross-tab grading release.
 - `76a10d5` — synchronize progress UI and protect concurrent note drafts.
+- `1ae62bd` — record the progress synchronization release.
+- `11d8c34` — refresh supported frontend dependencies and ESLint 10.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -656,6 +668,17 @@ The public, live-root and validated-build service workers match at SHA-256
 Public liveness/readiness passed, both containers stayed healthy and privileged
 `nginx -t` passed. No backend restart, database change, migration, environment
 change or Nginx reload was required.
+
+The supported-dependency release has frontend rollback root
+`.frontend.previous-20260927T185919Z-038c21ed` and external backup
+`frontend.20260927T185919Z-038c21ed`. Its entry chunk `index-BvxnNmgb.js` has
+SHA-256 `13e44d0eaf16674031d9cc7bc151334a9087af62969e5a3117081faa6b1e2f9b`;
+both it and preceding `index-DdurC_7K.js` returned 200 publicly after the swap.
+The public, live-root and validated-build service workers match at SHA-256
+`dc98c58d3433a575737a3a2887748b3e5601644512f03e4f86d689a71ec27701`.
+The backend and PostgreSQL stayed healthy and privileged `nginx -t` passed. No
+backend restart, database change, migration, environment change or Nginx reload
+was required.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
