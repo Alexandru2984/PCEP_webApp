@@ -169,15 +169,25 @@ export default function useQuizSession() {
   useEffect(() => {
     const sessionId = state.examProgress?.sessionId
     if (state.phase !== 'exam' || !sessionId) return
+    const stopStaleExam = () => {
+      const currentExam = loadActiveExam()
+      if (currentExam?.sessionId === sessionId) return
+      request.current?.abort()
+      request.current = null
+      dispatch({ type: 'storage-conflict', exam: currentExam })
+    }
     const changedInAnotherTab = (event) => {
       if (event.key !== 'pcep.activeExam') return
       const currentExam = loadActiveExam()
       if (currentExam?.sessionId === sessionId) return
       window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
-      dispatch({ type: 'storage-conflict', exam: currentExam })
     }
     window.addEventListener('storage', changedInAnotherTab)
-    return () => window.removeEventListener('storage', changedInAnotherTab)
+    window.addEventListener('pcep-active-exam-conflict', stopStaleExam)
+    return () => {
+      window.removeEventListener('storage', changedInAnotherTab)
+      window.removeEventListener('pcep-active-exam-conflict', stopStaleExam)
+    }
   }, [state.examProgress?.sessionId, state.phase])
 
   const begin = () => {
@@ -307,7 +317,14 @@ export default function useQuizSession() {
   }
 
   const finish = (items, total) => {
-    if (finished.current || !mounted.current) return
+    if (finished.current || !mounted.current) return false
+    if (state.lastConfig?.mode === 'exam') {
+      const currentExam = loadActiveExam()
+      if (currentExam && currentExam.sessionId !== state.examProgress?.sessionId) {
+        window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
+        return false
+      }
+    }
     finished.current = true
     const completedAt = Date.now()
     const elapsed = completedAt - state.startedAt
@@ -366,9 +383,15 @@ export default function useQuizSession() {
       items,
       completedAt
     )
-    if (saved && state.lastConfig?.mode === 'exam')
-      clearActiveExam(state.examProgress?.sessionId)
+    if (saved && state.lastConfig?.mode === 'exam') {
+      const sessionId = state.examProgress?.sessionId
+      if (!clearActiveExam(sessionId)) {
+        const currentExam = loadActiveExam()
+        if (currentExam && currentExam.sessionId !== sessionId) return false
+      }
+    }
     dispatch({ type: 'done', items, elapsed })
+    return true
   }
 
   const handleNext = () => {
@@ -421,8 +444,7 @@ export default function useQuizSession() {
               : null,
         }
       })
-      finish(items, state.questions.length)
-      return true
+      return finish(items, state.questions.length)
     } catch (error) {
       if (current(controller))
         dispatch({ type: 'grade-error', error: apiErrorMessage(error) })

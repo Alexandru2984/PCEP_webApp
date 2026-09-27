@@ -404,6 +404,68 @@ describe('quiz session requests', () => {
     expect(loadActiveExam().sessionId).toBe('session-in-another-tab')
   })
 
+  it('aborts in-flight grading when another tab claims the exam', async () => {
+    const grading = deferred()
+    gradeAnswers.mockReturnValueOnce(grading.promise)
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'exam' }))
+    let submission
+    act(() => {
+      submission = result.current.handleExamSubmit({ 1: 11 })
+    })
+    const signal = gradeAnswers.mock.calls[0][1].signal
+    const firstOwner = loadActiveExam()
+    const claimed = { ...firstOwner, sessionId: 'grading-in-another-tab' }
+
+    act(() => {
+      localStorage.setItem(
+        'pcep.activeExam',
+        JSON.stringify({ version: 1, data: claimed })
+      )
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'pcep.activeExam',
+          newValue: localStorage.getItem('pcep.activeExam'),
+        })
+      )
+    })
+    expect(signal.aborted).toBe(true)
+    expect(result.current.phase).toBe('setup')
+
+    let submitted
+    await act(async () => {
+      grading.resolve({
+        results: [{ ...feedback, question_id: 1, choice_id: 11 }],
+      })
+      submitted = await submission
+    })
+    expect(submitted).toBe(false)
+    expect(result.current.phase).toBe('setup')
+    expect(loadHistory()).toEqual([])
+    expect(loadActiveExam().sessionId).toBe('grading-in-another-tab')
+  })
+
+  it('checks exam ownership before persisting grading when no event arrives', async () => {
+    gradeAnswers.mockResolvedValue({
+      results: [{ ...feedback, question_id: 1, choice_id: 11 }],
+    })
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'exam' }))
+    const firstOwner = loadActiveExam()
+    const claimed = { ...firstOwner, sessionId: 'silent-owner-change' }
+    localStorage.setItem('pcep.activeExam', JSON.stringify({ version: 1, data: claimed }))
+
+    let submitted
+    await act(async () => {
+      submitted = await result.current.handleExamSubmit({ 1: 11 })
+    })
+
+    expect(submitted).toBe(false)
+    expect(result.current.phase).toBe('setup')
+    expect(loadHistory()).toEqual([])
+    expect(loadActiveExam().sessionId).toBe('silent-owner-change')
+  })
+
   it('starts a due-review drill from current public question ids', async () => {
     updateStudyProgress(
       [{ question, feedback: { is_correct: false } }],
