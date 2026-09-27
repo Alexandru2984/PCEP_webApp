@@ -443,17 +443,31 @@ export function saveNote(questionId, text, now = Date.now()) {
   return notes.find((note) => note.questionId === questionId) ?? null
 }
 
-export function updateMistakes(items) {
-  const progress = loadProgress()
+function mergeMistakes(existing, items) {
   // Insertion order is oldest first; do not reverse untouched records on each save.
-  const byId = new Map([...progress.mistakes].reverse().map((q) => [q.id, q]))
+  const byId = new Map([...existing].reverse().map((q) => [q.id, q]))
   for (const item of items) {
     const question = publicQuestion(item?.question)
     if (!question) continue
     byId.delete(question.id)
     if (item.feedback?.is_correct !== true) byId.set(question.id, question)
   }
-  const mistakes = [...byId.values()].reverse().slice(0, LIMIT)
+  return [...byId.values()].reverse().slice(0, LIMIT)
+}
+
+export function recordCompletedSession(attempt, items, now = Date.now()) {
+  const normalized = validAttempt({ ...attempt, id: attempt.id ?? crypto.randomUUID() })
+  if (!normalized || !Array.isArray(items)) return false
+  const progress = loadProgress()
+  const history = [normalized, ...progress.history].slice(0, LIMIT)
+  const mistakes = mergeMistakes(progress.mistakes, items)
+  const study = updateStudyRecords(progress.study, items, now)
+  return saveProgress({ ...progress, history, mistakes, study })
+}
+
+export function updateMistakes(items) {
+  const progress = loadProgress()
+  const mistakes = mergeMistakes(progress.mistakes, items)
   saveProgress({ ...progress, mistakes })
   return mistakes
 }

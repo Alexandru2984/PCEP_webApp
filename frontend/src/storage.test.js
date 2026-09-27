@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   loadHistory,
   appendAttempt,
+  recordCompletedSession,
   clearHistory,
   saveSettings,
   loadSettings,
@@ -413,6 +414,65 @@ describe('study progress', () => {
     updateMistakes([wrong(2)])
     expect(loadAdaptivePlan().ids).toEqual([2, 1])
     expect(loadAdaptivePlan().signals).toMatchObject({ due: 1, mistakes: 1 })
+  })
+})
+
+describe('completed sessions', () => {
+  it('persists history, mistakes and study progress with one storage write', () => {
+    appendAttempt(attempt('existing'))
+    updateMistakes([wrong(3)])
+    updateStudyProgress([wrong(3)], Date.UTC(2026, 8, 19))
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+
+    expect(
+      recordCompletedSession(
+        attempt('new', 1, { total: 2, pct: 50 }),
+        [right(1), wrong(2)],
+        Date.UTC(2026, 8, 20)
+      )
+    ).toBe(true)
+    expect(setItem).toHaveBeenCalledTimes(1)
+    expect(loadHistory().map((entry) => entry.id)).toEqual(['new', 'existing'])
+    expect(loadMistakes().map((item) => item.id)).toEqual([2, 3])
+    expect(loadStudyProgress()).toMatchObject([
+      { questionId: 1, attempts: 1, correct: 1 },
+      { questionId: 2, attempts: 1, correct: 0 },
+      { questionId: 3, attempts: 1, correct: 0 },
+    ])
+    expect(localStorage.getItem('pcep.progress')).not.toMatch(
+      /is_correct|correct_choice_id|explanation/
+    )
+    setItem.mockRestore()
+  })
+
+  it('keeps the entire previous snapshot when the browser rejects the write', () => {
+    appendAttempt(attempt('existing'))
+    updateMistakes([wrong(3)])
+    updateStudyProgress([wrong(3)], Date.UTC(2026, 8, 19))
+    const before = localStorage.getItem('pcep.progress')
+    const warning = vi.fn()
+    window.addEventListener('pcep-storage-warning', warning)
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota', 'QuotaExceededError')
+    })
+
+    expect(
+      recordCompletedSession(
+        attempt('new', 1, { total: 2, pct: 50 }),
+        [right(1), wrong(2)],
+        Date.UTC(2026, 8, 20)
+      )
+    ).toBe(false)
+    expect(localStorage.getItem('pcep.progress')).toBe(before)
+    expect(loadHistory().map((entry) => entry.id)).toEqual(['existing'])
+    expect(loadMistakes().map((item) => item.id)).toEqual([3])
+    expect(loadStudyProgress()).toMatchObject([
+      { questionId: 3, attempts: 1, correct: 0 },
+    ])
+    expect(warning).toHaveBeenCalledOnce()
+
+    setItem.mockRestore()
+    window.removeEventListener('pcep-storage-warning', warning)
   })
 })
 

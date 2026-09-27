@@ -7,7 +7,6 @@ import {
   submitAnswer,
 } from './api'
 import {
-  appendAttempt,
   clearActiveExam,
   loadActiveExam,
   loadAdaptivePlan,
@@ -15,10 +14,9 @@ import {
   loadDueReviews,
   loadMistakes,
   loadSettings,
+  recordCompletedSession,
   saveActiveExam,
   saveSettings,
-  updateMistakes,
-  updateStudyProgress,
 } from './storage'
 import { publicApiQuestion, validateFeedback } from './questionData'
 import { getStreakStats } from './streak'
@@ -287,7 +285,8 @@ export default function useQuizSession() {
     if (finished.current || !mounted.current) return
     finished.current = true
     if (state.lastConfig?.mode === 'exam') clearActiveExam()
-    const elapsed = Date.now() - state.startedAt
+    const completedAt = Date.now()
+    const elapsed = completedAt - state.startedAt
     const score = items.filter((i) => i.feedback?.is_correct).length
     const breakdown = (key) =>
       items.reduce((groups, item) => {
@@ -311,36 +310,38 @@ export default function useQuizSession() {
         item.responseMs >= 0 &&
         item.responseMs <= MAX_RESPONSE_MS
     )
-    appendAttempt({
-      date: new Date().toISOString(),
-      mode: state.lastConfig?.mode ?? 'practice',
-      module: state.lastConfig?.module ?? '',
-      objective: state.lastConfig?.objective ?? '',
-      difficulty: state.lastConfig?.difficulty ?? '',
-      score,
-      total,
-      pct: total ? Math.round((score / total) * 100) : 0,
-      elapsedMs: elapsed,
-      bestStreak: getStreakStats(items).best,
-      byModule: breakdown('module'),
-      byDifficulty: breakdown('difficulty'),
-      byObjective: breakdown('objective'),
-      ...(Object.keys(byConfidence).length ? { byConfidence } : {}),
-      ...(validDateKey(state.lastConfig?.challengeDate)
-        ? { challengeDate: state.lastConfig.challengeDate }
-        : {}),
-      ...(state.lastConfig?.preset === PCEP_30_02_PRESET.value
-        ? { preset: state.lastConfig.preset }
-        : {}),
-      ...(timedItems.length
-        ? {
-            responseMsTotal: timedItems.reduce((sum, item) => sum + item.responseMs, 0),
-            responseCount: timedItems.length,
-          }
-        : {}),
-    })
-    updateMistakes(items)
-    updateStudyProgress(items)
+    recordCompletedSession(
+      {
+        date: new Date(completedAt).toISOString(),
+        mode: state.lastConfig?.mode ?? 'practice',
+        module: state.lastConfig?.module ?? '',
+        objective: state.lastConfig?.objective ?? '',
+        difficulty: state.lastConfig?.difficulty ?? '',
+        score,
+        total,
+        pct: total ? Math.round((score / total) * 100) : 0,
+        elapsedMs: elapsed,
+        bestStreak: getStreakStats(items).best,
+        byModule: breakdown('module'),
+        byDifficulty: breakdown('difficulty'),
+        byObjective: breakdown('objective'),
+        ...(Object.keys(byConfidence).length ? { byConfidence } : {}),
+        ...(validDateKey(state.lastConfig?.challengeDate)
+          ? { challengeDate: state.lastConfig.challengeDate }
+          : {}),
+        ...(state.lastConfig?.preset === PCEP_30_02_PRESET.value
+          ? { preset: state.lastConfig.preset }
+          : {}),
+        ...(timedItems.length
+          ? {
+              responseMsTotal: timedItems.reduce((sum, item) => sum + item.responseMs, 0),
+              responseCount: timedItems.length,
+            }
+          : {}),
+      },
+      items,
+      completedAt
+    )
     dispatch({ type: 'done', items, elapsed })
   }
 

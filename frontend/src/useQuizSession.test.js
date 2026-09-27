@@ -202,6 +202,28 @@ describe('quiz session requests', () => {
     ])
   })
 
+  it('still shows completed results when browser storage rejects the snapshot', async () => {
+    submitAnswer.mockResolvedValue(feedback)
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+    await act(async () => result.current.handleSelect(11))
+    const warning = vi.fn()
+    window.addEventListener('pcep-storage-warning', warning)
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota', 'QuotaExceededError')
+    })
+
+    act(() => result.current.handleNext())
+    expect(result.current.phase).toBe('done')
+    expect(result.current.history).toHaveLength(1)
+    expect(loadHistory()).toEqual([])
+    expect(loadStudyProgress()).toEqual([])
+    expect(warning).toHaveBeenCalledOnce()
+
+    setItem.mockRestore()
+    window.removeEventListener('pcep-storage-warning', warning)
+  })
+
   it('cancels loading on reset and ignores stale responses', async () => {
     const loading = deferred()
     fetchQuizSet.mockReturnValueOnce(loading.promise)
