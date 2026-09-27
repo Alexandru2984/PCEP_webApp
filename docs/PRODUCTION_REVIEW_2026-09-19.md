@@ -415,6 +415,15 @@ held the first tab's grading request open while the second tab resumed the exam;
 release `3714babc2946` returned the stale tab to recovery, preserved the new owner
 and left local attempt history empty.
 
+The progress-synchronization follow-up passes 232 Vitest tests across 29 files,
+lint, formatting, the production build and all 27 Playwright flows. Setup counts,
+the dashboard and bookmark state now react to same-tab writes and native cross-tab
+storage events without polling. Note viewers refresh automatically; an editor
+detects a newer stored note, preserves its draft and requires a second deliberate
+Save before replacement. Fresh live Chromium verified release `76a10d5f0b14`, a
+dashboard update after another tab completed a session, protected concurrent note
+editing, zero axe violations and no horizontal overflow at 390 px.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -486,6 +495,8 @@ and left local attempt history empty.
 - `dc03ce0` — prevent stale tabs from overwriting active exams.
 - `ca59a7a` — record the active-exam ownership release.
 - `3714bab` — cancel stale cross-tab grading before it can persist.
+- `ae3c5c0` — record the cross-tab grading release.
+- `76a10d5` — synchronize progress UI and protect concurrent note drafts.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -634,6 +645,17 @@ The live and validated-build service workers match at SHA-256
 `15b726ff743866ed176d10b61d9b1a1a5ec4e039f22ffad8e1c2721e4b2194ca`.
 The backend and PostgreSQL remained healthy, and neither was recreated. No
 migration, environment change or Nginx reload was required.
+
+The progress-synchronization release has frontend rollback root
+`.frontend.previous-20260927T184840Z-90534d69` and external backup
+`frontend.20260927T184840Z-90534d69`. Its entry chunk `index-DdurC_7K.js` has
+SHA-256 `cc5c534ed657802ef988f1a4dce34b693b0182827e18a6b53d727cc530c88101`;
+both it and preceding `index-DFDJJr0q.js` returned 200 publicly after the swap.
+The public, live-root and validated-build service workers match at SHA-256
+`54ce85b3d2edcd8159a54408eb5b62793cb9af8bae45dfaaba493a3169deba0d`.
+Public liveness/readiness passed, both containers stayed healthy and privileged
+`nginx -t` passed. No backend restart, database change, migration, environment
+change or Nginx reload was required.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
