@@ -176,6 +176,13 @@ state change. Selecting a confidence level and immediately answering with
 `1`–`4` or `A`–`D` therefore records the chosen confidence instead of submitting
 through a stale pre-selection callback.
 
+The question-bank snapshot is now normalized before it reaches the setup UI.
+Module, difficulty and objective totals must agree with both coverage matrices
+and the four module summaries, so a partial or malformed API response produces a
+recoverable error instead of crashing the workspace or clamping a quiz against
+bad counts. A visible retry cancels any older stats request and preserves the
+learner's setup choices.
+
 The Pyodide manager bounds startup at 30 seconds, a run at eight seconds, source
 at 20,000 characters, output at 10,000 characters and active/queued jobs at
 four. Timeout or fatal failure replaces the worker. The pinned 0.29.4 npm
@@ -246,8 +253,8 @@ The stats endpoint now performs one grouped query. Questions prefetch choices;
 no N+1 path was introduced. API payloads are capped and public answer data stays
 minimal. Pyodide remains lazy and same-origin. Hashed frontend/admin assets are
 compressed and immutable; unversioned shell, worker, manifest and runtime entry
-points revalidate. The current main production bundle is approximately 270 KB
-JavaScript (86.5 KB gzip) and 46.5 KB CSS (8.4 KB gzip), excluding lazy chunks
+points revalidate. The current main production bundle is approximately 272.6 KB
+JavaScript (87.1 KB gzip) and 46.5 KB CSS (8.4 KB gzip), excluding lazy chunks
 and the Pyodide runtime.
 
 The release process retains older lazy chunks so tabs open across deployment do
@@ -328,6 +335,11 @@ release repeated all 194 Vitest and 24 Playwright checks and exercised the fixed
 confidence-plus-keyboard flow against the public site at 390 px with no
 application errors or horizontal overflow.
 
+The stats-resilience release passes 201 Vitest tests and 25 Playwright flows.
+Its live browser probe injected one 503 for `/api/stats/`, observed the recovery
+message, retried against the real production API and rendered the validated 308
+question snapshot at 390 px with no unexpected application errors or overflow.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -377,6 +389,8 @@ application errors or horizontal overflow.
 - `5ccb595` — expand foundations coverage for objectives 1.1 and 1.2.
 - `92808fe` — record the foundations coverage release.
 - `4d90431` — keep keyboard-submitted confidence metadata current.
+- `bb9b04c` — record the keyboard-confidence frontend release.
+- `493d368` — validate and retry question-bank stats snapshots.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -431,6 +445,10 @@ tag `pcep-backend-rollback:20260927-pre-foundations`, and candidate tag
 rollback root `.frontend.previous-20260927T134217Z-3eb500a8` and external backup
 `frontend.20260927T134217Z-3eb500a8`; both old and new hashed entry chunks were
 verified publicly after the atomic swap. It required no backend restart, database
+change or Nginx reload. The stats-resilience frontend release has rollback root
+`.frontend.previous-20260927T135508Z-dd77b23c` and external backup
+`frontend.20260927T135508Z-dd77b23c`; the new and preceding hashed entry chunks
+were both verified publicly. It also required no backend restart, database
 change or Nginx reload.
 
 ## 15. Breaking changes
