@@ -54,6 +54,31 @@ def test_python_option_case_is_semantically_significant():
     assert not validation_errors([q])
 
 
+def test_validation_rejects_unreviewed_invalid_python_snippets():
+    q = question(code_snippet='if ready:\nprint("missing indent")')
+    errors = validation_errors([q])
+    assert len(errors) == 1
+    assert (
+        'unreviewed invalid Python code snippet (IndentationError at line 2)'
+        in errors[0]
+    )
+
+
+def test_validation_allows_only_the_exact_reviewed_syntax_teaching_cases():
+    reviewed = question(
+        text='Which line raises a SyntaxError?',
+        code_snippet=(
+            '2nd = 5     # line A\n_value = 10  # line B\n'
+            'class_ = 1   # line C\nmyVar = 2    # line D'
+        ),
+    )
+    changed_prompt = {**reviewed, 'text': 'Which assignment raises a SyntaxError?'}
+    assert validation_errors([reviewed]) == []
+    assert 'unreviewed invalid Python code snippet' in ' '.join(
+        validation_errors([changed_prompt])
+    )
+
+
 def test_duplicate_audit_ignores_python_quote_and_whitespace_style():
     first = question(text='What is the output?', code_snippet='print("same")')
     second = question(text='  What  is the output? ', code_snippet="print( 'same' )")

@@ -13,6 +13,22 @@ VALID_OBJECTIVES = tuple(OBJECTIVE_LABELS)
 MIN_HARD_PER_MODULE = 8
 NEAR_DUPLICATE_THRESHOLD = 0.96
 
+# These snippets are deliberately invalid because the question asks learners to
+# identify the syntax failure. Match both prompt and source exactly so an
+# unrelated typo cannot inherit the exception.
+REVIEWED_INVALID_SNIPPETS = frozenset(
+    {
+        (
+            'Which line raises a SyntaxError?',
+            '2nd = 5     # line A\n_value = 10  # line B\nclass_ = 1   # line C\nmyVar = 2    # line D',
+        ),
+        (
+            'What happens when this code is executed?',
+            "if True:\nprint('ready')",
+        ),
+    }
+)
+
 # These pairs intentionally share a setup so learners can contrast one changed
 # rule: alias versus slice copy, negative index versus slice step, and skipping
 # one value versus all even values. Exact prompt/code keys make any future edit
@@ -147,6 +163,22 @@ def validation_errors(questions=ALL_QUESTIONS):
 
         if not question.get('text', '').strip():
             errors.append(f'{label} has empty question text')
+        snippet = question.get('code_snippet', '').strip()
+        if snippet:
+            try:
+                ast.parse(snippet)
+            except (SyntaxError, ValueError) as exc:
+                reviewed = (question.get('text', '').strip(), snippet)
+                if reviewed not in REVIEWED_INVALID_SNIPPETS:
+                    line = (
+                        f' at line {exc.lineno}'
+                        if isinstance(exc, SyntaxError)
+                        else ''
+                    )
+                    errors.append(
+                        f'{label} has an unreviewed invalid Python code snippet '
+                        f'({type(exc).__name__}{line})'
+                    )
         if question.get('module') not in valid_modules:
             errors.append(f'{label} has invalid module {question.get("module")!r}')
         if question.get('difficulty') not in valid_difficulties:
