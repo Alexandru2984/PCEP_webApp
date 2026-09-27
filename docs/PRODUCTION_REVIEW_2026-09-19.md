@@ -475,6 +475,12 @@ candidate-revision probe lacked Django initialization; the live container stayed
 healthy. The corrected probe is regression-tested, and the subsequent complete
 release validated the rollback-first behavior end to end.
 
+The CI supply-chain follow-up upgrades the official actions to their current
+Node 24 majors and pins every `uses:` reference to a full release commit SHA.
+Checkout credentials are no longer persisted because no job writes to Git.
+`actionlint` passes, all workflow permissions remain read-only and adjacent
+version comments preserve a reviewable update path.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -557,6 +563,8 @@ release validated the rollback-first behavior end to end.
 - `19754d5` — record rollback-safe backend releases.
 - `5085601` — pin and scan the backend runtime image.
 - `9d8ad66` — initialize Django for exact candidate revision checks.
+- `26ba462` — record the container security release.
+- `2040b48` — pin CI actions and stop persisting checkout credentials.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -761,6 +769,9 @@ release header. A separate public smoke test found no pre-answer fields and
 normal post-answer feedback; the exact live image passed Trivy and contains no
 test suite or development settings. PostgreSQL and Nginx were not restarted,
 no schema or environment setting changed, and privileged `nginx -t` passed.
+
+The CI action pinning changes only repository automation. It required no
+production deployment, service restart, migration or environment change.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
