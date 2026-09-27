@@ -105,6 +105,21 @@ describe('QuizSetup — practice your mistakes', () => {
     expect(screen.getByLabelText('Syllabus objective')).toHaveValue('')
   })
 
+  it('offers a retry when the question-bank snapshot fails', () => {
+    const onRetryStats = vi.fn()
+    render(
+      <QuizSetup
+        {...baseProps}
+        statsLoading={false}
+        statsError="Stats unavailable."
+        onRetryStats={onRetryStats}
+      />
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Stats unavailable.')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry snapshot' }))
+    expect(onRetryStats).toHaveBeenCalledOnce()
+  })
+
   it('offers the mistakes drill with a count and fires the callback', () => {
     const onPracticeMistakes = vi.fn()
     render(

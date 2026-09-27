@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { getScopeTotal } from './questionStats'
+import { getScopeTotal, normalizeQuestionStats } from './questionStats'
+import { OBJECTIVE_VALUES } from './syllabus'
 
 const stats = {
   total: 217,
@@ -14,6 +15,66 @@ const stats = {
     3.1: { easy: 7, medium: 8, hard: 3 },
   },
 }
+
+const emptyDifficulties = () => ({ easy: 0, medium: 0, hard: 0 })
+const snapshot = {
+  total: 4,
+  by_module: { module1: 1, module2: 1, module3: 1, module4: 1 },
+  by_difficulty: { easy: 2, medium: 1, hard: 1 },
+  by_objective: Object.fromEntries(OBJECTIVE_VALUES.map((value) => [value, 0])),
+  objective_matrix: Object.fromEntries(
+    OBJECTIVE_VALUES.map((value) => [value, emptyDifficulties()])
+  ),
+  matrix: {
+    module1: { easy: 1, medium: 0, hard: 0 },
+    module2: { easy: 0, medium: 1, hard: 0 },
+    module3: { easy: 0, medium: 0, hard: 1 },
+    module4: { easy: 1, medium: 0, hard: 0 },
+  },
+  modules: [
+    { value: 'module1', label: 'Module 1', total: 1, easy: 1, medium: 0, hard: 0 },
+    { value: 'module2', label: 'Module 2', total: 1, easy: 0, medium: 1, hard: 0 },
+    { value: 'module3', label: 'Module 3', total: 1, easy: 0, medium: 0, hard: 1 },
+    { value: 'module4', label: 'Module 4', total: 1, easy: 1, medium: 0, hard: 0 },
+  ],
+  pass_threshold: 70,
+}
+snapshot.by_objective['1.1'] = 1
+snapshot.by_objective['2.1'] = 1
+snapshot.by_objective['3.1'] = 1
+snapshot.by_objective['4.1'] = 1
+snapshot.objective_matrix['1.1'].easy = 1
+snapshot.objective_matrix['2.1'].medium = 1
+snapshot.objective_matrix['3.1'].hard = 1
+snapshot.objective_matrix['4.1'].easy = 1
+
+describe('normalizeQuestionStats', () => {
+  it('accepts a complete internally consistent snapshot', () => {
+    expect(normalizeQuestionStats(snapshot)).toEqual(snapshot)
+  })
+
+  it.each([
+    (value) => {
+      value.total = 5
+    },
+    (value) => {
+      value.modules[0].hard = 1
+    },
+    (value) => {
+      delete value.objective_matrix['4.4']
+    },
+    (value) => {
+      value.by_module.module5 = 0
+    },
+    (value) => {
+      value.pass_threshold = 101
+    },
+  ])('rejects malformed or inconsistent aggregate data', (mutate) => {
+    const invalid = structuredClone(snapshot)
+    mutate(invalid)
+    expect(normalizeQuestionStats(invalid)).toBeNull()
+  })
+})
 
 describe('getScopeTotal', () => {
   it('returns 0 when stats are missing', () => {

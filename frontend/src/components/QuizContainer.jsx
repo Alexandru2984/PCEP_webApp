@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { fetchQuestionStats, apiErrorMessage } from '../api'
 import {
   loadAdaptivePlan,
@@ -12,6 +12,7 @@ import { ignoreShortcut, nativeActivation } from '../shortcuts'
 import { formatElapsed } from '../format'
 import { getStreakStats } from '../streak'
 import { bucharestDateKey } from '../daily'
+import { normalizeQuestionStats } from '../questionStats'
 import QuestionCard from './QuestionCard'
 import FeedbackBox from './FeedbackBox'
 import QuizSetup from './QuizSetup'
@@ -78,32 +79,43 @@ export default function QuizContainer() {
   const [questionStats, setQuestionStats] = useState(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [statsError, setStatsError] = useState(null)
+  const statsRequest = useRef(null)
   const score = history.filter((h) => h.feedback?.is_correct).length
   const streak = getStreakStats(history)
 
-  useEffect(() => {
-    let active = true
-
-    const loadStats = async () => {
-      setStatsLoading(true)
-      setStatsError(null)
-      try {
-        const data = await fetchQuestionStats()
-        if (!active) return
+  const loadStats = useCallback(async () => {
+    statsRequest.current?.abort()
+    const controller = new AbortController()
+    statsRequest.current = controller
+    setStatsLoading(true)
+    setStatsError(null)
+    try {
+      const data = normalizeQuestionStats(
+        await fetchQuestionStats({ signal: controller.signal })
+      )
+      if (!data)
+        throw new Error('The server returned invalid question-bank stats. Please retry.')
+      if (statsRequest.current === controller && !controller.signal.aborted)
         setQuestionStats(data)
-      } catch (e) {
-        if (!active) return
+    } catch (e) {
+      if (statsRequest.current === controller && !controller.signal.aborted)
         setStatsError(apiErrorMessage(e, 'Could not load question-bank stats.'))
-      } finally {
-        if (active) setStatsLoading(false)
+    } finally {
+      if (statsRequest.current === controller) {
+        statsRequest.current = null
+        setStatsLoading(false)
       }
     }
-
-    loadStats()
-    return () => {
-      active = false
-    }
   }, [])
+
+  useEffect(() => {
+    const start = window.setTimeout(loadStats, 0)
+    return () => {
+      window.clearTimeout(start)
+      statsRequest.current?.abort()
+      statsRequest.current = null
+    }
+  }, [loadStats])
 
   // Keyboard shortcuts for practice mode: 1–4 / A–D to answer, Enter/→ to advance.
   useEffect(() => {
@@ -200,6 +212,7 @@ export default function QuizContainer() {
             stats={questionStats}
             statsLoading={statsLoading}
             statsError={statsError}
+            onRetryStats={loadStats}
           />
         )}
       </div>

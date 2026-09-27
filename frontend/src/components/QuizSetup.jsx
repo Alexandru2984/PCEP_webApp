@@ -60,6 +60,7 @@ export default function QuizSetup({
   stats,
   statsLoading,
   statsError,
+  onRetryStats,
 }) {
   const [mode, setMode] = useState(initial?.mode ?? 'practice')
   const [module, setModule] = useState(initial?.module ?? '')
@@ -371,6 +372,7 @@ export default function QuizSetup({
         stats={stats}
         loading={statsLoading}
         error={statsError}
+        onRetry={onRetryStats}
         selectedModule={module}
         selectedObjective={objective}
         selectedDifficulty={difficulty}

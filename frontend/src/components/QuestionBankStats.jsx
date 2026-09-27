@@ -10,6 +10,7 @@ export default function QuestionBankStats({
   stats,
   loading,
   error,
+  onRetry,
   selectedModule,
   selectedObjective,
   selectedDifficulty,
@@ -69,6 +70,15 @@ export default function QuestionBankStats({
           Question-bank snapshot
         </p>
         <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">{error}</p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          >
+            Retry snapshot
+          </button>
+        )}
       </section>
     )
   }

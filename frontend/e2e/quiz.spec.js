@@ -18,6 +18,16 @@ test('setup screen loads and shows the question-bank snapshot', async ({ page })
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
 })
 
+test('question-bank snapshot recovers from a temporary API failure', async ({ page }) => {
+  await mockApi(page, { statsFailures: 1 })
+  await page.goto('/')
+
+  await expect(page.getByRole('alert')).toContainText('Stats unavailable.')
+  await page.getByRole('button', { name: 'Retry snapshot' }).click()
+  await expect(page.getByText('Question-bank snapshot')).toBeVisible()
+  await expect(page.getByText('308', { exact: true }).first()).toBeVisible()
+})
+
 test('syllabus objective filter requests and displays the precise scope', async ({
   page,
 }) => {
