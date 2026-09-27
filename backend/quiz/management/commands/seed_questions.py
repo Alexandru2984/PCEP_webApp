@@ -3,7 +3,7 @@ Seed the database with PCEP quiz questions.
 
 Usage (inside the backend container):
     python manage.py seed_questions           # add missing questions, skip existing
-    python manage.py seed_questions --update  # update existing questions and choices
+    python manage.py seed_questions --update  # update matches without changing IDs
     python manage.py seed_questions --reset   # wipe all questions then seed
     python manage.py seed_questions --dry-run # report planned changes only
 """
@@ -27,7 +27,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--update',
             action='store_true',
-            help='Update matching existing questions and recreate their choices.',
+            help='Update matching questions and choices in place, preserving their IDs.',
         )
         parser.add_argument(
             '--dry-run',
@@ -110,7 +110,7 @@ class Command(BaseCommand):
                     module=module,
                     objective=q['objective'],
                 )
-                self._replace_choices(question, q['choices'])
+                self._create_choices(question, q['choices'])
                 created += 1
                 continue
 
@@ -121,13 +121,12 @@ class Command(BaseCommand):
             question.difficulty = q['difficulty']
             question.objective = q['objective']
             question.save(update_fields=['difficulty', 'objective', 'updated_at'])
-            self._replace_choices(question, q['choices'])
+            self._update_choices(question, q['choices'])
             updated += 1
 
         return created, updated, skipped
 
-    def _replace_choices(self, question, choices):
-        question.choices.all().delete()
+    def _create_choices(self, question, choices):
         Choice.objects.bulk_create(
             [
                 Choice(
@@ -138,4 +137,21 @@ class Command(BaseCommand):
                 )
                 for c in choices
             ]
+        )
+
+    def _update_choices(self, question, choices):
+        existing = list(question.choices.order_by('id'))
+        if len(existing) != len(choices):
+            raise CommandError(
+                f'Refusing to update question id={question.id}: it has '
+                f'{len(existing)} choices, expected {len(choices)}. '
+                'Use a reviewed data migration to repair structural differences.'
+            )
+        for choice, source in zip(existing, choices, strict=True):
+            choice.text = source['text']
+            choice.is_correct = source['is_correct']
+            choice.explanation = source['explanation']
+        Choice.objects.bulk_update(
+            existing,
+            ['text', 'is_correct', 'explanation'],
         )

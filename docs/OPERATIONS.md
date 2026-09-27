@@ -325,6 +325,12 @@ instead of assigning a guess. After migration, run `python manage.py seed_questi
 without `--update` or `--reset`; this safely creates only the four new questions
 covering objectives 1.1 and 1.2 and preserves all existing question and choice IDs.
 
+`seed_questions --update` is reserved for restoring reviewed fields on rows that
+already have the expected four choices. It updates those choices in ID order and
+preserves every question and choice ID. If a matching question has a structural
+difference, such as a missing choice, the entire transaction is refused; repair
+that case with a reviewed data migration rather than deleting and recreating rows.
+
 ## Nginx production topology and hardening
 
 The tracked vhost now matches the existing TLS deployment, including SEO,
