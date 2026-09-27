@@ -597,6 +597,7 @@ read-only live database audit pass; the live bank already had zero violations.
 - `94c6291` — resume interrupted Practice sessions without leaking future answers.
 - `d21757e` — document Practice recovery and its storage boundary.
 - `e8fc01e` — reject short/editorial explanations and remove a dead draft question.
+- `8026db9` — document the explanation quality gates.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -819,6 +820,19 @@ post-submit feedback and cache policies passed; privileged `nginx -t` passed.
 This was a frontend-only atomic publish. Backend and PostgreSQL stayed healthy,
 and neither was recreated; no migration, environment change or Nginx reload was
 required.
+
+The explanation-quality release runs backend revision `8026db95920d` in image
+`sha256:845f17b60f7e39805b5510eda51e7fec1a5e701ce5025eb1c09c8ad7c140c8d9`.
+The exact preceding image is retained as
+`pcep-backend-rollback:20260927T235520Z-release-9d8ad66c11dc`. The verified
+mode-`0600` database dump is `pcep_db_20260927T235520Z.sql.gz` with SHA-256
+`e8360da1d169294c730d54c8b9094ed01d6c67b5ffe426cce18950ce633082e5`.
+Candidate and live-container checks found no migrations, and the read-only live
+audit passed all 308 questions under the new explanation rules. Public release,
+readiness, pre-answer secrecy and post-submit feedback probes passed; the deployed
+image has zero fixable HIGH/CRITICAL Trivy findings. Only the backend was recreated.
+PostgreSQL and Nginx were not restarted, no schema or environment setting changed,
+and privileged `nginx -t` passed. The frontend remains on `d21757e7d12e`.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
