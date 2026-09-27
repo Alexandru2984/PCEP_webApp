@@ -183,6 +183,11 @@ cd frontend && npm run e2e
 CI runs all of the above on every push and pull request, plus
 `manage.py check --deploy` against a production-like config.
 
+Production builds identify themselves without analytics or an extra API call:
+the frontend revision is shown in the footer and Django API responses include the
+backend revision in `X-PCEP-Release`. The Make deploy/build targets inject the
+current Git revision automatically.
+
 Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## API reference

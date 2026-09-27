@@ -124,6 +124,8 @@ jobs:
         run: npm run fetch-pyodide
 
       - name: Build
+        env:
+          VITE_PCEP_RELEASE: ${{ github.sha }}
         run: npm run build
 
   e2e:
@@ -159,6 +161,8 @@ jobs:
         run: npm run fetch-pyodide
 
       - name: Build
+        env:
+          VITE_PCEP_RELEASE: ${{ github.sha }}
         run: npm run build
 
       - name: Run E2E tests
@@ -186,6 +190,7 @@ jobs:
       DJANGO_DEBUG: "False"
       DJANGO_ALLOWED_HOSTS: pcep.example.com
       CORS_ALLOWED_ORIGINS: https://pcep.example.com
+      PCEP_RELEASE: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4

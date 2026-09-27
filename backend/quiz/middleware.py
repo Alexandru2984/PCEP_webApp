@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import RequestDataTooBig
 from django.http import JsonResponse
 
@@ -18,5 +19,6 @@ class APIResponseMiddleware:
             else:
                 response = self.get_response(request)
             response['Cache-Control'] = 'no-store'
+            response['X-PCEP-Release'] = settings.PCEP_RELEASE
             return response
         return self.get_response(request)

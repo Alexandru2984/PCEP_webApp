@@ -1,4 +1,6 @@
+import re
 from pathlib import Path
+
 import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -14,6 +16,12 @@ if env_file.exists():
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-dev-only-CHANGE-IN-PRODUCTION')
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['*'])
+PCEP_RELEASE = env('PCEP_RELEASE', default='development')
+
+if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', PCEP_RELEASE):
+    raise RuntimeError(
+        'PCEP_RELEASE must contain 1-64 letters, digits, dots, underscores or hyphens.'
+    )
 
 # In production (DEBUG=False) refuse to boot with insecure defaults.
 if not DEBUG:

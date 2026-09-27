@@ -51,13 +51,21 @@ docker exec pcep_db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
   | gzip > "/home/micu/backups/pcep/pcep_db_${stamp}.sql.gz"
 gzip -t "/home/micu/backups/pcep/pcep_db_${stamp}.sql.gz"
 
-docker compose build backend
+make compose-build
 # Check the candidate/migration plan before this controlled single-service replacement.
 docker compose up -d --no-deps backend
 curl -fsS https://pcep.micutu.com/api/health/
+curl -fsSI https://pcep.micutu.com/api/live/ | grep -i '^x-pcep-release:'
 docker compose exec backend python manage.py check --deploy --fail-level WARNING
 docker compose exec backend python manage.py audit_questions --database --fail-on-warnings
 ```
+
+`make compose-build` and `make deploy-frontend` inject the current Git revision
+into their artifacts. Override `RELEASE=<bounded-label>` only for an intentional
+release label. API responses expose the backend revision in `X-PCEP-Release`;
+the frontend revision appears in the footer, which makes partial deploys and stale
+PWA tabs immediately distinguishable. Responses generated directly by Nginx (for
+example, an over-limit request) do not carry the Django release header.
 
 Never reset/reseed the live bank during routine deployment: question IDs are
 referenced by local progress. Startup runs pending migrations and collectstatic.

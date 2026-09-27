@@ -7,6 +7,7 @@ COMPOSE ?= docker compose
 FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
 RELEASE_KEEP ?= 5
+RELEASE ?= $(shell git describe --always --dirty --abbrev=12 --match '__pcep_no_matching_tag__' 2>/dev/null || printf development)
 
 .PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend build build-frontend fetch-pyodide django-check compose-up compose-build seed-reset deploy-frontend release-retention status
 
@@ -18,7 +19,7 @@ help:
 		'  audit            Run Python/npm dependency audits and question audit' \
 		'  build            Build the frontend production bundle' \
 		'  django-check     Run Django production deploy checks' \
-		'  compose-build    Rebuild Docker services' \
+		'  compose-build    Rebuild the backend image with its release revision' \
 		'  compose-up       Start db + backend' \
 		'  seed-reset       Reset and seed production DB in backend container' \
 		'  deploy-frontend  Backup and publish frontend/dist to FRONTEND_ROOT' \
@@ -39,7 +40,7 @@ test-backend:
 	cd backend && "$(PYTHON_BIN)" -m pytest -q
 
 test-frontend: fetch-pyodide
-	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && $(NPM) run build
+	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" $(NPM) run build
 
 audit: audit-backend audit-frontend
 
@@ -54,7 +55,7 @@ audit-frontend:
 build: build-frontend
 
 build-frontend: fetch-pyodide
-	cd frontend && $(NPM) run build
+	cd frontend && VITE_PCEP_RELEASE="$(RELEASE)" $(NPM) run build
 
 # Self-hosted Python runtime for the in-browser code runner (git-ignored, ~12 MB).
 # Fetched only when missing so repeat builds stay fast.
@@ -65,7 +66,7 @@ django-check:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.settings DJANGO_DEBUG=False DJANGO_SECRET_KEY=a-sufficiently-long-production-secret-key-for-local-check DJANGO_ALLOWED_HOSTS=pcep.micutu.com POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=dummy POSTGRES_HOST=localhost POSTGRES_PORT=5432 "$(PYTHON_BIN)" manage.py check --deploy --fail-level WARNING
 
 compose-build:
-	$(COMPOSE) build
+	PCEP_RELEASE="$(RELEASE)" $(COMPOSE) build backend
 
 compose-up:
 	$(COMPOSE) up -d

@@ -16,6 +16,9 @@ test('setup screen loads and shows the question-bank snapshot', async ({ page })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Start a new quiz/i })).toBeVisible()
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
+  await expect(page.getByLabel(/Application release/)).toHaveText(
+    /^(local|[A-Za-z0-9][A-Za-z0-9._-]{0,11})$/
+  )
 })
 
 test('question-bank snapshot recovers from a temporary API failure', async ({ page }) => {

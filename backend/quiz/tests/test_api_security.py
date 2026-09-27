@@ -120,6 +120,14 @@ def test_live_needs_no_database_and_readiness_handles_outage(api_client, django_
     assert 'SECRET_CANARY' not in response.content.decode()
 
 
+def test_api_responses_identify_the_backend_release(api_client, settings):
+    settings.PCEP_RELEASE = 'abc123-release'
+    response = api_client.get('/api/live/')
+    assert response.json() == {'status': 'ok'}
+    assert response['X-PCEP-Release'] == 'abc123-release'
+    assert response['Cache-Control'] == 'no-store'
+
+
 def test_forwarded_prefix_cannot_bypass_throttle(api_client, monkeypatch, question_bank):
     monkeypatch.setattr(AnonRateThrottle, 'THROTTLE_RATES', {'anon': '1/min'})
     headers = {'REMOTE_ADDR': '172.21.0.1', 'HTTP_X_FORWARDED_FOR': 'fake1, 192.0.2.10'}

@@ -2,6 +2,7 @@ import QuizContainer from './components/QuizContainer'
 import ThemeToggle from './components/ThemeToggle'
 import RuntimeStatus from './components/RuntimeStatus'
 import ErrorBoundary from './components/ErrorBoundary'
+import { RELEASE_LABEL, RELEASE_VERSION } from './release'
 
 export default function App() {
   return (
@@ -50,7 +51,16 @@ export default function App() {
             </li>
           </ul>
         </details>
-        Practice for the PCEP™ certification · built with Django &amp; React
+        <p>Practice for the PCEP™ certification · built with Django &amp; React</p>
+        <p
+          className="mt-2 font-mono text-xs text-slate-500 dark:text-slate-400"
+          title="Useful when reporting an update or cache issue"
+        >
+          Release{' '}
+          <span aria-label={`Application release ${RELEASE_VERSION}`}>
+            {RELEASE_LABEL}
+          </span>
+        </p>
       </footer>
     </div>
   )

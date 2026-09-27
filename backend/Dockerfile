@@ -5,9 +5,12 @@ COPY requirements.txt .
 RUN pip wheel --only-binary=:all: --wheel-dir /wheels -r requirements.txt
 
 FROM python:3.12-slim
+ARG PCEP_RELEASE=development
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PCEP_RELEASE=${PCEP_RELEASE}
+LABEL org.opencontainers.image.revision=${PCEP_RELEASE}
 WORKDIR /app
 COPY --from=dependencies /wheels /wheels
 COPY requirements.txt .
