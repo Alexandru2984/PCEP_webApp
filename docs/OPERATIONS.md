@@ -11,6 +11,21 @@ curl -fsS https://pcep.micutu.com/api/health/
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings backend/.venv/bin/python backend/manage.py audit_questions --fail-on-warnings
 ```
 
+## First-time volume bootstrap
+
+Compose treats persistent data as externally managed so even
+`docker compose down -v` cannot delete it. Create the configured volume names
+once before the first start (the commands are idempotent):
+
+```bash
+docker volume create pcep_webapp_postgres_data
+docker volume create pcep_webapp_static_volume
+docker volume create pcep_webapp_media_volume
+```
+
+The defaults come from `.env.example`; create the matching names instead when
+`PCEP_POSTGRES_VOLUME`, `PCEP_STATIC_VOLUME` or `PCEP_MEDIA_VOLUME` is changed.
+
 ## Local Verification
 
 ```bash

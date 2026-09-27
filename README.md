@@ -144,9 +144,16 @@ npm run dev             # Vite dev server, proxies /api to Django (see vite.conf
 
 ```bash
 cp .env.example .env          # then fill in real secrets
+docker volume create pcep_webapp_postgres_data
+docker volume create pcep_webapp_static_volume
+docker volume create pcep_webapp_media_volume
 docker compose up --build     # db + backend on 127.0.0.1:8001
 docker compose --profile build run --rm frontend-builder   # build the React app
 ```
+
+The three named volumes are external by design: Compose uses them but cannot
+remove them during teardown. If you customize their names in `.env`, create the
+matching volumes before the first start.
 
 ## Testing & quality
 

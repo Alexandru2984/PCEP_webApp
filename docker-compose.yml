@@ -72,5 +72,11 @@ services:
 
 volumes:
   postgres_data:
+    name: ${PCEP_POSTGRES_VOLUME:-pcep_webapp_postgres_data}
+    external: true
   static_volume:
+    name: ${PCEP_STATIC_VOLUME:-pcep_webapp_static_volume}
+    external: true
   media_volume:
+    name: ${PCEP_MEDIA_VOLUME:-pcep_webapp_media_volume}
+    external: true
