@@ -118,6 +118,10 @@ not printed or copied. No database or Docker volume was deleted.
   consistent cache/error middleware.
 - Added reusable question-bank validation, database-aware audit diagnostics,
   admin inline enforcement and safe seed preflight.
+- Changed `seed_questions --update` to update choices in their existing order
+  rather than delete and recreate them. Choice IDs used by saved local sessions
+  now remain stable; a structural choice-count mismatch aborts the entire atomic
+  update instead of partially reseeding the bank.
 - Applied reversible question-content migrations in place without changing IDs.
   Earlier migrations removed equivalent and out-of-syllabus set questions. The
   latest replaces 19 questions that exercised language features absent from the
@@ -140,14 +144,15 @@ not printed or copied. No database or Docker volume was deleted.
 - Added bounded database startup, connection health checks, short connect
   timeout, ManifestStaticFilesStorage, structured Gunicorn logs and request IDs.
 
-The bank now contains 305 questions and 1,220 choices. Four new questions cover
-previously empty objectives 1.1 and 1.2. The original 301 question and 1,204
-choice IDs were preserved. The scope and duplicate-cleanup releases deliberately
-changed 25 reviewed questions in place; question and choice ID-set fingerprints
-remained identical before and after both forward/rollback/forward migration
-tests. `order_by('?')` remains: at 305 rows, it is simple and measured cost does
-not justify a more complex sampler. Revisit it if the bank grows by orders of
-magnitude.
+The bank now contains 308 questions and 1,232 choices. Four earlier questions
+established coverage for previously empty objectives 1.1 and 1.2; three further
+questions now cover the missing lexis, Python-keyword and instruction concepts
+from those objectives. The original 305 questions and 1,220 choices were
+byte-for-byte identical to the pre-release backup after migration, including
+their IDs and explanations. The additive migration was also exercised through a
+forward/rollback/forward cycle on a restored database copy. `order_by('?')`
+remains: at 308 rows, it is simple and measured cost does not justify a more
+complex sampler. Revisit it if the bank grows by orders of magnitude.
 
 ## 5. Frontend changes
 
@@ -306,6 +311,15 @@ a restored database copy, a scope-migration forward/rollback/forward cycle,
 public answer-leakage probes and live Chromium at 390 and 1,440 px with zero axe
 violations or horizontal overflow.
 
+Continuation validation on 2026-09-27 covers 175 backend tests, 194 Vitest tests
+and 24 Playwright flows. `make test`, lint, formatting, the production build,
+strict seed and live-database audits, Django's deploy check, Compose validation
+and live Nginx validation passed. Migration `0010` and both seed modes were
+exercised on a fresh restore of the production backup; all 305 pre-existing
+questions and 1,220 choices remained identical. Public probes confirmed the
+three new questions expose only safe question/choice fields before submission,
+while answer feedback remains available after submission.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -350,6 +364,9 @@ violations or horizontal overflow.
 - `bd920f3` — record the objective-taxonomy production release.
 - `df2171e` — align the reviewed question bank with PCEP-30-02 scope.
 - `ea97ef0` — replace the remaining reviewed semantic duplicates.
+- `e5df6eb` — record the question-quality cleanup release.
+- `e7d7840` — preserve choice IDs during seed updates.
+- `5ccb595` — expand foundations coverage for objectives 1.1 and 1.2.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -372,13 +389,12 @@ added.
 
 ## 14. Deployment notes
 
-Question-content migrations through `0009_replace_near_duplicate_questions` are
-applied.
-The idempotent seed added exactly four rows and skipped all 301 existing rows.
-The backend image was rebuilt, and only the backend service was recreated.
-Static and frontend trees were published with atomic swaps. The Nginx vhost/snippets were
-installed only after validation and reloaded gracefully. The safe SEO generator
-and pages were installed/regenerated without an Nginx reload. No new
+Question-content migrations through `0010_add_foundations_coverage` are applied.
+The latest additive migration created exactly three questions and twelve choices;
+its no-op reverse keeps those valid study records on rollback. Both normal and
+`--update` seed modes were then verified as idempotent on a restored copy. The
+backend image was rebuilt, and only the backend service was recreated. This
+release did not publish frontend/static files and did not reload Nginx. No new
 required production environment variable was introduced.
 
 Backups and rollback artifacts are under
@@ -397,7 +413,11 @@ release has verified backup
 `pcep_db_pre_near_duplicate_cleanup_20260926T205313Z.sql.gz` (SHA-256
 `ca3be1b7be9380711e9b3af7f256ae4a5837965ba0ae9e6b3f769b2c3474d1bc`) and rollback
 tag `pcep-backend-rollback:20260926-pre-near-duplicates`. Detailed commands and
-cautions are in `docs/OPERATIONS.md`.
+cautions are in `docs/OPERATIONS.md`. The foundations release has verified
+backup `pcep_db_pre_foundations_20260927T130359Z.sql.gz` (SHA-256
+`4962c68e7236c6e899eda9bf9eede74f8e0fd17b70a2f7c04bfb09e1f509432e`), rollback
+tag `pcep-backend-rollback:20260927-pre-foundations`, and candidate tag
+`pcep-backend-candidate:5ccb595`.
 
 ## 15. Breaking changes
 
