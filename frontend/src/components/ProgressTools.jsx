@@ -19,16 +19,23 @@ export default function ProgressTools({ onChange }) {
   const [error, setError] = useState(null)
   const input = useRef(null)
   const exportBackup = () => {
-    const url = URL.createObjectURL(
-      new Blob([exportProgress()], { type: 'application/json' })
-    )
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `pcep-progress-${new Date().toISOString().slice(0, 10)}.json`
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setMessage('Backup downloaded. Keep it somewhere safe.')
+    setMessage(null)
     setError(null)
+    let url
+    try {
+      url = URL.createObjectURL(
+        new Blob([exportProgress()], { type: 'application/json' })
+      )
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `pcep-progress-${new Date().toISOString().slice(0, 10)}.json`
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setMessage('Backup downloaded. Keep it somewhere safe.')
+    } catch {
+      if (url) URL.revokeObjectURL(url)
+      setError('Could not create the backup file. Please retry in this browser.')
+    }
   }
   const readBackup = async (event) => {
     const file = event.target.files?.[0]
@@ -67,7 +74,10 @@ export default function ProgressTools({ onChange }) {
       onChange()
       setMessage(`Saved ${label} cleared.`)
       setError(null)
-    } else setError('Could not save the change. Browser storage is unavailable or full.')
+    } else {
+      setMessage(null)
+      setError('Could not save the change. Browser storage is unavailable or full.')
+    }
   }
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
