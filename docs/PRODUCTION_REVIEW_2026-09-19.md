@@ -171,6 +171,11 @@ objective. Attempt history and the portable backup schema retain validated
 objective breakdowns while accepting pre-taxonomy local data. Reports and the
 dashboard identify the weakest objective and launch a precisely filtered drill.
 
+Practice keyboard shortcuts now bind to the current session actions after every
+state change. Selecting a confidence level and immediately answering with
+`1`–`4` or `A`–`D` therefore records the chosen confidence instead of submitting
+through a stale pre-selection callback.
+
 The Pyodide manager bounds startup at 30 seconds, a run at eight seconds, source
 at 20,000 characters, output at 10,000 characters and active/queued jobs at
 four. Timeout or fatal failure replaces the worker. The pinned 0.29.4 npm
@@ -318,7 +323,10 @@ and live Nginx validation passed. Migration `0010` and both seed modes were
 exercised on a fresh restore of the production backup; all 305 pre-existing
 questions and 1,220 choices remained identical. Public probes confirmed the
 three new questions expose only safe question/choice fields before submission,
-while answer feedback remains available after submission.
+while answer feedback remains available after submission. A subsequent frontend
+release repeated all 194 Vitest and 24 Playwright checks and exercised the fixed
+confidence-plus-keyboard flow against the public site at 390 px with no
+application errors or horizontal overflow.
 
 ## 12. Commits
 
@@ -367,6 +375,8 @@ while answer feedback remains available after submission.
 - `e5df6eb` — record the question-quality cleanup release.
 - `e7d7840` — preserve choice IDs during seed updates.
 - `5ccb595` — expand foundations coverage for objectives 1.1 and 1.2.
+- `92808fe` — record the foundations coverage release.
+- `4d90431` — keep keyboard-submitted confidence metadata current.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -417,7 +427,11 @@ cautions are in `docs/OPERATIONS.md`. The foundations release has verified
 backup `pcep_db_pre_foundations_20260927T130359Z.sql.gz` (SHA-256
 `4962c68e7236c6e899eda9bf9eede74f8e0fd17b70a2f7c04bfb09e1f509432e`), rollback
 tag `pcep-backend-rollback:20260927-pre-foundations`, and candidate tag
-`pcep-backend-candidate:5ccb595`.
+`pcep-backend-candidate:5ccb595`. The keyboard-confidence frontend release has
+rollback root `.frontend.previous-20260927T134217Z-3eb500a8` and external backup
+`frontend.20260927T134217Z-3eb500a8`; both old and new hashed entry chunks were
+verified publicly after the atomic swap. It required no backend restart, database
+change or Nginx reload.
 
 ## 15. Breaking changes
 
