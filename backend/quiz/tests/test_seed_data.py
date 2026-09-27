@@ -65,6 +65,19 @@ def test_question_bank_has_no_unreviewed_near_duplicates():
     assert similar_questions() == []
 
 
+def test_additive_foundations_migration_matches_the_seed_bank():
+    import importlib
+
+    migration = importlib.import_module(
+        'quiz.migrations.0010_add_foundations_coverage'
+    )
+    for source in migration.QUESTIONS:
+        assert sum(
+            question == source
+            for question in ALL_QUESTIONS
+        ) == 1
+
+
 def test_each_module_has_enough_hard_questions():
     summary = question_bank_summary()
     assert summary['warnings'] == []

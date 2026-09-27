@@ -331,6 +331,15 @@ preserves every question and choice ID. If a matching question has a structural
 difference, such as a missing choice, the entire transaction is refused; repair
 that case with a reviewed data migration rather than deleting and recreating rows.
 
+Migrations `0008_replace_out_of_scope_constructs` and
+`0009_replace_near_duplicate_questions` revise reviewed rows in place while
+preserving their IDs and correct-option positions. Migration
+`0010_add_foundations_coverage` adds three medium questions for the previously
+thin lexis, keyword and instruction topics under objectives 1.1 and 1.2. It is a
+no-op on an empty database because a later `seed_questions` run installs the
+complete bank; on an existing bank it validates any matching row and refuses to
+overwrite divergent content.
+
 ## Nginx production topology and hardening
 
 The tracked vhost now matches the existing TLS deployment, including SEO,

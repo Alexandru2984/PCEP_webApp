@@ -447,6 +447,37 @@ def test_near_duplicate_replacement_preserves_all_ids(make_question):
 
 
 @pytest.mark.django_db
+def test_foundations_coverage_migration_is_additive_and_idempotent(make_question):
+    import importlib
+    from django.apps import apps
+    from django.db import connection
+
+    migration = importlib.import_module(
+        'quiz.migrations.0010_add_foundations_coverage'
+    )
+    editor = connection.schema_editor()
+    migration.add_foundations_coverage(apps, editor)
+    assert Question.objects.count() == 0
+
+    make_question(text='Existing reviewed bank row')
+    migration.add_foundations_coverage(apps, editor)
+    migration.add_foundations_coverage(apps, editor)
+
+    assert Question.objects.count() == 1 + len(migration.QUESTIONS)
+    for source in migration.QUESTIONS:
+        q = Question.objects.get(
+            module=source['module'],
+            text=source['text'],
+            code_snippet=source['code_snippet'],
+        )
+        assert q.objective == source['objective']
+        assert q.difficulty == source['difficulty']
+        assert list(
+            q.choices.order_by('id').values('text', 'is_correct', 'explanation')
+        ) == source['choices']
+
+
+@pytest.mark.django_db
 def test_objective_migration_assigns_frozen_taxonomy(make_question):
     import importlib
     from django.apps import apps
@@ -489,6 +520,14 @@ def test_migration_chain_covers_the_complete_reviewed_bank():
             objective_by_signature[objective_migration._signature(new)] = (
                 objective_by_signature[objective_migration._signature(old)]
             )
+    addition_migration = importlib.import_module(
+        'quiz.migrations.0010_add_foundations_coverage'
+    )
+    for source in addition_migration.QUESTIONS:
+        question = SimpleNamespace(**source)
+        objective_by_signature[objective_migration._signature(question)] = source[
+            'objective'
+        ]
 
     signatures = []
     for source in ALL_QUESTIONS:

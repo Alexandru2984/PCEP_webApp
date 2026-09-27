@@ -32,12 +32,12 @@ export const FULL_MOCK_QUESTIONS = [
 ]
 
 const STATS = {
-  total: 305,
-  by_module: { module1: 77, module2: 73, module3: 85, module4: 70 },
-  by_difficulty: { easy: 106, medium: 122, hard: 77 },
+  total: 308,
+  by_module: { module1: 80, module2: 73, module3: 85, module4: 70 },
+  by_difficulty: { easy: 106, medium: 125, hard: 77 },
   by_objective: {
-    1.1: 2,
-    1.2: 2,
+    1.1: 3,
+    1.2: 4,
     1.3: 15,
     1.4: 49,
     1.5: 9,
@@ -53,13 +53,13 @@ const STATS = {
     4.4: 12,
   },
   matrix: {
-    module1: { easy: 31, medium: 26, hard: 20 },
+    module1: { easy: 31, medium: 29, hard: 20 },
     module2: { easy: 22, medium: 34, hard: 17 },
     module3: { easy: 34, medium: 32, hard: 19 },
     module4: { easy: 19, medium: 30, hard: 21 },
   },
   modules: [
-    { value: 'module1', label: 'Module 1 — Fundamentals', total: 77 },
+    { value: 'module1', label: 'Module 1 — Fundamentals', total: 80 },
     { value: 'module2', label: 'Module 2 — Control Flow', total: 73 },
     { value: 'module3', label: 'Module 3 — Data Collections', total: 85 },
     { value: 'module4', label: 'Module 4 — Functions & Exceptions', total: 70 },

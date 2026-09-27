@@ -53,8 +53,8 @@ def _positions(*values):
 # attaching an old objective to a different question.
 CURATED_POSITIONS = {
     'module1': {
-        '1.1': _positions(74, 75),
-        '1.2': _positions(76, 77),
+        '1.1': _positions(74, 75, 78),
+        '1.2': _positions(76, 77, 79, 80),
         '1.3': _positions(10, 13, range(19, 23), 25, 26, 31, 33, 39, 44, 51, 64, 65),
         '1.4': _positions(
             range(1, 7), 9, 12, range(14, 18), 23, 24, 28, 30,
@@ -107,7 +107,7 @@ CURATED_POSITIONS = {
 # Filled from the reviewed source bank. See ``module_signature`` and the tests;
 # changing question content requires an explicit taxonomy review.
 CURATED_MODULE_SIGNATURES = {
-    'module1': '5403fa0735e92558617d0af0379d046f6f612f64816f9753412fcd77542293d6',
+    'module1': 'a5c21ba91eb72c6bc301d6e6fc5d6243712bd08405544a4ae8100b7f4b9a8336',
     'module2': '02757b38fed57d6ef9af4547b75cd5afeb4d44a8eae65365666f8f12105629b1',
     'module3': '0683824107c52ac87e2a700b7509cbad514c8af9f3f3132e64510029eb155c01',
     'module4': 'a3d3b8764dba02f496bc9dd00e6574cdb9f42156bb40e803b1d516e2a00f5967',
