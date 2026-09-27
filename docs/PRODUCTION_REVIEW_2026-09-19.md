@@ -396,6 +396,17 @@ reload, and observed navigation only after the Reload action. Fresh live Chromiu
 then verified release `e8c15d24af42`, an active controller, zero axe violations
 and no horizontal overflow at 390 px.
 
+The active-exam ownership follow-up passes 226 Vitest tests across 28 files,
+lint, formatting, the production build and all 26 Playwright flows. Every saved
+exam now has a validated session ID; resume rotates it, stale-tab saves and
+deletes fail, and pre-existing recovery data receives a compatible legacy ID.
+The two-tab browser regression confirms that the former owner returns to the
+recovery screen and announces the conflict. Fresh live Chromium verified release
+`dc03ce0b8fbc`, ownership transfer on the public site, zero axe violations, no
+horizontal overflow at 390 px and an active service worker with no waiting update.
+Public API probes again found zero answer fields before submission and normal
+feedback after submission.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -463,6 +474,8 @@ and no horizontal overflow at 390 px.
 - `4969d39` — activate PWA updates only after the learner requests reload.
 - `3e030b3` — record the controlled PWA update release.
 - `e8c15d2` — preserve local data written with a newer storage schema.
+- `ed5e2eb` — record the cross-version storage release.
+- `dc03ce0` — prevent stale tabs from overwriting active exams.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -590,6 +603,17 @@ SHA-256 `1a22857c17bfedc1de04878c1f84d98f526d345623fc6800a9a69da909727285`;
 both it and preceding `index-DnHg66tv.js` returned 200 publicly after the swap.
 This was another frontend-only atomic publish. The backend remained healthy on
 release `0d92a2d8a4a0`; PostgreSQL, Docker services and Nginx were not restarted.
+
+The active-exam ownership release has frontend rollback root
+`.frontend.previous-20260927T183228Z-d731657c` and external backup
+`frontend.20260927T183228Z-d731657c`. Its entry chunk `index-BNeBr8ht.js` has
+SHA-256 `0a2d1489f7a6d13cba49edc370d2fef863b50534ca93a5a4ee6433fee85e8747`;
+both it and preceding `index-vuzCFG8p.js` returned 200 publicly after the swap.
+The public, live-root and validated-build service workers match at SHA-256
+`60fd6ac7e1b0c36d5216f34a6b0b60cad0cb942bb10c5fbac67f63a81a552730`.
+This was a frontend-only atomic publish. The backend remained healthy on release
+`0d92a2d8a4a0`; PostgreSQL, Docker services and Nginx were not restarted, and
+no migration or environment change was required. Privileged `nginx -t` passed.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
