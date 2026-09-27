@@ -48,14 +48,19 @@ def run_command(args, *, cwd, env=None):
 
 
 def capture_command(args, *, cwd, env=None):
-    return subprocess.run(
+    completed = subprocess.run(
         args,
         cwd=cwd,
         env=env,
-        check=True,
         capture_output=True,
         text=True,
-    ).stdout.strip()
+    )
+    if completed.returncode:
+        detail = (completed.stderr or completed.stdout).strip()[-2000:]
+        raise ReleaseError(
+            f'Command failed with exit code {completed.returncode}: {detail or args[0]}'
+        )
+    return completed.stdout.strip()
 
 
 def validate_release(value):
@@ -265,7 +270,11 @@ def deploy(config):
     candidate_release = capture_command(
         [
             'docker', 'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
-            'backend', '-c', 'from django.conf import settings; print(settings.PCEP_RELEASE)',
+            'backend', '-c', (
+                'import os; '
+                'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pcep_project.settings"); '
+                'from django.conf import settings; print(settings.PCEP_RELEASE)'
+            ),
         ],
         cwd=root,
         env=environment,

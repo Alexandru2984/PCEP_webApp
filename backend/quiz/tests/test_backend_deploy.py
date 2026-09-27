@@ -60,6 +60,12 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
     assert events.index(build) < events.index(up) < events.index(('healthy',))
     assert events[-1] == ('public',)
     assert result.rollback_tag == 'rollback:test'
+    assert any(
+        event[0] == 'capture'
+        and event[1][-2] == '-c'
+        and 'DJANGO_SETTINGS_MODULE' in event[1][-1]
+        for event in events
+    )
     assert any(event[0] == 'run' and event[1][-2:] == ('migrate', '--check') for event in events)
 
 
