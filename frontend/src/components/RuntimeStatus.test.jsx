@@ -19,6 +19,13 @@ describe('application recovery', () => {
       'Saved quiz data was created by a newer app version'
     )
   })
+  it('announces when another tab takes over the active exam', () => {
+    render(<RuntimeStatus />)
+    fireEvent(window, new CustomEvent('pcep-active-exam-conflict'))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The active exam changed in another tab'
+    )
+  })
   it('announces a worker update without reloading an active session', () => {
     const serviceWorker = new EventTarget()
     serviceWorker.controller = {}

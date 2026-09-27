@@ -63,6 +63,7 @@ const activeExam = (override = {}) => {
     questions: [question(1), question(2)],
     startedAt,
     deadline: startedAt + 160_000,
+    sessionId: 'session-a',
     index: 1,
     answers: { 1: 11 },
     flagged: [2],
@@ -352,10 +353,43 @@ describe('active exam recovery', () => {
 
   it('clears a saved exam without changing progress history', () => {
     appendAttempt(attempt('kept'))
-    saveActiveExam(activeExam())
-    expect(clearActiveExam()).toBe(true)
+    const exam = activeExam()
+    saveActiveExam(exam)
+    expect(clearActiveExam(exam.sessionId)).toBe(true)
     expect(loadActiveExam()).toBeNull()
     expect(loadHistory()).toEqual([attempt('kept')])
+  })
+
+  it('prevents a stale session from overwriting or clearing a replacement', () => {
+    const first = activeExam({ sessionId: 'session-first' })
+    expect(saveActiveExam(first)).toBe(true)
+    const replacement = { ...first, sessionId: 'session-replacement', index: 0 }
+    expect(saveActiveExam(replacement, first.sessionId)).toBe(true)
+    const warning = vi.fn()
+    window.addEventListener('pcep-active-exam-conflict', warning)
+
+    expect(saveActiveExam({ ...first, index: 1 })).toBe(false)
+    expect(clearActiveExam(first.sessionId)).toBe(false)
+    expect(loadActiveExam()).toMatchObject({
+      sessionId: 'session-replacement',
+      index: 0,
+    })
+    expect(warning).toHaveBeenCalledTimes(2)
+
+    window.removeEventListener('pcep-active-exam-conflict', warning)
+  })
+
+  it('derives ownership for legacy recovery data so it can be claimed safely', () => {
+    const legacy = activeExam()
+    delete legacy.sessionId
+    localStorage.setItem('pcep.activeExam', JSON.stringify({ version: 1, data: legacy }))
+
+    const loaded = loadActiveExam()
+    expect(loaded.sessionId).toBe(`legacy-${legacy.startedAt}-1`)
+    expect(
+      saveActiveExam({ ...loaded, sessionId: 'session-after-upgrade' }, loaded.sessionId)
+    ).toBe(true)
+    expect(loadActiveExam().sessionId).toBe('session-after-upgrade')
   })
 
   it('never reads, overwrites or clears a recovery snapshot from a newer schema', () => {

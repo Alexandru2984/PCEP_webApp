@@ -76,10 +76,13 @@ export function sessionReducer(state, event) {
           deadline: event.exam.deadline,
           confidences: event.exam.confidences ?? {},
           responseMs: event.exam.responseMs ?? {},
+          sessionId: event.exam.sessionId,
         },
       }
     case 'discard-resume':
       return { ...state, resumableExam: null }
+    case 'storage-conflict':
+      return emptyState(state.lastConfig, event.exam)
     case 'load-error':
       return { ...state, phase: 'error', error: event.error }
     case 'answering':
@@ -132,7 +135,10 @@ export function sessionReducer(state, event) {
         error: null,
       }
     case 'reset':
-      return emptyState('config' in event ? event.config : state.lastConfig)
+      return emptyState(
+        'config' in event ? event.config : state.lastConfig,
+        event.exam ?? null
+      )
     default:
       return state
   }
@@ -160,6 +166,19 @@ export default function useQuizSession() {
   useEffect(() => {
     if (state.phase === 'answering') questionStartedAt.current = Date.now()
   }, [state.index, state.phase])
+  useEffect(() => {
+    const sessionId = state.examProgress?.sessionId
+    if (state.phase !== 'exam' || !sessionId) return
+    const changedInAnotherTab = (event) => {
+      if (event.key !== 'pcep.activeExam') return
+      const currentExam = loadActiveExam()
+      if (currentExam?.sessionId === sessionId) return
+      window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
+      dispatch({ type: 'storage-conflict', exam: currentExam })
+    }
+    window.addEventListener('storage', changedInAnotherTab)
+    return () => window.removeEventListener('storage', changedInAnotherTab)
+  }, [state.examProgress?.sessionId, state.phase])
 
   const begin = () => {
     if (request.current) return null
@@ -177,7 +196,6 @@ export default function useQuizSession() {
     const controller = begin()
     if (!controller) return
     finished.current = false
-    clearActiveExam()
     const isDaily = config.source === 'daily'
     if (!config.source) saveSettings(config)
     dispatch({ type: 'loading', config })
@@ -225,16 +243,23 @@ export default function useQuizSession() {
               flagged: [],
               confidences: {},
               responseMs: {},
+              sessionId: crypto.randomUUID(),
               deadline: now + questions.length * EXAM_SECONDS_PER_QUESTION * 1000,
             }
           : null
-      if (examProgress)
-        saveActiveExam({
+      if (examProgress) {
+        const saved = saveActiveExam({
           config: sessionConfig,
           questions,
           startedAt: now,
           ...examProgress,
         })
+        const currentExam = loadActiveExam()
+        if (!saved && currentExam && currentExam.sessionId !== examProgress.sessionId) {
+          dispatch({ type: 'storage-conflict', exam: currentExam })
+          return
+        }
+      }
       dispatch({ type: 'start', config: sessionConfig, questions, now, examProgress })
     } catch (error) {
       if (current(controller))
@@ -341,7 +366,8 @@ export default function useQuizSession() {
       items,
       completedAt
     )
-    if (saved && state.lastConfig?.mode === 'exam') clearActiveExam()
+    if (saved && state.lastConfig?.mode === 'exam')
+      clearActiveExam(state.examProgress?.sessionId)
     dispatch({ type: 'done', items, elapsed })
   }
 
@@ -409,8 +435,8 @@ export default function useQuizSession() {
   const resetToSetup = () => {
     request.current?.abort()
     request.current = null
-    clearActiveExam()
-    dispatch({ type: 'reset', config: loadSettings() })
+    if (state.phase === 'exam') clearActiveExam(state.examProgress?.sessionId)
+    dispatch({ type: 'reset', config: loadSettings(), exam: loadActiveExam() })
   }
   const resumeExam = () => {
     const exam = loadActiveExam()
@@ -418,12 +444,18 @@ export default function useQuizSession() {
       dispatch({ type: 'discard-resume' })
       return
     }
+    const claimed = { ...exam, sessionId: crypto.randomUUID() }
+    if (!saveActiveExam(claimed, exam.sessionId)) {
+      dispatch({ type: 'storage-conflict', exam: loadActiveExam() })
+      return
+    }
     finished.current = false
-    dispatch({ type: 'resume', exam })
+    dispatch({ type: 'resume', exam: claimed })
   }
   const discardSavedExam = () => {
-    clearActiveExam()
-    dispatch({ type: 'discard-resume' })
+    if (clearActiveExam(state.resumableExam?.sessionId))
+      dispatch({ type: 'discard-resume' })
+    else dispatch({ type: 'storage-conflict', exam: loadActiveExam() })
   }
   const saveExamProgress = (progress) => {
     if (state.phase !== 'exam') return false
@@ -431,6 +463,7 @@ export default function useQuizSession() {
       config: state.lastConfig,
       questions: state.questions,
       startedAt: state.startedAt,
+      sessionId: state.examProgress?.sessionId,
       ...progress,
     })
   }

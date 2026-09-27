@@ -544,6 +544,40 @@ test('an interrupted exam restores answers, flags, position and deadline', async
   )
 })
 
+test('resuming an exam in another tab transfers recovery ownership', async ({
+  page,
+  context,
+}) => {
+  await mockApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Exam simulation/ }).click()
+  await page.getByRole('button', { name: /Start exam/ }).click()
+  const firstOwner = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeExam')).data.sessionId
+  )
+
+  const secondTab = await context.newPage()
+  await mockApi(secondTab)
+  await secondTab.goto('/')
+  await secondTab.getByRole('button', { name: 'Resume exam' }).click()
+  await expect(secondTab.getByText('Question 1 of 4')).toBeVisible()
+  const currentOwner = await secondTab.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeExam')).data.sessionId
+  )
+  expect(currentOwner).not.toBe(firstOwner)
+
+  await expect(page.getByRole('heading', { name: 'Resume saved exam' })).toBeVisible()
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'active exam changed in another tab' })
+  ).toBeVisible()
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('pcep.activeExam')).data.sessionId
+    )
+  ).toBe(currentOwner)
+  await secondTab.close()
+})
+
 test('progress backup exports and imports with a preview', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')

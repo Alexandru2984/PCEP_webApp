@@ -302,6 +302,13 @@ correctness flags, explanations or a correct-choice ID, and it is not included i
 progress exports. Only one active exam is retained. A failed grading request keeps
 the exact answer, confidence and timing snapshot for a safe retry.
 
+Each active exam also has an opaque local session ID. Resuming it rotates that
+ID and transfers write ownership to the current tab. Other open tabs detect the
+storage change, leave their stale in-memory exam and show the newly saved copy;
+their later saves, completion cleanup or Quit action cannot overwrite or delete
+the current owner's recovery data. Recovery snapshots created before session IDs
+were introduced receive a deterministic legacy ID when read and remain resumable.
+
 On reload the setup screen requires an explicit choice: resume the saved exam or
 discard it before starting any quiz or dashboard drill. The recovery countdown
 uses the original wall-clock deadline and refreshes after timer suspension, focus

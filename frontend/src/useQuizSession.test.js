@@ -379,6 +379,31 @@ describe('quiz session requests', () => {
     expect(loadActiveExam()).toBeNull()
   })
 
+  it('stops a stale tab after another tab claims its active exam', async () => {
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'exam' }))
+    const firstOwner = loadActiveExam()
+    const claimed = { ...firstOwner, sessionId: 'session-in-another-tab' }
+    expect(saveActiveExam(claimed, firstOwner.sessionId)).toBe(true)
+
+    act(() =>
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'pcep.activeExam',
+          newValue: localStorage.getItem('pcep.activeExam'),
+        })
+      )
+    )
+
+    expect(result.current.phase).toBe('setup')
+    expect(result.current.examProgress).toBeNull()
+    expect(result.current.resumableExam).toMatchObject({
+      sessionId: 'session-in-another-tab',
+    })
+    expect(result.current.saveExamProgress({ index: 0 })).toBe(false)
+    expect(loadActiveExam().sessionId).toBe('session-in-another-tab')
+  })
+
   it('starts a due-review drill from current public question ids', async () => {
     updateStudyProgress(
       [{ question, feedback: { is_correct: false } }],

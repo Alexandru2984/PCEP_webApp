@@ -24,6 +24,7 @@ const BACKUP_MAX_BYTES = 8 * 1024 * 1024
 const ACTIVE_EXAM_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const ACTIVE_EXAM_MAX_DURATION_MS = MAX_RESPONSE_MS
 const MODES = ['practice', 'exam', 'flashcards']
+const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/
 const integer = (v, min, max) => Number.isSafeInteger(v) && v >= min && v <= max
 const object = (v) => v && typeof v === 'object' && !Array.isArray(v)
 let cachedRaw
@@ -307,6 +308,7 @@ function normalizeActiveExam(value, now = Date.now()) {
     'flagged',
     'confidences',
     'responseMs',
+    'sessionId',
   ])
   if (!object(value) || Object.keys(value).some((key) => !allowed.has(key))) return null
   const config = normalizeSettings(value.config)
@@ -346,6 +348,14 @@ function normalizeActiveExam(value, now = Date.now()) {
     !Array.isArray(value.flagged)
   )
     return null
+
+  const sessionId =
+    value.sessionId === undefined
+      ? `legacy-${value.startedAt}-${normalizedQuestions[0].id}`
+      : typeof value.sessionId === 'string' && SESSION_ID_PATTERN.test(value.sessionId)
+        ? value.sessionId
+        : null
+  if (!sessionId) return null
 
   const byId = new Map(
     normalizedQuestions.map((question) => [String(question.id), question])
@@ -394,6 +404,7 @@ function normalizeActiveExam(value, now = Date.now()) {
     flagged: [...value.flagged],
     ...(Object.keys(confidences).length ? { confidences } : {}),
     ...(Object.keys(responseMs).length ? { responseMs } : {}),
+    sessionId,
   }
 }
 
@@ -413,19 +424,33 @@ export function loadActiveExam() {
   }
   return normalized
 }
-export function saveActiveExam(exam) {
+export function saveActiveExam(exam, expectedSessionId = exam?.sessionId) {
   if (newerSchema(read(ACTIVE_EXAM_KEY, null))) {
     warnNewerSchema()
     return false
   }
   const normalized = normalizeActiveExam(exam)
+  const existing = loadActiveExam()
+  if (
+    normalized &&
+    existing &&
+    (!expectedSessionId || existing.sessionId !== expectedSessionId)
+  ) {
+    window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
+    return false
+  }
   return normalized
     ? write(ACTIVE_EXAM_KEY, { version: VERSION, data: normalized })
     : false
 }
-export function clearActiveExam() {
+export function clearActiveExam(expectedSessionId) {
   if (newerSchema(read(ACTIVE_EXAM_KEY, null))) {
     warnNewerSchema()
+    return false
+  }
+  const existing = loadActiveExam()
+  if (existing && existing.sessionId !== expectedSessionId) {
+    window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
     return false
   }
   try {
