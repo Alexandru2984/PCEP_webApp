@@ -284,7 +284,6 @@ export default function useQuizSession() {
   const finish = (items, total) => {
     if (finished.current || !mounted.current) return
     finished.current = true
-    if (state.lastConfig?.mode === 'exam') clearActiveExam()
     const completedAt = Date.now()
     const elapsed = completedAt - state.startedAt
     const score = items.filter((i) => i.feedback?.is_correct).length
@@ -310,7 +309,7 @@ export default function useQuizSession() {
         item.responseMs >= 0 &&
         item.responseMs <= MAX_RESPONSE_MS
     )
-    recordCompletedSession(
+    const saved = recordCompletedSession(
       {
         date: new Date(completedAt).toISOString(),
         mode: state.lastConfig?.mode ?? 'practice',
@@ -342,6 +341,7 @@ export default function useQuizSession() {
       items,
       completedAt
     )
+    if (saved && state.lastConfig?.mode === 'exam') clearActiveExam()
     dispatch({ type: 'done', items, elapsed })
   }
 
