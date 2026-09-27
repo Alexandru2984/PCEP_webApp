@@ -187,7 +187,9 @@ test('confidence and response timing produce actionable local insights', async (
   await page.getByRole('button', { name: /Start practice/ }).click()
 
   await page.getByRole('button', { name: 'High' }).click()
-  await page.getByRole('button', { name: /option 2/ }).click()
+  // The shortcut listener must use the render that contains the confidence
+  // change; a stale listener used to submit this answer without its rating.
+  await page.keyboard.press('2')
   await page.getByRole('button', { name: /Next Question/ }).click()
   await page.getByRole('button', { name: 'Low' }).click()
   await page.getByRole('button', { name: /option 1/ }).click()

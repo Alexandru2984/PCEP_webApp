@@ -129,8 +129,7 @@ export default function QuizContainer() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, index, questions])
+  }, [handleNext, handleSelect, index, phase, questions])
 
   if (phase === 'setup') {
     if (resumableExam)
