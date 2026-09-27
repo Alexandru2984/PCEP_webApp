@@ -588,6 +588,7 @@ existing exam ownership transfer.
 - `26ba462` — record the container security release.
 - `2040b48` — pin CI actions and stop persisting checkout credentials.
 - `94c6291` — resume interrupted Practice sessions without leaking future answers.
+- `d21757e` — document Practice recovery and its storage boundary.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -795,6 +796,21 @@ no schema or environment setting changed, and privileged `nginx -t` passed.
 
 The CI action pinning changes only repository automation. It required no
 production deployment, service restart, migration or environment change.
+
+The Practice-recovery release has frontend rollback root
+`.frontend.previous-20260927T235046Z-7ef8c998` and external backup
+`frontend.20260927T235046Z-7ef8c998`. The published release is
+`d21757e7d12e`; entry chunk `index-Br9GlvNG.js` has SHA-256
+`e14654e9b84f6029d6c01557ecc5a56ca470430378018afb657faa633578ad77`, and
+the public service worker matches the live root at SHA-256
+`f78da35316c71215edec571540f8a64aa9ecdce21a299678db7a3dcaab59212c`.
+The preceding `index-BvxnNmgb.js` remains public for open tabs. Fresh live
+Chromium verified the release marker, answer-safe quiz payload, post-submit
+Practice snapshot, reload/resume path and mobile fit. Public liveness, readiness,
+post-submit feedback and cache policies passed; privileged `nginx -t` passed.
+This was a frontend-only atomic publish. Backend and PostgreSQL stayed healthy,
+and neither was recreated; no migration, environment change or Nginx reload was
+required.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
