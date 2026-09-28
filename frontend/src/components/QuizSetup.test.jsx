@@ -142,19 +142,23 @@ describe('QuizSetup — practice your mistakes', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('starts a due-review drill with a visible count', () => {
+  it('starts due reviews as practice or flashcards with a visible count', () => {
     const onPracticeDueReviews = vi.fn()
+    const onFlashcardDueReviews = vi.fn()
     render(
       <QuizSetup
         {...baseProps}
         dueReviewCount={7}
         onPracticeDueReviews={onPracticeDueReviews}
+        onFlashcardDueReviews={onFlashcardDueReviews}
       />
     )
-    const button = screen.getByRole('button', { name: /Review what is due/i })
-    expect(button).toHaveTextContent('7')
-    fireEvent.click(button)
+    expect(screen.getByRole('heading', { name: 'Review what is due' })).toBeVisible()
+    expect(screen.getByText('7')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Practice due questions' }))
     expect(onPracticeDueReviews).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Review due as flashcards' }))
+    expect(onFlashcardDueReviews).toHaveBeenCalledOnce()
   })
 
   it('shows why an adaptive set was recommended and starts it', () => {

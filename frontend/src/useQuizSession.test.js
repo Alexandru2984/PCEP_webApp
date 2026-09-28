@@ -666,6 +666,31 @@ describe('quiz session requests', () => {
     expect(result.current.phase).toBe('answering')
   })
 
+  it('starts due reviews as a recoverable flashcard deck', async () => {
+    updateStudyProgress(
+      [{ question, feedback: { is_correct: false } }],
+      Date.now() - 1000
+    )
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startDueReviewsFlashcards())
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'flashcards',
+        source: 'due-reviews',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('flashcards')
+    expect(loadActiveFlashcards()).toMatchObject({
+      config: { mode: 'flashcards', count: 1 },
+      questions: [{ id: 1 }],
+      index: 0,
+      revealed: null,
+    })
+  })
+
   it('starts a transparent adaptive drill from the ranked local plan', async () => {
     updateStudyProgress(
       [{ question, feedback: { is_correct: false } }],

@@ -512,8 +512,9 @@ test('personal notes persist into review without storing answer data', async ({
   ).toBe(true)
 })
 
-test('missed questions become due reviews and launch adaptive practice', async ({
+test('missed questions offer due flashcards and launch adaptive practice', async ({
   page,
+  context,
 }) => {
   await mockApi(page)
   await page.goto('/')
@@ -532,8 +533,13 @@ test('missed questions become due reviews and launch adaptive practice', async (
 
   await page.reload()
   await page.setViewportSize({ width: 390, height: 844 })
-  const due = page.getByRole('button', { name: /Review what is due/ })
-  await expect(due).toContainText(String(QUESTIONS.length))
+  const dueCard = page.getByRole('region', { name: 'Review what is due' })
+  await expect(dueCard).toBeVisible()
+  await expect(dueCard.getByText(String(QUESTIONS.length), { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Practice due questions' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Review due as flashcards' })
+  ).toBeVisible()
   const recommended = page.getByRole('button', { name: /Adaptive practice/ })
   await expect(recommended).toContainText(String(QUESTIONS.length))
   const { violations } = await new AxeBuilder({ page }).analyze()
@@ -541,6 +547,44 @@ test('missed questions become due reviews and launch adaptive practice', async (
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   ).toBe(true)
+
+  const flashTab = await context.newPage()
+  await mockApi(flashTab)
+  await flashTab.setViewportSize({ width: 390, height: 844 })
+  await flashTab.goto('/')
+  const flashResponsePromise = flashTab.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
+  })
+  await flashTab.getByRole('button', { name: 'Review due as flashcards' }).click()
+  const flashResponse = await flashResponsePromise
+  const flashParams = new URL(flashResponse.url()).searchParams
+  const flashPayload = await flashResponse.json()
+  expect(flashParams.get('count')).toBe(String(QUESTIONS.length))
+  expect(JSON.stringify(flashPayload)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  await expect(flashTab.getByText(`Flashcard 1 of ${QUESTIONS.length}`)).toBeVisible()
+  const activeFlashcards = await flashTab.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+  )
+  expect(JSON.stringify(activeFlashcards.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  const flashAnalysis = await new AxeBuilder({ page: flashTab }).analyze()
+  expect(flashAnalysis.violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await flashTab.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  ).toBe(true)
+  await flashTab.getByRole('button', { name: 'Quit' }).click()
+  await expect(flashTab.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  expect(
+    await flashTab.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
+  ).toBeNull()
+  await flashTab.close()
+
   const requestPromise = page.waitForRequest((request) => {
     const url = new URL(request.url())
     return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')

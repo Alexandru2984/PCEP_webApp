@@ -170,6 +170,7 @@ describe('Dashboard', () => {
 
   it('shows due review metrics and starts the scheduled drill', () => {
     const onDueReviews = vi.fn()
+    const onDueFlashcards = vi.fn()
     const onAdaptivePractice = vi.fn()
     updateStudyProgress([
       {
@@ -188,13 +189,19 @@ describe('Dashboard', () => {
       },
     ])
     render(
-      <Dashboard onDueReviews={onDueReviews} onAdaptivePractice={onAdaptivePractice} />
+      <Dashboard
+        onDueReviews={onDueReviews}
+        onDueFlashcards={onDueFlashcards}
+        onAdaptivePractice={onAdaptivePractice}
+      />
     )
     expect(screen.getByRole('heading', { name: 'Review plan' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start recommended (1)' }))
     expect(onAdaptivePractice).toHaveBeenCalledOnce()
-    fireEvent.click(screen.getByRole('button', { name: 'Review due (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Practice due (1)' }))
     expect(onDueReviews).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Flashcards due (1)' }))
+    expect(onDueFlashcards).toHaveBeenCalledOnce()
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Clear review schedule' }))
     expect(

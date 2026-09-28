@@ -51,6 +51,7 @@ export default function QuizSetup({
   onPracticeBookmarks,
   dueReviewCount = 0,
   onPracticeDueReviews,
+  onFlashcardDueReviews,
   adaptivePlan,
   onAdaptivePractice,
   onDailyChallenge,
@@ -139,24 +140,48 @@ export default function QuizSetup({
         </button>
       )}
 
-      {dueReviewCount > 0 && onPracticeDueReviews && (
-        <button
-          type="button"
-          onClick={onPracticeDueReviews}
-          className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-left transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60"
+      {dueReviewCount > 0 && (onPracticeDueReviews || onFlashcardDueReviews) && (
+        <section
+          aria-labelledby="due-review-heading"
+          className="mb-5 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/40"
         >
-          <span>
-            <span className="block font-semibold text-emerald-900 dark:text-emerald-200">
-              Review what is due
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3
+                id="due-review-heading"
+                className="font-semibold text-emerald-900 dark:text-emerald-200"
+              >
+                Review what is due
+              </h3>
+              <p className="mt-0.5 text-xs text-emerald-800 dark:text-emerald-300/90">
+                Up to 20 scheduled questions, with instant feedback or self-rating.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-emerald-200 px-2.5 py-1 text-sm font-bold text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
+              {dueReviewCount}
             </span>
-            <span className="mt-0.5 block text-xs text-emerald-800 dark:text-emerald-300/90">
-              A focused drill of up to 20 questions from your review schedule.
-            </span>
-          </span>
-          <span className="shrink-0 rounded-full bg-emerald-200 px-2.5 py-1 text-sm font-bold text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100">
-            {dueReviewCount}
-          </span>
-        </button>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {onPracticeDueReviews && (
+              <button
+                type="button"
+                onClick={onPracticeDueReviews}
+                className="min-h-11 rounded-lg bg-emerald-700 px-4 py-2.5 font-medium text-white hover:bg-emerald-800"
+              >
+                Practice due questions
+              </button>
+            )}
+            {onFlashcardDueReviews && (
+              <button
+                type="button"
+                onClick={onFlashcardDueReviews}
+                className="min-h-11 rounded-lg border border-emerald-600 bg-white px-4 py-2.5 font-medium text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300"
+              >
+                Review due as flashcards
+              </button>
+            )}
+          </div>
+        </section>
       )}
 
       {mistakesCount > 0 && onPracticeMistakes && (

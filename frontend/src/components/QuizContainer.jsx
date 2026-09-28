@@ -77,6 +77,7 @@ export default function QuizContainer() {
     startMistakesQuiz,
     startBookmarksQuiz,
     startDueReviewsQuiz,
+    startDueReviewsFlashcards,
     startAdaptiveQuiz,
     startSearchDrill,
     startDailyChallenge,
@@ -219,6 +220,7 @@ export default function QuizContainer() {
               onBookmarks={startBookmarksQuiz}
               onMistakes={startMistakesQuiz}
               onDueReviews={startDueReviewsQuiz}
+              onDueFlashcards={startDueReviewsFlashcards}
               onAdaptivePractice={startAdaptiveQuiz}
             />
           </Suspense>
@@ -231,6 +233,7 @@ export default function QuizContainer() {
             onPracticeBookmarks={startBookmarksQuiz}
             dueReviewCount={loadStudySummary().due}
             onPracticeDueReviews={startDueReviewsQuiz}
+            onFlashcardDueReviews={startDueReviewsFlashcards}
             adaptivePlan={loadAdaptivePlan()}
             onAdaptivePractice={startAdaptiveQuiz}
             onDailyChallenge={startDailyChallenge}

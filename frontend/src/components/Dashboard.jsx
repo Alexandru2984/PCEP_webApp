@@ -200,7 +200,13 @@ function StudyMomentum({ attempts }) {
   )
 }
 
-function StudyPlan({ summary, onDueReviews, adaptivePlan, onAdaptivePractice }) {
+function StudyPlan({
+  summary,
+  onDueReviews,
+  onDueFlashcards,
+  adaptivePlan,
+  onAdaptivePractice,
+}) {
   if (!summary.tracked && !adaptivePlan?.count) return null
   return (
     <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
@@ -231,7 +237,16 @@ function StudyPlan({ summary, onDueReviews, adaptivePlan, onAdaptivePractice }) 
               onClick={onDueReviews}
               className="rounded-lg border border-emerald-600 bg-white px-4 py-2.5 font-medium text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300"
             >
-              Review due ({summary.due})
+              Practice due ({summary.due})
+            </button>
+          )}
+          {summary.due > 0 && onDueFlashcards && (
+            <button
+              type="button"
+              onClick={onDueFlashcards}
+              className="rounded-lg border border-emerald-600 bg-white px-4 py-2.5 font-medium text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300"
+            >
+              Flashcards due ({summary.due})
             </button>
           )}
         </div>
@@ -263,6 +278,7 @@ export default function Dashboard({
   onBookmarks,
   onMistakes,
   onDueReviews,
+  onDueFlashcards,
   onAdaptivePractice,
 }) {
   useProgressSync()
@@ -279,6 +295,7 @@ export default function Dashboard({
         <StudyPlan
           summary={study}
           onDueReviews={onDueReviews}
+          onDueFlashcards={onDueFlashcards}
           adaptivePlan={adaptivePlan}
           onAdaptivePractice={onAdaptivePractice}
         />
@@ -342,6 +359,7 @@ export default function Dashboard({
       <StudyPlan
         summary={study}
         onDueReviews={onDueReviews}
+        onDueFlashcards={onDueFlashcards}
         adaptivePlan={adaptivePlan}
         onAdaptivePractice={onAdaptivePractice}
       />

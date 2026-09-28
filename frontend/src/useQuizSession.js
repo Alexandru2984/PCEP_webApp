@@ -787,7 +787,7 @@ export default function useQuizSession() {
       sessionId: state.flashcardProgress?.sessionId,
     })
   }
-  const startSavedDrill = (list, source) => {
+  const startSavedDrill = (list, source, mode = 'practice') => {
     if (!list.length) return
     // Fetch current public options so admin edits cannot leave a drill with stale choice IDs.
     const ids = [
@@ -802,7 +802,7 @@ export default function useQuizSession() {
     ]
     if (!ids.length) return
     return startQuiz({
-      mode: 'practice',
+      mode,
       module: '',
       objective: '',
       difficulty: '',
@@ -815,6 +815,8 @@ export default function useQuizSession() {
   const startBookmarksQuiz = () => startSavedDrill(loadBookmarks(), 'bookmarks')
   const startDueReviewsQuiz = () =>
     startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews')
+  const startDueReviewsFlashcards = () =>
+    startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews', 'flashcards')
   const startAdaptiveQuiz = () => startSavedDrill(loadAdaptivePlan().ids, 'adaptive')
   const startSearchDrill = (ids) => startSavedDrill(ids, 'search')
   return {
@@ -837,6 +839,7 @@ export default function useQuizSession() {
     startMistakesQuiz,
     startBookmarksQuiz,
     startDueReviewsQuiz,
+    startDueReviewsFlashcards,
     startAdaptiveQuiz,
     startSearchDrill,
     startDailyChallenge: () =>
