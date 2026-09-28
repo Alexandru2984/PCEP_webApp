@@ -642,13 +642,13 @@ test('missed questions offer due and adaptive flashcards plus adaptive practice'
   const adaptiveFlashResponse = await adaptiveFlashResponsePromise
   const adaptiveFlashParams = new URL(adaptiveFlashResponse.url()).searchParams
   const adaptiveFlashPayload = await adaptiveFlashResponse.json()
-  expect(
-    adaptiveFlashParams
-      .get('ids')
-      .split(',')
-      .map(Number)
-      .sort((a, b) => a - b)
-  ).toEqual(QUESTIONS.map((question) => question.id))
+  const adaptiveIds = adaptiveFlashParams.get('ids').split(',').map(Number)
+  expect([...adaptiveIds].sort((a, b) => a - b)).toEqual(
+    QUESTIONS.map((question) => question.id)
+  )
+  expect(adaptiveFlashPayload.questions.map((question) => question.id)).toEqual(
+    adaptiveIds
+  )
   expect(JSON.stringify(adaptiveFlashPayload)).not.toMatch(
     /is_correct|correct_choice_id|explanation/
   )
@@ -659,27 +659,31 @@ test('missed questions offer due and adaptive flashcards plus adaptive practice'
   expect(JSON.stringify(adaptiveFlashcards.questions)).not.toMatch(
     /is_correct|correct_choice_id|explanation/
   )
+  expect(adaptiveFlashcards.questions.map((question) => question.id)).toEqual(adaptiveIds)
   await flashTab.getByRole('button', { name: 'Quit' }).click()
   expect(
     await flashTab.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
   ).toBeNull()
   await flashTab.close()
 
-  const requestPromise = page.waitForRequest((request) => {
-    const url = new URL(request.url())
+  const responsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url())
     return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
   })
   await recommended.click()
-  const request = await requestPromise
-  const params = new URL(request.url()).searchParams
+  const response = await responsePromise
+  const params = new URL(response.url()).searchParams
   expect(params.get('count')).toBe(String(QUESTIONS.length))
-  expect(
-    params
-      .get('ids')
-      .split(',')
-      .map(Number)
-      .sort((a, b) => a - b)
-  ).toEqual(QUESTIONS.map((question) => question.id))
+  const practiceIds = params.get('ids').split(',').map(Number)
+  expect([...practiceIds].sort((a, b) => a - b)).toEqual(
+    QUESTIONS.map((question) => question.id)
+  )
+  expect(practiceIds).toEqual(adaptiveIds)
+  const practicePayload = await response.json()
+  expect(practicePayload.questions.map((question) => question.id)).toEqual(practiceIds)
+  expect(JSON.stringify(practicePayload)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
   await expect(page.getByText(/Tip: press/)).toBeVisible()
 })
 

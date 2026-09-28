@@ -583,7 +583,10 @@ The targeted-order follow-up fixes a server-side mismatch that randomized every
 request order after optional filters and applies `count` to that order, while
 unscoped quiz sets retain database randomization. All 197 backend tests pass,
 including two-query prefetch coverage, filtered-order and answer-leakage regressions;
-the 308-question audit and Django production check also pass.
+the 308-question audit and Django production check also pass. Playwright's API mock
+now implements the same ordered-ID and `count` contract, and the adaptive browser
+flow asserts that Practice, Flashcards and the recovery snapshot all retain that
+order. All 29 Playwright flows, lint and formatting pass.
 
 ## 12. Commits
 

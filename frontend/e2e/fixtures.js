@@ -179,18 +179,26 @@ export async function mockApi(page, { statsFailures = 0 } = {}) {
       const module = url.searchParams.get('module')
       const objective = url.searchParams.get('objective')
       const difficulty = url.searchParams.get('difficulty')
+      const count = Math.max(
+        1,
+        Math.min(Number(url.searchParams.get('count') ?? 30), 100)
+      )
       const questions = (
         ids
-          ? QUESTIONS.filter((question) =>
-              ids.split(',').map(Number).includes(question.id)
-            )
+          ? ids
+              .split(',')
+              .map(Number)
+              .map((id) => QUESTIONS.find((question) => question.id === id))
+              .filter(Boolean)
           : QUESTIONS
-      ).filter(
-        (question) =>
-          (!module || question.module === module) &&
-          (!objective || question.objective === objective) &&
-          (!difficulty || question.difficulty === difficulty)
       )
+        .filter(
+          (question) =>
+            (!module || question.module === module) &&
+            (!objective || question.objective === objective) &&
+            (!difficulty || question.difficulty === difficulty)
+        )
+        .slice(0, count)
       return route.fulfill({ json: { count: questions.length, questions } })
     }
 
