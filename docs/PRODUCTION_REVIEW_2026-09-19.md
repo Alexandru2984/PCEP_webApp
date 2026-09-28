@@ -892,6 +892,23 @@ liveness/readiness and privileged `nginx -t` passed. This was a frontend-only at
 publish; backend, PostgreSQL and Nginx were not restarted or reloaded, and no schema
 or environment setting changed.
 
+The Flashcard keyboard release is published at frontend revision
+`555d4abb3e08`. Its rollback root is
+`.frontend.previous-20260928T132755Z-0153c4b6`, with the external copy
+`frontend.20260928T132755Z-0153c4b6`. The entry chunk `index-CIl0VRdG.js` has
+SHA-256 `f325b9db94ca57f735c70d141c5b92a2d0b215bc000f0ef9540c9a2f41296603`,
+the Flashcard chunk `FlashcardView-ZCoMqwZ-.js` has SHA-256
+`7410c19f55b215a0f8fcfc911776024520dc3fa4e78e544bad1d5b4c951956fd`,
+and the public service worker matches the live file at SHA-256
+`e9cf494357fe1f6e611eaae6c1d4d98d952ab4f12f28125724243b8e738fe4a4`.
+The preceding entry chunk remains public and byte-identical. Fresh live Chromium at
+390 px verified the exact release, answer-safe deck, Space reveal, strict feedback,
+focus transfer, `aria-keyshortcuts`, `2` self-rating and advancement to the second
+card, with zero axe violations and no horizontal overflow. The existing Cloudflare
+JavaScript detection injection blocked by CSP remained the only console message.
+Public liveness/readiness and privileged `nginx -t` passed. This frontend-only atomic
+publish recreated no service and required no schema, environment or Nginx change.
+
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
 `/u/script.js` with the existing privacy attributes. The external-volume
