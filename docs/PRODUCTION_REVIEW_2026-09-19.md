@@ -606,6 +606,7 @@ seven viewport widths.
 - `e8fc01e` — reject short/editorial explanations and remove a dead draft question.
 - `8026db9` — document the explanation quality gates.
 - `20453df` — cancel stale Flashcard reveals and reject malformed feedback.
+- `698aed9` — document resilient Flashcard reveal behavior.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -841,6 +842,24 @@ readiness, pre-answer secrecy and post-submit feedback probes passed; the deploy
 image has zero fixable HIGH/CRITICAL Trivy findings. Only the backend was recreated.
 PostgreSQL and Nginx were not restarted, no schema or environment setting changed,
 and privileged `nginx -t` passed. The frontend remains on `d21757e7d12e`.
+
+The Flashcard reliability release is published at frontend revision
+`698aed939783`. Its rollback root is
+`.frontend.previous-20260928T131219Z-c91e4306`, with the external copy
+`frontend.20260928T131219Z-c91e4306`. The entry chunk `index-Dpng6iol.js` has
+SHA-256 `c0ee07f0dfd2863d6c2e47964b4f9efec76592d8703b1503640f529c8a27712b`,
+the Flashcard chunk `FlashcardView-DoabSnWm.js` has SHA-256
+`d26f8f3a4175af41483c341397e1fe08b4bbf32fc7714b3987bbb928000a7095`,
+and the public service worker matches the live file at SHA-256
+`2a8c5fe666df0f9c90fa9da75d881f95158e365de655f5e93c4bf72f94810c2e`.
+The previous entry chunk remains public for open tabs. Fresh live Chromium at
+390 px verified the exact release, an answer-safe Flashcard set, valid post-reveal
+feedback, zero horizontal overflow, zero axe violations and return to setup after
+Quit. The only console message was the already tracked Cloudflare JavaScript
+detection injection being blocked by CSP. Public liveness/readiness, security and
+cache headers passed; privileged `nginx -t` passed. This was a frontend-only atomic
+publish. Backend and PostgreSQL remained healthy, no service was recreated, and no
+migration, environment change or Nginx reload was required.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
