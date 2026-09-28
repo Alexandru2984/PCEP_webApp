@@ -233,6 +233,7 @@ def quiz_set(request):
         difficulty — optional: easy | medium | hard.
         module     — optional: module1 | module2 | module3 | module4.
         objective  — optional PCEP-30-02 objective, for example 3.1.
+        ids        — optional ordered, comma-separated question IDs.
     """
     raw = request.query_params.get('count', 30)
     try:
@@ -303,6 +304,7 @@ def quiz_set(request):
             'questions': serializer.data,
         })
 
+    selected_ids = None
     ids = request.query_params.get('ids')
     if ids is not None:
         parts = ids.split(',')
@@ -347,7 +349,22 @@ def quiz_set(request):
             )
         qs = qs.filter(objective=objective)
 
-    questions = qs.order_by('?').prefetch_related('choices')[:count]
+    if selected_ids is None:
+        questions = qs.order_by('?').prefetch_related('choices')[:count]
+    else:
+        # Targeted study lists are already ordered by the learner's intent: due
+        # date, adaptive priority, or an explicit Search selection. Fetch the
+        # bounded set in two queries, then restore that validated order rather
+        # than randomizing it again in the database.
+        questions_by_id = {
+            question.id: question
+            for question in qs.prefetch_related('choices')
+        }
+        questions = [
+            questions_by_id[question_id]
+            for question_id in selected_ids
+            if question_id in questions_by_id
+        ][:count]
     serializer = QuestionSerializer(questions, many=True)
     return Response({
         'count': len(serializer.data),

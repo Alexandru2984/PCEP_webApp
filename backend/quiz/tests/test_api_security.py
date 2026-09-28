@@ -165,12 +165,52 @@ def test_invalid_json_has_no_feedback(api_client):
     assert 'results' not in response.json()
 
 
-def test_saved_drill_fetches_only_requested_public_questions(api_client, make_question):
+def test_saved_drill_fetches_only_requested_public_questions(
+    api_client, make_question, django_assert_num_queries
+):
     q1, q2, q3 = make_question(), make_question(), make_question()
-    response = api_client.get(f'/api/quiz-set/?ids={q1.id},{q3.id}&count=50')
+    with django_assert_num_queries(2):
+        response = api_client.get(f'/api/quiz-set/?ids={q3.id},{q1.id}&count=50')
     assert response.status_code == 200
-    assert {q['id'] for q in response.json()['questions']} == {q1.id, q3.id}
-    assert q2.id not in {q['id'] for q in response.json()['questions']}
+    questions = response.json()['questions']
+    assert [question['id'] for question in questions] == [q3.id, q1.id]
+    assert q2.id not in {question['id'] for question in questions}
+    assert all(
+        set(question) == {
+            'id', 'text', 'code_snippet', 'difficulty', 'module', 'objective', 'choices'
+        }
+        and all(set(choice) == {'id', 'text'} for choice in question['choices'])
+        for question in questions
+    )
+
+
+def test_saved_drill_preserves_relative_order_after_filters(api_client, make_question):
+    first = make_question(module='module1')
+    filtered_out = make_question(module='module2')
+    second = make_question(module='module1')
+
+    response = api_client.get('/api/quiz-set/', {
+        'ids': f'{second.id},{filtered_out.id},{first.id}',
+        'module': 'module1',
+        'count': 50,
+    })
+
+    assert response.status_code == 200
+    assert [question['id'] for question in response.json()['questions']] == [
+        second.id,
+        first.id,
+    ]
+
+
+def test_saved_drill_applies_count_to_requested_order(api_client, make_question):
+    first, second = make_question(), make_question()
+
+    response = api_client.get(
+        f'/api/quiz-set/?ids={second.id},{first.id}&count=1'
+    )
+
+    assert response.status_code == 200
+    assert [question['id'] for question in response.json()['questions']] == [second.id]
 
 
 @pytest.mark.parametrize('ids', ['', '0', '-1', '1,1', 'true', '1.0', '9223372036854775808',
