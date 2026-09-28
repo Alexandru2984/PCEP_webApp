@@ -3,6 +3,7 @@ import CodeBlock from './CodeBlock'
 import { submitAnswer, apiErrorMessage } from '../api'
 import { ignoreShortcut, nativeActivation } from '../shortcuts'
 import { OBJECTIVE_LABELS } from '../syllabus'
+import { validateFeedback } from '../questionData'
 
 // A flip-card study mode: read the snippet, reveal the answer, then self-mark
 // "Got it" or "Review later". The reveal POSTs a throwaway guess so the correct
@@ -16,12 +17,16 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
   const [items, setItems] = useState([])
   const [error, setError] = useState(null)
   const pending = useRef(false)
+  const request = useRef(null)
   const marking = useRef(false)
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
     return () => {
       mounted.current = false
+      request.current?.abort()
+      request.current = null
+      pending.current = false
     }
   }, [])
   useEffect(() => {
@@ -36,24 +41,38 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
   const reveal = useCallback(async () => {
     if (revealed || pending.current) return
     pending.current = true
+    const controller = new AbortController()
+    request.current = controller
     setRevealing(true)
     setError(null)
     try {
-      const data = await submitAnswer(question.id, question.choices[0].id)
-      if (!mounted.current) return
-      if (!question.choices.some((c) => c.id === data?.correct_choice_id))
-        throw new Error('The server returned invalid feedback. Please retry.')
+      const data = await submitAnswer(question.id, question.choices[0].id, {
+        signal: controller.signal,
+      })
+      if (!mounted.current || request.current !== controller) return
+      validateFeedback(data, question)
       setRevealed({
         correct_choice_id: data.correct_choice_id,
         correct_explanation: data.correct_explanation,
       })
     } catch (error) {
-      if (mounted.current) setError(apiErrorMessage(error))
+      if (mounted.current && request.current === controller && !controller.signal.aborted)
+        setError(apiErrorMessage(error))
     } finally {
-      pending.current = false
-      if (mounted.current) setRevealing(false)
+      if (request.current === controller) {
+        request.current = null
+        pending.current = false
+        if (mounted.current) setRevealing(false)
+      }
     }
   }, [question, revealed])
+
+  const quit = () => {
+    request.current?.abort()
+    request.current = null
+    pending.current = false
+    onQuit()
+  }
 
   const mark = (gotIt) => {
     if (!revealed || marking.current) return
@@ -123,7 +142,7 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
         </span>
         <button
           type="button"
-          onClick={onQuit}
+          onClick={quit}
           className="text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         >
           Quit

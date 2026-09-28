@@ -20,11 +20,15 @@ describe('FlashcardView', () => {
   it('reveals the answer from the API and records self-marks across the deck', async () => {
     submitAnswer
       .mockResolvedValueOnce({
+        is_correct: false,
         correct_choice_id: 2,
+        explanation: 'first choice',
         correct_explanation: 'first concept',
       })
       .mockResolvedValueOnce({
+        is_correct: true,
         correct_choice_id: 3,
+        explanation: 'second concept',
         correct_explanation: 'second concept',
       })
     const onFinish = vi.fn()
@@ -40,13 +44,21 @@ describe('FlashcardView', () => {
     fireEvent.click(screen.getByRole('button', { name: /Reveal answer/i }))
     expect(await screen.findByText(/first concept/)).toBeInTheDocument()
     // The reveal POSTs a throwaway guess (the first choice) to learn the key.
-    expect(submitAnswer).toHaveBeenCalledWith(10, 1)
+    expect(submitAnswer).toHaveBeenCalledWith(
+      10,
+      1,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
     fireEvent.click(screen.getByRole('button', { name: /Got it/i }))
 
     // Card 2: flip (proves we advanced), then mark "Review later".
     fireEvent.click(screen.getByRole('button', { name: /Reveal answer/i }))
     expect(await screen.findByText(/second concept/)).toBeInTheDocument()
-    expect(submitAnswer).toHaveBeenLastCalledWith(20, 3)
+    expect(submitAnswer).toHaveBeenLastCalledWith(
+      20,
+      3,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
     fireEvent.click(screen.getByRole('button', { name: /Review later/i }))
 
     expect(onFinish).toHaveBeenCalledOnce()
@@ -79,7 +91,9 @@ describe('FlashcardView', () => {
     submitAnswer
       .mockRejectedValueOnce(new Error('Network failure'))
       .mockResolvedValueOnce({
+        is_correct: false,
         correct_choice_id: 2,
+        explanation: 'first choice',
         correct_explanation: 'Recovered concept',
       })
     render(
@@ -94,5 +108,44 @@ describe('FlashcardView', () => {
     expect(screen.queryByRole('button', { name: /Got it/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Reveal answer/ }))
     expect(await screen.findByText(/Recovered concept/)).toBeInTheDocument()
+  })
+
+  it('rejects incomplete feedback instead of rendering unsafe response data', async () => {
+    submitAnswer.mockResolvedValue({
+      is_correct: true,
+      correct_choice_id: 2,
+      correct_explanation: { unexpected: true },
+    })
+    render(
+      <FlashcardView
+        questions={[card(10, [1, 2])]}
+        onFinish={vi.fn()}
+        onQuit={() => {}}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Reveal answer/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The server returned invalid feedback'
+    )
+    expect(screen.queryByRole('button', { name: /Got it/ })).not.toBeInTheDocument()
+  })
+
+  it('aborts an in-flight reveal before quitting', () => {
+    submitAnswer.mockImplementation(() => new Promise(() => {}))
+    const onQuit = vi.fn()
+    render(
+      <FlashcardView questions={[card(10, [1, 2])]} onFinish={vi.fn()} onQuit={onQuit} />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Reveal answer/ }))
+    const signal = submitAnswer.mock.calls[0][2].signal
+    expect(signal.aborted).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quit' }))
+
+    expect(signal.aborted).toBe(true)
+    expect(onQuit).toHaveBeenCalledOnce()
   })
 })
