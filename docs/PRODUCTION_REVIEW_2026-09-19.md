@@ -737,6 +737,7 @@ fresh production build.
 - `5d1ff63` — document scheduled production smoke checks.
 - `840d042` — add one-click focused review drills.
 - `9a101c9` — confirm before discarding active study sessions.
+- `c9e084a` — document focused review and safe session exit.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1174,6 +1175,31 @@ The production-smoke stage requires no migration, image rebuild, service restart
 Nginx reload or environment change. Its local command already validates the live
 domain. The scheduled GitHub workflow becomes active when commit `494b862` is
 pushed to the repository's default branch.
+
+The focused-review/safe-quit frontend release is published at revision
+`c9e084aeb6d0`. Its rollback root is
+`.frontend.previous-20260928T215206Z-09288549`, with external copy
+`frontend.20260928T215206Z-09288549`. The entry chunk
+`index-BJQLTMCQ.js` has SHA-256
+`7b69edf3d30ddf3bbb0e23d0866041aad6a661f808837f19690cf0acaff44bba`,
+the Review chunk `ReviewScreen-PScnr1uT.js` has SHA-256
+`6e90aad983b9fedf3182edb89b3171faa5d88c3599c447cfb9dd57c6f83915a3`,
+the Flashcard chunk `FlashcardView-D6XNoa5e.js` has SHA-256
+`f13e267ddc273f7fbce2ea90813e297d3cce2611fbc1101b08cd858731ee94ab`,
+and `sw.js` has SHA-256
+`51812da1303de83673f8368addc0799bca00bb4ba25481083b0f0f12d5f0216c`.
+The preceding entry chunk remains publicly available with immutable caching.
+Fresh live Chromium at 390 px completed ten production questions, built a focused
+Flashcard queue for production question 226 and observed that exact ID in the
+request, public response and answer-safe recovery snapshot. Cancelling Quit kept
+the active deck and recovery; confirming it returned to setup and cleared the
+snapshot. The report and active deck had zero axe violations, no horizontal
+overflow and no unexpected console errors. Public release, shell assets,
+liveness, readiness, the 308-question snapshot, answer secrecy, ordered drills,
+HTTPS redirect, dependency audits, Django deploy checks, Compose validation and
+privileged `nginx -t` passed. This frontend-only atomic publish recreated no
+service and required no migration, environment, Nginx or Cloudflare change; the
+backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
