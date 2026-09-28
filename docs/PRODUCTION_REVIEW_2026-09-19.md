@@ -221,7 +221,9 @@ action and requires confirmation before deleting the saved attempt.
 Practice recovery uses the same explicit resume/discard pattern and remains usable
 at 360 px. If the learner had already submitted the current answer, its feedback and
 confidence return without another request; otherwise the unanswered card returns
-cleanly. Both recovery cards passed axe checks.
+cleanly. Flashcard recovery restores completed ratings and the current card, including
+an answer only when it had already been revealed. All three recovery cards passed axe
+checks.
 
 Question and result headings receive focus after navigation. Code blocks scroll
 without expanding the viewport. Actions, feedback, empty states, offline state,
@@ -270,6 +272,8 @@ assistive-technology certification.
   one-click weak-objective drills without exposing answer metadata.
 - Reload-safe Practice sessions with post-submission feedback recovery, 24-hour
   expiry, strict schema validation and cross-tab ownership transfer.
+- Reload-safe Flashcard decks with revealed-card recovery, answer-safe future cards,
+  strict 24-hour snapshots and cross-tab ownership transfer.
 
 ## 9. Performance
 
@@ -530,6 +534,15 @@ Vitest tests, lint, formatting and the production build pass. Browser coverage u
 the shortcuts end to end and the Flashcard screens remain axe-clean without overflow
 in both themes across seven viewport widths.
 
+The Flashcard recovery follow-up stores a strictly normalized 24-hour deck snapshot,
+resumes completed ratings and an already revealed current card, and rotates ownership
+between tabs. Unrevealed questions retain only the public API fields. Quit, confirmed
+discard and successful completion clear only the current owner's copy, while stale
+tabs return to recovery and cannot overwrite it. All 269 Vitest tests across 31 files,
+lint, formatting, the production build and all 29 Playwright flows pass. The browser
+regression covers reload without a duplicate answer request, answer-key boundaries,
+mobile fit, axe, advancement after resume and cleanup on Quit.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -621,7 +634,13 @@ in both themes across seven viewport widths.
 - `20453df` — cancel stale Flashcard reveals and reject malformed feedback.
 - `698aed9` — document resilient Flashcard reveal behavior.
 - `c7a7fb6` — prevent duplicate Search requests in the same render.
+- `afcb584` — document the Search request guard.
+- `89eb12b` — record the Search reliability release.
 - `02b23e0` — add focus-safe Flashcard keyboard self-rating.
+- `555d4ab` — document Flashcard keyboard controls.
+- `a2b0549` — record the Flashcard keyboard release.
+- `3ddd657` — add the validated Flashcard recovery schema.
+- `072de44` — resume interrupted Flashcard study sessions.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.

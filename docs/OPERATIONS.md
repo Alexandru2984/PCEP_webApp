@@ -378,6 +378,22 @@ the same bindings through `aria-keyshortcuts`, the footer lists them, and the sh
 shortcut guard suppresses them in editable fields, during composition, on key repeat
 and with browser modifier keys.
 
+An in-progress deck is stored under the versioned `pcep.activeFlashcards` key and
+expires after 24 hours. The snapshot contains the sanitized public deck, current
+position, completed self-ratings, start time and an opaque ownership ID. It may retain
+the answer for the current card only after that learner has revealed it; all later
+cards still pass through the public-question whitelist and contain no answer metadata.
+The snapshot is local to the browser and excluded from progress exports.
+
+Reload offers explicit Resume or confirmed Discard. A revealed current card resumes
+without repeating its answer request, while an unrevealed card returns cleanly.
+Successful completion records one attempt and clears the snapshot; Quit discards it.
+Strict validation binds completed ratings to their positional questions and correct
+choices, bounds explanations, rejects unknown fields and enforces the deck/config
+size. Resume rotates the session ID. A stale tab detects that ownership transfer,
+aborts any reveal in flight, returns to the recovery screen and cannot overwrite or
+delete the new owner's copy.
+
 Progress, settings and active-session writes refuse to replace a storage schema
 with a higher version number. A stale tab also leaves newer recovery data untouched
 on read and clear, and shows a reload warning immediately or after a cross-tab
