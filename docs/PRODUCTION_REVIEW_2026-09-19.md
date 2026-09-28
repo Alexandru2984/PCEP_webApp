@@ -686,6 +686,9 @@ both launch modes, axe and mobile horizontal fit.
 - `4bf62b3` — record the saved-list Flashcard release.
 - `49f31ee` — add Flashcard mode to selected Search drills.
 - `bb77e0d` — document Search Flashcard drills.
+- `8c5b78d` — record the Search Flashcard release.
+- `64862bd` — add adaptive Flashcard sessions.
+- `e4568e2` — document adaptive Flashcard sessions.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -1070,6 +1073,30 @@ JavaScript-detection injection blocked by CSP remained the only console message.
 Public liveness, readiness, the 308-question snapshot, cache headers and
 privileged `nginx -t` passed. This frontend-only atomic publish recreated no
 service and required no migration, environment or Nginx change.
+
+The adaptive-Flashcard release is published at frontend revision
+`e4568e267944`. Its rollback root is
+`.frontend.previous-20260928T211617Z-b16004f3`, with the external copy
+`frontend.20260928T211617Z-b16004f3`. The entry chunk `index-CeGUX6L7.js`
+has SHA-256
+`c8c1e5eadf6be85e16c0f6c440ce3a9cfba518a0bc20109b875eb0877b4b3a14`,
+the Flashcard chunk `FlashcardView-B7VawKjo.js` has SHA-256
+`750f9199f4116ed6131ce1e636102188a3b3c6b69c74b0dc18a7ec28f92ea408`,
+the Dashboard chunk `Dashboard-HBLVwTZz.js` has SHA-256
+`7b3a7efd74b0a59f146e5b5ee76e8ce089459c3ea879c89eb4b61991be3521bb`,
+and the public service worker matches the live root at SHA-256
+`53de5029353f939863c3f69cee892e3215780bcaaf50e10695be3c198029e34d`.
+The preceding entry chunk remains public. Fresh live Chromium at 390 px seeded
+production IDs 254, 320, 258 and 232 from an answer-safe public set; the adaptive
+ranking requested 232, 254, 258 and 320 in both Flashcards and Practice. Neither
+response nor the unrevealed recovery snapshot contained answer metadata. Reload,
+explicit resume and cleanup on Quit passed, and the setup, active deck and recovery
+screen had zero axe violations and no horizontal overflow. The existing Cloudflare
+JavaScript-detection injection blocked by CSP remained the only console message.
+Public liveness, readiness, the 308-question snapshot, HTTPS redirect, TLS, security
+and cache headers, retained assets, Compose validation and privileged `nginx -t`
+passed. This frontend-only atomic publish recreated no service and required no
+migration, environment or Nginx change.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
