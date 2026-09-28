@@ -10,6 +10,17 @@ import {
   mockApi,
 } from './fixtures'
 
+async function answerConfirmation(page, action, accept = true) {
+  const dialogPromise = page.waitForEvent('dialog')
+  const actionPromise = action()
+  const dialog = await dialogPromise
+  const message = dialog.message()
+  if (accept) await dialog.accept()
+  else await dialog.dismiss()
+  await actionPromise
+  return message
+}
+
 // --- Tests ------------------------------------------------------------------
 test('setup screen loads and shows the question-bank snapshot', async ({ page }) => {
   await mockApi(page)
@@ -288,7 +299,18 @@ test('confidence and response timing produce actionable local insights', async (
     /is_correct|correct_choice_id|explanation/
   )
 
-  await page.getByRole('button', { name: 'Quit' }).click()
+  const cancelMessage = await answerConfirmation(
+    page,
+    () => page.getByRole('button', { name: 'Quit' }).click(),
+    false
+  )
+  expect(cancelMessage).toContain('current session progress will be discarded')
+  await expect(page.getByText('Question 1 of 2')).toBeVisible()
+  expect(
+    await page.evaluate(() => localStorage.getItem('pcep.activePractice'))
+  ).not.toBeNull()
+
+  await answerConfirmation(page, () => page.getByRole('button', { name: 'Quit' }).click())
   await page.getByRole('button', { name: /Progress/ }).click()
   await expect(page.getByText(/Confidence calibration:/)).toBeVisible()
   await expect(page.getByText(/Pace uses measured time to first answer/)).toBeVisible()
@@ -442,7 +464,7 @@ test('an interrupted flashcard deck restores only already revealed answers', asy
 
   analysis = await new AxeBuilder({ page }).analyze()
   expect(analysis.violations.map((violation) => violation.id)).toEqual([])
-  await page.getByRole('button', { name: 'Quit' }).click()
+  await answerConfirmation(page, () => page.getByRole('button', { name: 'Quit' }).click())
   await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
   expect(
     await page.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
@@ -505,13 +527,13 @@ test('bookmarks persist and start answer-safe practice or flashcard drills', asy
   await page.reload()
   await page.getByRole('button', { name: 'Resume practice' }).click()
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
-  await page.getByRole('button', { name: 'Quit' }).click()
+  await answerConfirmation(page, () => page.getByRole('button', { name: 'Quit' }).click())
   const drill = page.getByRole('button', { name: /Practice bookmarks/ })
   await expect(drill).toBeVisible()
   await drill.click()
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Quit' }).click()
+  await answerConfirmation(page, () => page.getByRole('button', { name: 'Quit' }).click())
   const responsePromise = page.waitForResponse((response) => {
     const url = new URL(response.url())
     return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
@@ -650,7 +672,9 @@ test('missed questions offer due and adaptive flashcards plus adaptive practice'
       () => document.documentElement.scrollWidth <= window.innerWidth
     )
   ).toBe(true)
-  await flashTab.getByRole('button', { name: 'Quit' }).click()
+  await answerConfirmation(flashTab, () =>
+    flashTab.getByRole('button', { name: 'Quit' }).click()
+  )
   await expect(flashTab.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
   expect(
     await flashTab.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
@@ -686,7 +710,9 @@ test('missed questions offer due and adaptive flashcards plus adaptive practice'
     /is_correct|correct_choice_id|explanation/
   )
   expect(adaptiveFlashcards.questions.map((question) => question.id)).toEqual(adaptiveIds)
-  await flashTab.getByRole('button', { name: 'Quit' }).click()
+  await answerConfirmation(flashTab, () =>
+    flashTab.getByRole('button', { name: 'Quit' }).click()
+  )
   expect(
     await flashTab.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
   ).toBeNull()

@@ -77,6 +77,12 @@ export default function FlashcardView({
   }, [question, revealed])
 
   const quit = () => {
+    if (
+      !window.confirm(
+        'Quit these flashcards? Your current session progress will be discarded.'
+      )
+    )
+      return
     request.current?.abort()
     request.current = null
     pending.current = false

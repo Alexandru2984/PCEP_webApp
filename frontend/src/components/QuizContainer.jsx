@@ -387,7 +387,14 @@ export default function QuizContainer() {
         </div>
         <button
           type="button"
-          onClick={returnToSetup}
+          onClick={() => {
+            if (
+              window.confirm(
+                'Quit this practice session? Your current session progress will be discarded.'
+              )
+            )
+              returnToSetup()
+          }}
           className="text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         >
           Quit

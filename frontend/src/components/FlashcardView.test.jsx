@@ -136,6 +136,10 @@ describe('FlashcardView', () => {
   it('aborts an in-flight reveal before quitting', () => {
     submitAnswer.mockImplementation(() => new Promise(() => {}))
     const onQuit = vi.fn()
+    const confirm = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true)
     render(
       <FlashcardView questions={[card(10, [1, 2])]} onFinish={vi.fn()} onQuit={onQuit} />
     )
@@ -145,7 +149,15 @@ describe('FlashcardView', () => {
     expect(signal.aborted).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: 'Quit' }))
+    expect(signal.aborted).toBe(false)
+    expect(onQuit).not.toHaveBeenCalled()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Quit' }))
+
+    expect(confirm).toHaveBeenCalledTimes(2)
+    expect(confirm).toHaveBeenCalledWith(
+      'Quit these flashcards? Your current session progress will be discarded.'
+    )
     expect(signal.aborted).toBe(true)
     expect(onQuit).toHaveBeenCalledOnce()
   })
