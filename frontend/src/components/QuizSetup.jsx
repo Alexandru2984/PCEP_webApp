@@ -46,9 +46,11 @@ const MODES = [
 export default function QuizSetup({
   onStart,
   onPracticeMistakes,
+  onFlashcardMistakes,
   mistakesCount = 0,
   bookmarksCount = 0,
   onPracticeBookmarks,
+  onFlashcardBookmarks,
   dueReviewCount = 0,
   onPracticeDueReviews,
   onFlashcardDueReviews,
@@ -184,35 +186,93 @@ export default function QuizSetup({
         </section>
       )}
 
-      {mistakesCount > 0 && onPracticeMistakes && (
-        <button
-          type="button"
-          onClick={onPracticeMistakes}
-          className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-left transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:hover:bg-amber-950/60"
+      {mistakesCount > 0 && (onPracticeMistakes || onFlashcardMistakes) && (
+        <section
+          aria-labelledby="mistakes-heading"
+          className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40"
         >
-          <span>
-            <span className="block font-semibold text-amber-900 dark:text-amber-200">
-              🔁 Practice your mistakes
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3
+                id="mistakes-heading"
+                className="font-semibold text-amber-900 dark:text-amber-200"
+              >
+                Practice your mistakes
+              </h3>
+              <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-300/90">
+                Correct answers remove questions from this list; Flashcards use your
+                self-rating.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-amber-200 px-2.5 py-1 text-sm font-bold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+              {mistakesCount}
             </span>
-            <span className="mt-0.5 block text-xs text-amber-800 dark:text-amber-300/90">
-              Re-drill the {mistakesCount} question{mistakesCount === 1 ? '' : 's'} you
-              missed — answer one correctly and it drops off the list.
-            </span>
-          </span>
-          <span className="shrink-0 rounded-full bg-amber-200 px-2.5 py-1 text-sm font-bold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
-            {mistakesCount}
-          </span>
-        </button>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {onPracticeMistakes && (
+              <button
+                type="button"
+                onClick={onPracticeMistakes}
+                className="min-h-11 rounded-lg bg-amber-700 px-4 py-2.5 font-medium text-white hover:bg-amber-800"
+              >
+                Practice mistakes
+              </button>
+            )}
+            {onFlashcardMistakes && (
+              <button
+                type="button"
+                onClick={onFlashcardMistakes}
+                className="min-h-11 rounded-lg border border-amber-600 bg-white px-4 py-2.5 font-medium text-amber-800 hover:bg-amber-100 dark:bg-slate-900 dark:text-amber-300"
+              >
+                Mistakes as flashcards
+              </button>
+            )}
+          </div>
+        </section>
       )}
 
-      {bookmarksCount > 0 && onPracticeBookmarks && (
-        <button
-          type="button"
-          onClick={onPracticeBookmarks}
-          className="mb-5 w-full rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-left font-medium text-sky-900 hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-200"
+      {bookmarksCount > 0 && (onPracticeBookmarks || onFlashcardBookmarks) && (
+        <section
+          aria-labelledby="bookmarks-heading"
+          className="mb-5 rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 dark:border-sky-700 dark:bg-sky-950/40"
         >
-          ★ Practice bookmarks ({bookmarksCount})
-        </button>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3
+                id="bookmarks-heading"
+                className="font-semibold text-sky-900 dark:text-sky-200"
+              >
+                Saved bookmarks
+              </h3>
+              <p className="mt-0.5 text-xs text-sky-800 dark:text-sky-300/90">
+                Study saved questions with graded answers or self-rated recall.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-sky-200 px-2.5 py-1 text-sm font-bold text-sky-900 dark:bg-sky-800 dark:text-sky-100">
+              {bookmarksCount}
+            </span>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {onPracticeBookmarks && (
+              <button
+                type="button"
+                onClick={onPracticeBookmarks}
+                className="min-h-11 rounded-lg bg-sky-700 px-4 py-2.5 font-medium text-white hover:bg-sky-800"
+              >
+                Practice bookmarks
+              </button>
+            )}
+            {onFlashcardBookmarks && (
+              <button
+                type="button"
+                onClick={onFlashcardBookmarks}
+                className="min-h-11 rounded-lg border border-sky-600 bg-white px-4 py-2.5 font-medium text-sky-800 hover:bg-sky-100 dark:bg-slate-900 dark:text-sky-300"
+              >
+                Bookmarks as flashcards
+              </button>
+            )}
+          </div>
+        </section>
       )}
 
       <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">

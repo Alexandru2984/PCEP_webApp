@@ -10,6 +10,8 @@ import {
   saveActiveExam,
   saveActiveFlashcards,
   saveActivePractice,
+  toggleBookmark,
+  updateMistakes,
   updateStudyProgress,
 } from './storage'
 import useQuizSession from './useQuizSession'
@@ -690,6 +692,40 @@ describe('quiz session requests', () => {
       revealed: null,
     })
   })
+
+  it.each([
+    [
+      'mistakes',
+      () => updateMistakes([{ question, feedback: { is_correct: false } }]),
+      'startMistakesFlashcards',
+    ],
+    ['bookmarks', () => toggleBookmark(question), 'startBookmarksFlashcards'],
+  ])(
+    'starts saved %s as a recoverable flashcard deck',
+    async (source, seed, startMethod) => {
+      seed()
+      const { result } = renderHook(useQuizSession)
+
+      await act(async () => result.current[startMethod]())
+
+      expect(fetchQuizSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'flashcards',
+          source,
+          ids: [1],
+          count: 1,
+        }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+      expect(result.current.phase).toBe('flashcards')
+      expect(loadActiveFlashcards()).toMatchObject({
+        config: { mode: 'flashcards', count: 1 },
+        questions: [{ id: 1 }],
+        index: 0,
+        revealed: null,
+      })
+    }
+  )
 
   it('starts a transparent adaptive drill from the ranked local plan', async () => {
     updateStudyProgress(

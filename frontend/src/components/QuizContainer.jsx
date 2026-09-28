@@ -75,7 +75,9 @@ export default function QuizContainer() {
     saveExamProgress,
     saveFlashcardProgress,
     startMistakesQuiz,
+    startMistakesFlashcards,
     startBookmarksQuiz,
+    startBookmarksFlashcards,
     startDueReviewsQuiz,
     startDueReviewsFlashcards,
     startAdaptiveQuiz,
@@ -218,7 +220,9 @@ export default function QuizContainer() {
               onDrill={startModuleDrill}
               onDrillObjective={startObjectiveDrill}
               onBookmarks={startBookmarksQuiz}
+              onBookmarkFlashcards={startBookmarksFlashcards}
               onMistakes={startMistakesQuiz}
+              onMistakeFlashcards={startMistakesFlashcards}
               onDueReviews={startDueReviewsQuiz}
               onDueFlashcards={startDueReviewsFlashcards}
               onAdaptivePractice={startAdaptiveQuiz}
@@ -228,9 +232,11 @@ export default function QuizContainer() {
           <QuizSetup
             onStart={startQuiz}
             onPracticeMistakes={startMistakesQuiz}
+            onFlashcardMistakes={startMistakesFlashcards}
             mistakesCount={loadMistakes().length}
             bookmarksCount={loadBookmarks().length}
             onPracticeBookmarks={startBookmarksQuiz}
+            onFlashcardBookmarks={startBookmarksFlashcards}
             dueReviewCount={loadStudySummary().due}
             onPracticeDueReviews={startDueReviewsQuiz}
             onFlashcardDueReviews={startDueReviewsFlashcards}

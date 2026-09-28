@@ -276,7 +276,9 @@ export default function Dashboard({
   onDrill,
   onDrillObjective,
   onBookmarks,
+  onBookmarkFlashcards,
   onMistakes,
+  onMistakeFlashcards,
   onDueReviews,
   onDueFlashcards,
   onAdaptivePractice,
@@ -374,6 +376,15 @@ export default function Dashboard({
               Practice mistakes ({mistakes})
             </button>
           )}
+          {mistakes > 0 && onMistakeFlashcards && (
+            <button
+              type="button"
+              onClick={onMistakeFlashcards}
+              className="rounded-lg border border-amber-600 bg-white px-4 py-3 font-medium text-amber-800 dark:bg-slate-900 dark:text-amber-300"
+            >
+              Flashcard mistakes ({mistakes})
+            </button>
+          )}
           {bookmarks > 0 && onBookmarks && (
             <button
               type="button"
@@ -381,6 +392,15 @@ export default function Dashboard({
               className="rounded-lg bg-sky-700 px-4 py-3 font-medium text-white"
             >
               Practice bookmarks ({bookmarks})
+            </button>
+          )}
+          {bookmarks > 0 && onBookmarkFlashcards && (
+            <button
+              type="button"
+              onClick={onBookmarkFlashcards}
+              className="rounded-lg border border-sky-600 bg-white px-4 py-3 font-medium text-sky-800 dark:bg-slate-900 dark:text-sky-300"
+            >
+              Flashcard bookmarks ({bookmarks})
             </button>
           )}
         </div>

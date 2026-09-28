@@ -456,8 +456,11 @@ test('exam preserves answers through a throttled grading request and retries onc
   expect(submissions[1]).toEqual(submissions[0])
 })
 
-test('bookmarks persist across reload and start a targeted drill', async ({ page }) => {
+test('bookmarks persist and start answer-safe practice or flashcard drills', async ({
+  page,
+}) => {
   await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
   await page.getByRole('button', { name: /Start practice/ }).click()
   await page.getByRole('button', { name: '☆ Bookmark' }).click()
@@ -469,6 +472,30 @@ test('bookmarks persist across reload and start a targeted drill', async ({ page
   await expect(drill).toBeVisible()
   await drill.click()
   await expect(page.getByRole('button', { name: '★ Bookmarked' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Quit' }).click()
+  const responsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
+  })
+  await page.getByRole('button', { name: 'Bookmarks as flashcards' }).click()
+  const response = await responsePromise
+  const payload = await response.json()
+  expect(new URL(response.url()).searchParams.get('ids')).toBe('1')
+  expect(JSON.stringify(payload)).not.toMatch(/is_correct|correct_choice_id|explanation/)
+  await expect(page.getByText('Flashcard 1 of 1')).toBeVisible()
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+  )
+  expect(saved.config).toMatchObject({ mode: 'flashcards', count: 1 })
+  expect(JSON.stringify(saved.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
 })
 
 test('personal notes persist into review without storing answer data', async ({

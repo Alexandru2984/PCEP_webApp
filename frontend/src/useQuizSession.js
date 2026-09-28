@@ -812,7 +812,11 @@ export default function useQuizSession() {
     })
   }
   const startMistakesQuiz = () => startSavedDrill(loadMistakes(), 'mistakes')
+  const startMistakesFlashcards = () =>
+    startSavedDrill(loadMistakes(), 'mistakes', 'flashcards')
   const startBookmarksQuiz = () => startSavedDrill(loadBookmarks(), 'bookmarks')
+  const startBookmarksFlashcards = () =>
+    startSavedDrill(loadBookmarks(), 'bookmarks', 'flashcards')
   const startDueReviewsQuiz = () =>
     startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews')
   const startDueReviewsFlashcards = () =>
@@ -837,7 +841,9 @@ export default function useQuizSession() {
     saveExamProgress,
     saveFlashcardProgress,
     startMistakesQuiz,
+    startMistakesFlashcards,
     startBookmarksQuiz,
+    startBookmarksFlashcards,
     startDueReviewsQuiz,
     startDueReviewsFlashcards,
     startAdaptiveQuiz,

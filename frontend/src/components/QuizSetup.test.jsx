@@ -120,26 +120,49 @@ describe('QuizSetup — practice your mistakes', () => {
     expect(onRetryStats).toHaveBeenCalledOnce()
   })
 
-  it('offers the mistakes drill with a count and fires the callback', () => {
+  it('offers saved mistakes as practice or flashcards with a count', () => {
     const onPracticeMistakes = vi.fn()
+    const onFlashcardMistakes = vi.fn()
     render(
       <QuizSetup
         {...baseProps}
         mistakesCount={3}
         onPracticeMistakes={onPracticeMistakes}
+        onFlashcardMistakes={onFlashcardMistakes}
       />
     )
-    const button = screen.getByRole('button', { name: /Practice your mistakes/i })
-    expect(button).toHaveTextContent('3')
-    fireEvent.click(button)
+    expect(screen.getByRole('heading', { name: 'Practice your mistakes' })).toBeVisible()
+    expect(screen.getByText('3')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Practice mistakes' }))
     expect(onPracticeMistakes).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Mistakes as flashcards' }))
+    expect(onFlashcardMistakes).toHaveBeenCalledOnce()
   })
 
   it('hides the drill when there are no saved mistakes', () => {
     render(<QuizSetup {...baseProps} mistakesCount={0} onPracticeMistakes={() => {}} />)
     expect(
-      screen.queryByRole('button', { name: /Practice your mistakes/i })
+      screen.queryByRole('heading', { name: /Practice your mistakes/i })
     ).not.toBeInTheDocument()
+  })
+
+  it('offers saved bookmarks as practice or flashcards', () => {
+    const onPracticeBookmarks = vi.fn()
+    const onFlashcardBookmarks = vi.fn()
+    render(
+      <QuizSetup
+        {...baseProps}
+        bookmarksCount={2}
+        onPracticeBookmarks={onPracticeBookmarks}
+        onFlashcardBookmarks={onFlashcardBookmarks}
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: 'Saved bookmarks' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Practice bookmarks' }))
+    expect(onPracticeBookmarks).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Bookmarks as flashcards' }))
+    expect(onFlashcardBookmarks).toHaveBeenCalledOnce()
   })
 
   it('starts due reviews as practice or flashcards with a visible count', () => {

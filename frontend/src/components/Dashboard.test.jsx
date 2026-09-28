@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import Dashboard from './Dashboard'
-import { updateStudyProgress } from '../storage'
+import { toggleBookmark, updateMistakes, updateStudyProgress } from '../storage'
 
 // Dashboard reads attempt history straight from localStorage on mount.
 function seedHistory(attempts) {
@@ -208,5 +208,45 @@ describe('Dashboard', () => {
       screen.queryByRole('button', { name: /Start recommended/ })
     ).not.toBeInTheDocument()
     confirm.mockRestore()
+  })
+
+  it('starts mistakes and bookmarks as practice or flashcards', () => {
+    const question = {
+      id: 42,
+      text: 'Saved question?',
+      code_snippet: '',
+      module: 'module2',
+      objective: '2.1',
+      difficulty: 'medium',
+      choices: [
+        { id: 421, text: 'One' },
+        { id: 422, text: 'Two' },
+      ],
+    }
+    seedHistory([attempt({ score: 5, total: 10, pct: 50 })])
+    updateMistakes([{ question, feedback: { is_correct: false } }])
+    toggleBookmark(question)
+    const onMistakes = vi.fn()
+    const onMistakeFlashcards = vi.fn()
+    const onBookmarks = vi.fn()
+    const onBookmarkFlashcards = vi.fn()
+
+    render(
+      <Dashboard
+        onMistakes={onMistakes}
+        onMistakeFlashcards={onMistakeFlashcards}
+        onBookmarks={onBookmarks}
+        onBookmarkFlashcards={onBookmarkFlashcards}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Practice mistakes (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Flashcard mistakes (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Practice bookmarks (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Flashcard bookmarks (1)' }))
+    expect(onMistakes).toHaveBeenCalledOnce()
+    expect(onMistakeFlashcards).toHaveBeenCalledOnce()
+    expect(onBookmarks).toHaveBeenCalledOnce()
+    expect(onBookmarkFlashcards).toHaveBeenCalledOnce()
   })
 })
