@@ -698,6 +698,9 @@ the 308-question audit and Django production check also pass.
 - `8c5b78d` — record the Search Flashcard release.
 - `64862bd` — add adaptive Flashcard sessions.
 - `e4568e2` — document adaptive Flashcard sessions.
+- `ba13b7a` — record the adaptive Flashcard release.
+- `0091bc7` — preserve targeted study order in the API.
+- `7207b1b` — document ordered targeted drills.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -1106,6 +1109,24 @@ Public liveness, readiness, the 308-question snapshot, HTTPS redirect, TLS, secu
 and cache headers, retained assets, Compose validation and privileged `nginx -t`
 passed. This frontend-only atomic publish recreated no service and required no
 migration, environment or Nginx change.
+
+The targeted-order release runs backend revision `7207b1bc2fb9` in image
+`sha256:fe9c54a960d1a39658a0205a7441d64c5e68bbd23ab753a80d6a637548914cb1`.
+The exact preceding image is retained as
+`pcep-backend-rollback:20260928T212443Z-release-5a6a74d844a7`. The verified
+mode-`0600` database dump is `pcep_db_20260928T212443Z.sql.gz` with SHA-256
+`79a34f220a16c9e38e9f603debeece5861a776d8cade5d52035200ede8a63a42`.
+Candidate and live checks found no migration to apply, and the read-only audit
+passed all 308 questions. A public ID request for 232, 254, 258 and 320 with
+`count=3` returned 232, 254 and 258 in that order without answer metadata;
+post-submit feedback remained available. Fresh live Chromium then generated an
+adaptive plan ordered 317, 272, 391 and 251 and found the same order in the API
+response and answer-safe Flashcard recovery snapshot. The deployed image runs as
+the non-root user with a read-only filesystem and has zero fixable HIGH/CRITICAL
+Trivy findings. Liveness, readiness, stats, Compose validation and privileged
+`nginx -t` passed. Only the backend was recreated; PostgreSQL and Nginx were not
+restarted, and no schema or environment setting changed. The frontend remains on
+`e4568e267944`.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
