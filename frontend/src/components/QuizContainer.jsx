@@ -83,6 +83,7 @@ export default function QuizContainer() {
     startAdaptiveQuiz,
     startAdaptiveFlashcards,
     startSearchDrill,
+    startSessionReview,
     startDailyChallenge,
     startModuleDrill,
     startObjectiveDrill,
@@ -332,6 +333,8 @@ export default function QuizContainer() {
           onRestart={returnToSetup}
           onDrillModule={startModuleDrill}
           onDrillObjective={startObjectiveDrill}
+          onPracticeQueue={(ids) => startSessionReview(ids)}
+          onFlashcardQueue={(ids) => startSessionReview(ids, 'flashcards')}
           elapsedLabel={elapsedMs ? `in ${formatElapsed(elapsedMs)}` : ''}
           streakStats={getStreakStats(history)}
           mode={lastConfig?.mode}

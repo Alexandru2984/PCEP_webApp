@@ -262,7 +262,33 @@ test('confidence and response timing produce actionable local insights', async (
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   ).toBe(true)
 
-  await page.getByRole('button', { name: 'New quiz' }).click()
+  const queueResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
+  })
+  await page.getByRole('button', { name: 'Practice review queue (2)' }).click()
+  const queueResponse = await queueResponsePromise
+  expect(new URL(queueResponse.url()).searchParams.get('ids')).toBe('1,2')
+  const queuePayload = await queueResponse.json()
+  expect(queuePayload.questions.map((question) => question.id)).toEqual([1, 2])
+  expect(JSON.stringify(queuePayload)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  await expect(page.getByText('Question 1 of 2')).toBeVisible()
+  const activeReview = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activePractice')).data
+  )
+  expect(activeReview.config).toMatchObject({
+    mode: 'practice',
+    source: 'session-review',
+    count: 2,
+  })
+  expect(activeReview.questions.map((question) => question.id)).toEqual([1, 2])
+  expect(JSON.stringify(activeReview.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+
+  await page.getByRole('button', { name: 'Quit' }).click()
   await page.getByRole('button', { name: /Progress/ }).click()
   await expect(page.getByText(/Confidence calibration:/)).toBeVisible()
   await expect(page.getByText(/Pace uses measured time to first answer/)).toBeVisible()

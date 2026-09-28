@@ -826,6 +826,12 @@ export default function useQuizSession() {
     startSavedDrill(loadAdaptivePlan().ids, 'adaptive', 'flashcards')
   const startSearchDrill = (ids, mode = 'practice') =>
     startSavedDrill(ids, 'search', mode === 'flashcards' ? 'flashcards' : 'practice')
+  const startSessionReview = (ids, mode = 'practice') =>
+    startSavedDrill(
+      ids,
+      'session-review',
+      mode === 'flashcards' ? 'flashcards' : 'practice'
+    )
   return {
     ...state,
     startQuiz,
@@ -852,6 +858,7 @@ export default function useQuizSession() {
     startAdaptiveQuiz,
     startAdaptiveFlashcards,
     startSearchDrill,
+    startSessionReview,
     startDailyChallenge: () =>
       startQuiz({
         mode: 'practice',

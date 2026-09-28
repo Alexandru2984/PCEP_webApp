@@ -158,6 +158,8 @@ export default function ReviewScreen({
   onRestart,
   onDrillModule,
   onDrillObjective,
+  onPracticeQueue,
+  onFlashcardQueue,
   elapsedLabel,
   streakStats,
   mode = 'practice',
@@ -174,6 +176,8 @@ export default function ReviewScreen({
   const focus = items.filter(
     (item) => !item.feedback?.is_correct || item.confidence === 'low'
   )
+  const queue = selfRated ? wrong : focus
+  const queueIds = queue.map((item) => item.question.id)
   const shown = filter === 'focus' ? focus : filter === 'wrong' ? wrong : items
 
   const pct = total > 0 ? Math.round((score / total) * 100) : 0
@@ -319,6 +323,33 @@ export default function ReviewScreen({
             All ({total})
           </button>
         </div>
+
+        {queue.length > 0 && (onPracticeQueue || onFlashcardQueue) && (
+          <div
+            className="mt-4 flex flex-wrap gap-2 border-t border-slate-200 pt-4 dark:border-slate-700"
+            role="group"
+            aria-label="Review queue actions"
+          >
+            {onPracticeQueue && (
+              <button
+                type="button"
+                onClick={() => onPracticeQueue(queueIds)}
+                className="min-h-11 rounded-lg bg-violet-700 px-4 py-2.5 font-medium text-white hover:bg-violet-800"
+              >
+                Practice review queue ({queue.length})
+              </button>
+            )}
+            {onFlashcardQueue && (
+              <button
+                type="button"
+                onClick={() => onFlashcardQueue(queueIds)}
+                className="min-h-11 rounded-lg border border-violet-600 bg-white px-4 py-2.5 font-medium text-violet-800 hover:bg-violet-100 dark:bg-slate-900 dark:text-violet-300"
+              >
+                Review queue as flashcards ({queue.length})
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <PerformanceReport

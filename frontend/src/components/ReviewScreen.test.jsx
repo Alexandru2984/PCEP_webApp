@@ -29,6 +29,8 @@ function reviewItem(id, { correct, confidence, responseMs }) {
 
 describe('ReviewScreen focused review', () => {
   it('starts with misses and low-confidence correct answers, including context', () => {
+    const onPracticeQueue = vi.fn()
+    const onFlashcardQueue = vi.fn()
     const items = [
       reviewItem(1, { correct: false, confidence: 'high', responseMs: 9000 }),
       reviewItem(2, { correct: true, confidence: 'low', responseMs: 3200 }),
@@ -40,6 +42,8 @@ describe('ReviewScreen focused review', () => {
         score={2}
         total={3}
         onRestart={vi.fn()}
+        onPracticeQueue={onPracticeQueue}
+        onFlashcardQueue={onFlashcardQueue}
         streakStats={{ best: 2 }}
       />
     )
@@ -54,6 +58,13 @@ describe('ReviewScreen focused review', () => {
     expect(within(list).queryByText('Question 3')).toBeNull()
     expect(within(list).getByText('Low confidence')).toBeVisible()
     expect(within(list).getByText('3s response')).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Practice review queue (2)' }))
+    expect(onPracticeQueue).toHaveBeenCalledWith([1, 2])
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review queue as flashcards (2)' })
+    )
+    expect(onFlashcardQueue).toHaveBeenCalledWith([1, 2])
 
     fireEvent.click(screen.getByRole('button', { name: 'Wrong only (1)' }))
     expect(within(list).getByText('Question 1')).toBeVisible()
@@ -84,6 +95,7 @@ describe('ReviewScreen focused review', () => {
           total={2}
           mode="flashcards"
           onRestart={vi.fn()}
+          onPracticeQueue={vi.fn()}
         />
       )
 
@@ -97,6 +109,9 @@ describe('ReviewScreen focused review', () => {
         'true'
       )
       expect(screen.getByText('Review later', { selector: 'span' })).toBeVisible()
+      expect(
+        screen.getByRole('button', { name: 'Practice review queue (1)' })
+      ).toBeVisible()
 
       fireEvent.click(screen.getByRole('button', { name: 'Copy result' }))
       await waitFor(() => expect(clipboard).toHaveBeenCalledOnce())

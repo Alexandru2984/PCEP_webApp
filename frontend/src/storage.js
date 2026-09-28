@@ -481,6 +481,7 @@ function normalizePracticeConfig(value, questionCount) {
     'due-reviews',
     'mistakes',
     'search',
+    'session-review',
   ]
   if (value.source !== undefined && !allowedSources.includes(value.source)) return null
   if (

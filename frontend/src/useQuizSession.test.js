@@ -811,6 +811,31 @@ describe('quiz session requests', () => {
     })
   })
 
+  it.each([
+    ['practice', 'answering'],
+    ['flashcards', 'flashcards'],
+  ])('starts the focused session review as %s in exact order', async (mode, phase) => {
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startSessionReview([1, 1, 0], mode))
+
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode,
+        source: 'session-review',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe(phase)
+    if (mode === 'practice')
+      expect(loadActivePractice()).toMatchObject({
+        config: { mode: 'practice', source: 'session-review', count: 1 },
+        questions: [{ id: 1 }],
+      })
+  })
+
   it('starts an objective drill and rejects a response outside that scope', async () => {
     const scopedQuestion = {
       ...question,
