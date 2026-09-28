@@ -281,8 +281,8 @@ The stats endpoint now performs one grouped query. Questions prefetch choices;
 no N+1 path was introduced. API payloads are capped and public answer data stays
 minimal. Pyodide remains lazy and same-origin. Hashed frontend/admin assets are
 compressed and immutable; unversioned shell, worker, manifest and runtime entry
-points revalidate. The current main production bundle is approximately 272.6 KB
-JavaScript (87.1 KB gzip) and 46.5 KB CSS (8.4 KB gzip), excluding lazy chunks
+points revalidate. The current main production bundle is approximately 294.4 KB
+JavaScript (91.2 KB gzip) and 47.2 KB CSS (8.5 KB gzip), excluding lazy chunks
 and the Pyodide runtime.
 
 The release process retains older lazy chunks so tabs open across deployment do
@@ -641,6 +641,7 @@ mobile fit, axe, advancement after resume and cleanup on Quit.
 - `a2b0549` — record the Flashcard keyboard release.
 - `3ddd657` — add the validated Flashcard recovery schema.
 - `072de44` — resume interrupted Flashcard study sessions.
+- `b5b4c4c` — document Flashcard session recovery.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -927,6 +928,25 @@ card, with zero axe violations and no horizontal overflow. The existing Cloudfla
 JavaScript detection injection blocked by CSP remained the only console message.
 Public liveness/readiness and privileged `nginx -t` passed. This frontend-only atomic
 publish recreated no service and required no schema, environment or Nginx change.
+
+The Flashcard recovery release is published at frontend revision
+`b5b4c4cd6d34`. Its rollback root is
+`.frontend.previous-20260928T141732Z-009836b2`, with the external copy
+`frontend.20260928T141732Z-009836b2`. The entry chunk `index-CaNGPjNn.js` has
+SHA-256 `f0e354cc33cca99d6ced978b2f4d706648033654a93028e83b28aa19c5372372`,
+the Flashcard chunk `FlashcardView-BgOPM-Y1.js` has SHA-256
+`47d3707d38daa3db1faf95fcb6744ecb0c31a89944c3ca689c16f54f38fce3ba`,
+and the public service worker matches the live root at SHA-256
+`794b00bfcf265a19e87a91f4c531028cf2baa9f0f70715da938334741992aae8`.
+The preceding entry chunk remains publicly available for open tabs. Fresh live
+Chromium at 390 px verified the exact release, a 30-question answer-safe deck,
+revealed-card snapshot, reload and resume without another answer request, advancement,
+cleanup on Quit, zero axe violations and no horizontal overflow. The existing
+Cloudflare JavaScript-detection injection blocked by CSP remained the only console
+message. Public readiness reported the database up, stats reported 308 questions,
+security/cache headers passed and privileged `nginx -t` passed. This frontend-only
+atomic publish recreated no service and required no migration, environment or Nginx
+change.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
