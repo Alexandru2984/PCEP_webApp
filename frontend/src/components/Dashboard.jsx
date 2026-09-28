@@ -206,6 +206,7 @@ function StudyPlan({
   onDueFlashcards,
   adaptivePlan,
   onAdaptivePractice,
+  onAdaptiveFlashcards,
 }) {
   if (!summary.tracked && !adaptivePlan?.count) return null
   return (
@@ -229,6 +230,15 @@ function StudyPlan({
               className="rounded-lg bg-violet-700 px-4 py-3 font-medium text-white hover:bg-violet-800"
             >
               Start recommended ({adaptivePlan.count})
+            </button>
+          )}
+          {adaptivePlan?.count > 0 && onAdaptiveFlashcards && (
+            <button
+              type="button"
+              onClick={onAdaptiveFlashcards}
+              className="rounded-lg border border-violet-600 bg-white px-4 py-2.5 font-medium text-violet-800 hover:bg-violet-100 dark:bg-slate-900 dark:text-violet-300"
+            >
+              Recommended flashcards ({adaptivePlan.count})
             </button>
           )}
           {summary.due > 0 && onDueReviews && (
@@ -282,6 +292,7 @@ export default function Dashboard({
   onDueReviews,
   onDueFlashcards,
   onAdaptivePractice,
+  onAdaptiveFlashcards,
 }) {
   useProgressSync()
   const attempts = loadHistory()
@@ -300,6 +311,7 @@ export default function Dashboard({
           onDueFlashcards={onDueFlashcards}
           adaptivePlan={adaptivePlan}
           onAdaptivePractice={onAdaptivePractice}
+          onAdaptiveFlashcards={onAdaptiveFlashcards}
         />
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
           <p className="text-slate-600 dark:text-slate-400">
@@ -364,6 +376,7 @@ export default function Dashboard({
         onDueFlashcards={onDueFlashcards}
         adaptivePlan={adaptivePlan}
         onAdaptivePractice={onAdaptivePractice}
+        onAdaptiveFlashcards={onAdaptiveFlashcards}
       />
       {(bookmarks > 0 || mistakes > 0) && (
         <div className="flex flex-wrap gap-2">

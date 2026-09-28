@@ -184,8 +184,9 @@ describe('QuizSetup — practice your mistakes', () => {
     expect(onFlashcardDueReviews).toHaveBeenCalledOnce()
   })
 
-  it('shows why an adaptive set was recommended and starts it', () => {
+  it('shows why an adaptive set was recommended and offers both study modes', () => {
     const onAdaptivePractice = vi.fn()
+    const onAdaptiveFlashcards = vi.fn()
     render(
       <QuizSetup
         {...baseProps}
@@ -194,11 +195,16 @@ describe('QuizSetup — practice your mistakes', () => {
           signals: { due: 4, mistakes: 6, weak: 9 },
         }}
         onAdaptivePractice={onAdaptivePractice}
+        onAdaptiveFlashcards={onAdaptiveFlashcards}
       />
     )
-    const button = screen.getByRole('button', { name: /Adaptive practice/i })
-    expect(button).toHaveTextContent('4 due · 6 mistakes · 9 below-target mastery')
-    fireEvent.click(button)
+    const card = screen.getByRole('region', { name: 'Adaptive study' })
+    expect(card).toHaveTextContent('4 due · 6 mistakes · 9 below-target mastery')
+    fireEvent.click(screen.getByRole('button', { name: 'Start adaptive practice (12)' }))
     expect(onAdaptivePractice).toHaveBeenCalledOnce()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Start adaptive flashcards (12)' })
+    )
+    expect(onAdaptiveFlashcards).toHaveBeenCalledOnce()
   })
 })

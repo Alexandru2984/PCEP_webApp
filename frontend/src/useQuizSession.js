@@ -822,6 +822,8 @@ export default function useQuizSession() {
   const startDueReviewsFlashcards = () =>
     startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews', 'flashcards')
   const startAdaptiveQuiz = () => startSavedDrill(loadAdaptivePlan().ids, 'adaptive')
+  const startAdaptiveFlashcards = () =>
+    startSavedDrill(loadAdaptivePlan().ids, 'adaptive', 'flashcards')
   const startSearchDrill = (ids, mode = 'practice') =>
     startSavedDrill(ids, 'search', mode === 'flashcards' ? 'flashcards' : 'practice')
   return {
@@ -848,6 +850,7 @@ export default function useQuizSession() {
     startDueReviewsQuiz,
     startDueReviewsFlashcards,
     startAdaptiveQuiz,
+    startAdaptiveFlashcards,
     startSearchDrill,
     startDailyChallenge: () =>
       startQuiz({

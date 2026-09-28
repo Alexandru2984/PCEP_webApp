@@ -56,6 +56,7 @@ export default function QuizSetup({
   onFlashcardDueReviews,
   adaptivePlan,
   onAdaptivePractice,
+  onAdaptiveFlashcards,
   onDailyChallenge,
   dailyCompletion,
   onSearchDrill,
@@ -115,31 +116,55 @@ export default function QuizSetup({
         </button>
       )}
 
-      {adaptivePlan?.count > 0 && onAdaptivePractice && (
-        <button
-          type="button"
-          onClick={onAdaptivePractice}
-          className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 text-left transition-colors hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:hover:bg-violet-950/60"
+      {adaptivePlan?.count > 0 && (onAdaptivePractice || onAdaptiveFlashcards) && (
+        <section
+          aria-labelledby="adaptive-heading"
+          className="mb-5 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3 dark:border-violet-800 dark:bg-violet-950/40"
         >
-          <span>
-            <span className="block text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
-              Recommended next
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+                Recommended next
+              </p>
+              <h3
+                id="adaptive-heading"
+                className="mt-0.5 font-semibold text-violet-950 dark:text-violet-100"
+              >
+                Adaptive study
+              </h3>
+              <p className="mt-1 text-xs text-violet-800 dark:text-violet-300/90">
+                {adaptivePlan.signals.due} due · {adaptivePlan.signals.mistakes} mistakes
+                · {adaptivePlan.signals.weak} below-target mastery
+                {adaptivePlan.signals.lowConfidence > 0
+                  ? ` · ${adaptivePlan.signals.lowConfidence} low confidence`
+                  : ''}
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full bg-violet-200 px-2.5 py-1 text-sm font-bold text-violet-950 dark:bg-violet-800 dark:text-violet-100">
+              {adaptivePlan.count}
             </span>
-            <span className="mt-0.5 block font-semibold text-violet-950 dark:text-violet-100">
-              Adaptive practice
-            </span>
-            <span className="mt-1 block text-xs text-violet-800 dark:text-violet-300/90">
-              {adaptivePlan.signals.due} due · {adaptivePlan.signals.mistakes} mistakes ·{' '}
-              {adaptivePlan.signals.weak} below-target mastery
-              {adaptivePlan.signals.lowConfidence > 0
-                ? ` · ${adaptivePlan.signals.lowConfidence} low confidence`
-                : ''}
-            </span>
-          </span>
-          <span className="shrink-0 rounded-full bg-violet-200 px-2.5 py-1 text-sm font-bold text-violet-950 dark:bg-violet-800 dark:text-violet-100">
-            {adaptivePlan.count}
-          </span>
-        </button>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {onAdaptivePractice && (
+              <button
+                type="button"
+                onClick={onAdaptivePractice}
+                className="min-h-11 rounded-lg bg-violet-700 px-4 py-2.5 font-medium text-white hover:bg-violet-800"
+              >
+                Start adaptive practice ({adaptivePlan.count})
+              </button>
+            )}
+            {onAdaptiveFlashcards && (
+              <button
+                type="button"
+                onClick={onAdaptiveFlashcards}
+                className="min-h-11 rounded-lg border border-violet-600 bg-white px-4 py-2.5 font-medium text-violet-800 hover:bg-violet-100 dark:bg-slate-900 dark:text-violet-300"
+              >
+                Start adaptive flashcards ({adaptivePlan.count})
+              </button>
+            )}
+          </div>
+        </section>
       )}
 
       {dueReviewCount > 0 && (onPracticeDueReviews || onFlashcardDueReviews) && (

@@ -81,6 +81,7 @@ export default function QuizContainer() {
     startDueReviewsQuiz,
     startDueReviewsFlashcards,
     startAdaptiveQuiz,
+    startAdaptiveFlashcards,
     startSearchDrill,
     startDailyChallenge,
     startModuleDrill,
@@ -226,6 +227,7 @@ export default function QuizContainer() {
               onDueReviews={startDueReviewsQuiz}
               onDueFlashcards={startDueReviewsFlashcards}
               onAdaptivePractice={startAdaptiveQuiz}
+              onAdaptiveFlashcards={startAdaptiveFlashcards}
             />
           </Suspense>
         ) : (
@@ -242,6 +244,7 @@ export default function QuizContainer() {
             onFlashcardDueReviews={startDueReviewsFlashcards}
             adaptivePlan={loadAdaptivePlan()}
             onAdaptivePractice={startAdaptiveQuiz}
+            onAdaptiveFlashcards={startAdaptiveFlashcards}
             onDailyChallenge={startDailyChallenge}
             dailyCompletion={dailyCompletion}
             onSearchDrill={startSearchDrill}

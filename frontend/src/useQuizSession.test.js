@@ -746,6 +746,33 @@ describe('quiz session requests', () => {
     expect(result.current.phase).toBe('answering')
   })
 
+  it('starts the ranked adaptive plan as recoverable flashcards', async () => {
+    updateStudyProgress(
+      [{ question, feedback: { is_correct: false } }],
+      Date.now() - 1000
+    )
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startAdaptiveFlashcards())
+
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'flashcards',
+        source: 'adaptive',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('flashcards')
+    expect(loadActiveFlashcards()).toMatchObject({
+      config: { mode: 'flashcards', count: 1 },
+      questions: [{ id: 1 }],
+      index: 0,
+      revealed: null,
+    })
+  })
+
   it('starts a search drill from unique valid IDs', async () => {
     const { result } = renderHook(useQuizSession)
     await act(async () => result.current.startSearchDrill([1, 1, 0, null]))

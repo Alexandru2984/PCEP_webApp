@@ -551,7 +551,7 @@ test('personal notes persist into review without storing answer data', async ({
   ).toBe(true)
 })
 
-test('missed questions offer due flashcards and launch adaptive practice', async ({
+test('missed questions offer due and adaptive flashcards plus adaptive practice', async ({
   page,
   context,
 }) => {
@@ -579,8 +579,15 @@ test('missed questions offer due flashcards and launch adaptive practice', async
   await expect(
     page.getByRole('button', { name: 'Review due as flashcards' })
   ).toBeVisible()
-  const recommended = page.getByRole('button', { name: /Adaptive practice/ })
+  const recommended = page.getByRole('button', {
+    name: `Start adaptive practice (${QUESTIONS.length})`,
+  })
   await expect(recommended).toContainText(String(QUESTIONS.length))
+  await expect(
+    page.getByRole('button', {
+      name: `Start adaptive flashcards (${QUESTIONS.length})`,
+    })
+  ).toBeVisible()
   const { violations } = await new AxeBuilder({ page }).analyze()
   expect(violations.map((violation) => violation.id)).toEqual([])
   expect(
@@ -619,6 +626,40 @@ test('missed questions offer due flashcards and launch adaptive practice', async
   ).toBe(true)
   await flashTab.getByRole('button', { name: 'Quit' }).click()
   await expect(flashTab.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  expect(
+    await flashTab.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
+  ).toBeNull()
+
+  const adaptiveFlashResponsePromise = flashTab.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
+  })
+  await flashTab
+    .getByRole('button', {
+      name: `Start adaptive flashcards (${QUESTIONS.length})`,
+    })
+    .click()
+  const adaptiveFlashResponse = await adaptiveFlashResponsePromise
+  const adaptiveFlashParams = new URL(adaptiveFlashResponse.url()).searchParams
+  const adaptiveFlashPayload = await adaptiveFlashResponse.json()
+  expect(
+    adaptiveFlashParams
+      .get('ids')
+      .split(',')
+      .map(Number)
+      .sort((a, b) => a - b)
+  ).toEqual(QUESTIONS.map((question) => question.id))
+  expect(JSON.stringify(adaptiveFlashPayload)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  await expect(flashTab.getByText(`Flashcard 1 of ${QUESTIONS.length}`)).toBeVisible()
+  const adaptiveFlashcards = await flashTab.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+  )
+  expect(JSON.stringify(adaptiveFlashcards.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  await flashTab.getByRole('button', { name: 'Quit' }).click()
   expect(
     await flashTab.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
   ).toBeNull()

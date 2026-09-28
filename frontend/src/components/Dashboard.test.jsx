@@ -172,6 +172,7 @@ describe('Dashboard', () => {
     const onDueReviews = vi.fn()
     const onDueFlashcards = vi.fn()
     const onAdaptivePractice = vi.fn()
+    const onAdaptiveFlashcards = vi.fn()
     updateStudyProgress([
       {
         question: {
@@ -193,11 +194,14 @@ describe('Dashboard', () => {
         onDueReviews={onDueReviews}
         onDueFlashcards={onDueFlashcards}
         onAdaptivePractice={onAdaptivePractice}
+        onAdaptiveFlashcards={onAdaptiveFlashcards}
       />
     )
     expect(screen.getByRole('heading', { name: 'Review plan' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start recommended (1)' }))
     expect(onAdaptivePractice).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Recommended flashcards (1)' }))
+    expect(onAdaptiveFlashcards).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Practice due (1)' }))
     expect(onDueReviews).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Flashcards due (1)' }))
