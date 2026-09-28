@@ -3,10 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchDailyChallenge, fetchQuizSet, gradeAnswers, submitAnswer } from './api'
 import {
   loadActiveExam,
+  loadActiveFlashcards,
   loadActivePractice,
   loadHistory,
   loadStudyProgress,
   saveActiveExam,
+  saveActiveFlashcards,
   saveActivePractice,
   updateStudyProgress,
 } from './storage'
@@ -369,6 +371,91 @@ describe('quiz session requests', () => {
       sessionId: 'practice-in-another-tab',
     })
     expect(loadActivePractice().sessionId).toBe('practice-in-another-tab')
+  })
+
+  it('recovers revealed flashcards and completes the deck exactly once', async () => {
+    fetchQuizSet.mockResolvedValueOnce({ questions: [question, secondQuestion] })
+    const flashcardConfig = { ...config, mode: 'flashcards' }
+    const firstItem = {
+      question,
+      pickedChoiceId: 11,
+      feedback: { ...feedback, explanation: '' },
+    }
+    const secondItem = {
+      question: secondQuestion,
+      pickedChoiceId: null,
+      feedback: {
+        is_correct: false,
+        correct_choice_id: 21,
+        explanation: '',
+        correct_explanation: 'Why',
+      },
+    }
+    const first = renderHook(useQuizSession)
+
+    await act(async () => first.result.current.startQuiz(flashcardConfig))
+    expect(loadActiveFlashcards()).toMatchObject({
+      index: 0,
+      items: [],
+      revealed: null,
+    })
+    act(() =>
+      expect(
+        first.result.current.saveFlashcardProgress({
+          index: 1,
+          items: [firstItem],
+          revealed: {
+            correct_choice_id: 21,
+            correct_explanation: 'Why',
+          },
+        })
+      ).toBe(true)
+    )
+    first.unmount()
+
+    const resumed = renderHook(useQuizSession)
+    expect(resumed.result.current.resumableFlashcards).toMatchObject({
+      index: 1,
+      items: [{ question: { id: 1 }, pickedChoiceId: 11 }],
+      revealed: { correct_choice_id: 21 },
+    })
+    act(() => resumed.result.current.resumeFlashcards())
+    expect(resumed.result.current.phase).toBe('flashcards')
+    expect(resumed.result.current.flashcardProgress).toMatchObject({
+      index: 1,
+      revealed: { correct_choice_id: 21 },
+    })
+    act(() => resumed.result.current.finish([firstItem, secondItem], 2))
+
+    expect(resumed.result.current.phase).toBe('done')
+    expect(resumed.result.current.finish([firstItem, secondItem], 2)).toBe(false)
+    expect(loadActiveFlashcards()).toBeNull()
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadHistory()[0]).toMatchObject({ mode: 'flashcards', score: 1, total: 2 })
+  })
+
+  it('stops a stale flashcard tab after another tab claims its recovery copy', async () => {
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz({ ...config, mode: 'flashcards' }))
+    const firstOwner = loadActiveFlashcards()
+    const claimed = { ...firstOwner, sessionId: 'flashcards-in-another-tab' }
+    expect(saveActiveFlashcards(claimed, firstOwner.sessionId)).toBe(true)
+
+    act(() =>
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'pcep.activeFlashcards',
+          newValue: localStorage.getItem('pcep.activeFlashcards'),
+        })
+      )
+    )
+
+    expect(result.current.phase).toBe('setup')
+    expect(result.current.resumableFlashcards).toMatchObject({
+      sessionId: 'flashcards-in-another-tab',
+    })
+    expect(result.current.saveFlashcardProgress({ index: 0 })).toBe(false)
+    expect(loadActiveFlashcards().sessionId).toBe('flashcards-in-another-tab')
   })
 
   it('records optional confidence and time to answer without answer metadata', async () => {

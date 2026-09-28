@@ -8,8 +8,10 @@ import {
 } from './api'
 import {
   clearActiveExam,
+  clearActiveFlashcards,
   clearActivePractice,
   loadActiveExam,
+  loadActiveFlashcards,
   loadActivePractice,
   loadAdaptivePlan,
   loadBookmarks,
@@ -18,6 +20,7 @@ import {
   loadSettings,
   recordCompletedSession,
   saveActiveExam,
+  saveActiveFlashcards,
   saveActivePractice,
   saveSettings,
 } from './storage'
@@ -27,7 +30,12 @@ import { MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
 import { EXAM_SECONDS_PER_QUESTION, PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
 
-function emptyState(lastConfig = null, resumableExam = null, resumablePractice = null) {
+function emptyState(
+  lastConfig = null,
+  resumableExam = null,
+  resumablePractice = null,
+  resumableFlashcards = null
+) {
   return {
     phase: 'setup',
     questions: [],
@@ -39,7 +47,9 @@ function emptyState(lastConfig = null, resumableExam = null, resumablePractice =
     lastConfig,
     resumableExam,
     resumablePractice,
+    resumableFlashcards,
     examProgress: null,
+    flashcardProgress: null,
     practiceSessionId: null,
     startedAt: 0,
     elapsedMs: 0,
@@ -48,7 +58,12 @@ function emptyState(lastConfig = null, resumableExam = null, resumablePractice =
   }
 }
 function initialState() {
-  return emptyState(loadSettings(), loadActiveExam(), loadActivePractice())
+  return emptyState(
+    loadSettings(),
+    loadActiveExam(),
+    loadActivePractice(),
+    loadActiveFlashcards()
+  )
 }
 
 export function sessionReducer(state, event) {
@@ -62,6 +77,7 @@ export function sessionReducer(state, event) {
         startedAt: event.now,
         examProgress: event.examProgress,
         practiceSessionId: event.practiceSessionId,
+        flashcardProgress: event.flashcardProgress,
         phase:
           event.config.mode === 'exam'
             ? 'exam'
@@ -103,14 +119,36 @@ export function sessionReducer(state, event) {
         practiceSessionId: event.practice.sessionId,
       }
     }
+    case 'resume-flashcards':
+      return {
+        ...emptyState(event.flashcards.config),
+        phase: 'flashcards',
+        questions: event.flashcards.questions,
+        startedAt: event.flashcards.startedAt,
+        flashcardProgress: {
+          index: event.flashcards.index,
+          items: event.flashcards.items,
+          revealed: event.flashcards.revealed,
+          sessionId: event.flashcards.sessionId,
+        },
+      }
     case 'discard-resume':
       return { ...state, resumableExam: null }
     case 'discard-practice-resume':
       return { ...state, resumablePractice: null }
+    case 'discard-flashcards-resume':
+      return { ...state, resumableFlashcards: null }
     case 'storage-conflict':
       return emptyState(state.lastConfig, event.exam)
     case 'practice-storage-conflict':
       return emptyState(state.lastConfig, state.resumableExam, event.practice)
+    case 'flashcards-storage-conflict':
+      return emptyState(
+        state.lastConfig,
+        state.resumableExam,
+        state.resumablePractice,
+        event.flashcards
+      )
     case 'load-error':
       return { ...state, phase: 'error', error: event.error }
     case 'answering':
@@ -166,7 +204,8 @@ export function sessionReducer(state, event) {
       return emptyState(
         'config' in event ? event.config : state.lastConfig,
         event.exam ?? null,
-        event.practice ?? null
+        event.practice ?? null,
+        event.flashcards ?? null
       )
     default:
       return state
@@ -245,6 +284,32 @@ export default function useQuizSession() {
       window.removeEventListener('pcep-active-practice-conflict', stopStalePractice)
     }
   }, [state.phase, state.practiceSessionId])
+  useEffect(() => {
+    const sessionId = state.flashcardProgress?.sessionId
+    if (state.phase !== 'flashcards' || !sessionId) return
+    const stopStaleFlashcards = () => {
+      const currentFlashcards = loadActiveFlashcards()
+      if (currentFlashcards?.sessionId === sessionId) return
+      request.current?.abort()
+      request.current = null
+      dispatch({
+        type: 'flashcards-storage-conflict',
+        flashcards: currentFlashcards,
+      })
+    }
+    const changedInAnotherTab = (event) => {
+      if (event.key !== 'pcep.activeFlashcards') return
+      const currentFlashcards = loadActiveFlashcards()
+      if (currentFlashcards?.sessionId === sessionId) return
+      window.dispatchEvent(new CustomEvent('pcep-active-flashcards-conflict'))
+    }
+    window.addEventListener('storage', changedInAnotherTab)
+    window.addEventListener('pcep-active-flashcards-conflict', stopStaleFlashcards)
+    return () => {
+      window.removeEventListener('storage', changedInAnotherTab)
+      window.removeEventListener('pcep-active-flashcards-conflict', stopStaleFlashcards)
+    }
+  }, [state.flashcardProgress?.sessionId, state.phase])
   useEffect(() => {
     if (
       !['answering', 'reviewing'].includes(state.phase) ||
@@ -351,6 +416,15 @@ export default function useQuizSession() {
           : null
       const practiceSessionId =
         sessionConfig.mode === 'practice' ? crypto.randomUUID() : null
+      const flashcardProgress =
+        sessionConfig.mode === 'flashcards'
+          ? {
+              index: 0,
+              items: [],
+              revealed: null,
+              sessionId: crypto.randomUUID(),
+            }
+          : null
       if (examProgress) {
         const saved = saveActiveExam({
           config: sessionConfig,
@@ -364,6 +438,26 @@ export default function useQuizSession() {
           return
         }
       }
+      if (flashcardProgress) {
+        const saved = saveActiveFlashcards({
+          config: sessionConfig,
+          questions,
+          startedAt: now,
+          ...flashcardProgress,
+        })
+        const currentFlashcards = loadActiveFlashcards()
+        if (
+          !saved &&
+          currentFlashcards &&
+          currentFlashcards.sessionId !== flashcardProgress.sessionId
+        ) {
+          dispatch({
+            type: 'flashcards-storage-conflict',
+            flashcards: currentFlashcards,
+          })
+          return
+        }
+      }
       dispatch({
         type: 'start',
         config: sessionConfig,
@@ -371,6 +465,7 @@ export default function useQuizSession() {
         now,
         examProgress,
         practiceSessionId,
+        flashcardProgress,
       })
     } catch (error) {
       if (current(controller))
@@ -430,6 +525,16 @@ export default function useQuizSession() {
       const currentPractice = loadActivePractice()
       if (currentPractice && currentPractice.sessionId !== state.practiceSessionId) {
         window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
+        return false
+      }
+    }
+    if (state.lastConfig?.mode === 'flashcards') {
+      const currentFlashcards = loadActiveFlashcards()
+      if (
+        currentFlashcards &&
+        currentFlashcards.sessionId !== state.flashcardProgress?.sessionId
+      ) {
+        window.dispatchEvent(new CustomEvent('pcep-active-flashcards-conflict'))
         return false
       }
     }
@@ -505,6 +610,13 @@ export default function useQuizSession() {
         if (currentPractice && currentPractice.sessionId !== sessionId) return false
       }
     }
+    if (saved && state.lastConfig?.mode === 'flashcards') {
+      const sessionId = state.flashcardProgress?.sessionId
+      if (!clearActiveFlashcards(sessionId)) {
+        const currentFlashcards = loadActiveFlashcards()
+        if (currentFlashcards && currentFlashcards.sessionId !== sessionId) return false
+      }
+    }
     dispatch({ type: 'done', items, elapsed })
     return true
   }
@@ -574,11 +686,14 @@ export default function useQuizSession() {
     request.current = null
     if (state.phase === 'exam') clearActiveExam(state.examProgress?.sessionId)
     if (state.practiceSessionId) clearActivePractice(state.practiceSessionId)
+    if (state.flashcardProgress?.sessionId)
+      clearActiveFlashcards(state.flashcardProgress.sessionId)
     dispatch({
       type: 'reset',
       config: loadSettings(),
       exam: loadActiveExam(),
       practice: loadActivePractice(),
+      flashcards: loadActiveFlashcards(),
     })
   }
   const resumeExam = () => {
@@ -626,6 +741,32 @@ export default function useQuizSession() {
         practice: loadActivePractice(),
       })
   }
+  const resumeFlashcards = () => {
+    const flashcards = loadActiveFlashcards()
+    if (!flashcards) {
+      dispatch({ type: 'discard-flashcards-resume' })
+      return
+    }
+    const claimed = { ...flashcards, sessionId: crypto.randomUUID() }
+    if (!saveActiveFlashcards(claimed, flashcards.sessionId)) {
+      dispatch({
+        type: 'flashcards-storage-conflict',
+        flashcards: loadActiveFlashcards(),
+      })
+      return
+    }
+    finished.current = false
+    dispatch({ type: 'resume-flashcards', flashcards: claimed })
+  }
+  const discardSavedFlashcards = () => {
+    if (clearActiveFlashcards(state.resumableFlashcards?.sessionId))
+      dispatch({ type: 'discard-flashcards-resume' })
+    else
+      dispatch({
+        type: 'flashcards-storage-conflict',
+        flashcards: loadActiveFlashcards(),
+      })
+  }
   const saveExamProgress = (progress) => {
     if (state.phase !== 'exam') return false
     return saveActiveExam({
@@ -634,6 +775,16 @@ export default function useQuizSession() {
       startedAt: state.startedAt,
       sessionId: state.examProgress?.sessionId,
       ...progress,
+    })
+  }
+  const saveFlashcardProgress = (progress) => {
+    if (state.phase !== 'flashcards') return false
+    return saveActiveFlashcards({
+      ...progress,
+      config: state.lastConfig,
+      questions: state.questions,
+      startedAt: state.startedAt,
+      sessionId: state.flashcardProgress?.sessionId,
     })
   }
   const startSavedDrill = (list, source) => {
@@ -679,7 +830,10 @@ export default function useQuizSession() {
     discardSavedExam,
     resumePractice,
     discardSavedPractice,
+    resumeFlashcards,
+    discardSavedFlashcards,
     saveExamProgress,
+    saveFlashcardProgress,
     startMistakesQuiz,
     startBookmarksQuiz,
     startDueReviewsQuiz,

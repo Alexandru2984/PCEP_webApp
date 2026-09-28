@@ -196,4 +196,54 @@ describe('FlashcardView', () => {
       false,
     ])
   })
+
+  it('resumes an already revealed card without repeating the answer request', () => {
+    const firstQuestion = card(10, [1, 2])
+    const second = card(20, [3, 4])
+    const completed = {
+      question: firstQuestion,
+      pickedChoiceId: 2,
+      feedback: {
+        is_correct: true,
+        correct_choice_id: 2,
+        explanation: '',
+        correct_explanation: 'first concept',
+      },
+    }
+    const onFinish = vi.fn()
+    const onProgress = vi.fn()
+    render(
+      <FlashcardView
+        questions={[firstQuestion, second]}
+        initialProgress={{
+          index: 1,
+          items: [completed],
+          revealed: {
+            correct_choice_id: 3,
+            correct_explanation: 'second concept',
+          },
+        }}
+        onProgress={onProgress}
+        onFinish={onFinish}
+        onQuit={() => {}}
+      />
+    )
+
+    expect(screen.getByText(/Flashcard/)).toHaveTextContent('Flashcard 2 of 2')
+    expect(screen.getByText('second concept')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Review later' })).toHaveFocus()
+    expect(submitAnswer).not.toHaveBeenCalled()
+    expect(onProgress).toHaveBeenCalledWith({
+      index: 1,
+      items: [completed],
+      revealed: {
+        correct_choice_id: 3,
+        correct_explanation: 'second concept',
+      },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review later' }))
+    expect(onFinish).toHaveBeenCalledOnce()
+    expect(onFinish.mock.calls[0][0]).toHaveLength(2)
+  })
 })

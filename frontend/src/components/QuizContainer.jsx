@@ -19,6 +19,7 @@ import FeedbackBox from './FeedbackBox'
 import QuizSetup from './QuizSetup'
 import SavedExamCard from './SavedExamCard'
 import SavedPracticeCard from './SavedPracticeCard'
+import SavedFlashcardsCard from './SavedFlashcardsCard'
 
 // Loaded on demand: none of these are on the first-paint (setup) path, so they
 // ship as separate chunks and stay out of the initial bundle.
@@ -55,7 +56,9 @@ export default function QuizContainer() {
     error,
     resumableExam,
     resumablePractice,
+    resumableFlashcards,
     examProgress,
+    flashcardProgress,
     startQuiz,
     handleSelect,
     handleConfidence,
@@ -67,7 +70,10 @@ export default function QuizContainer() {
     discardSavedExam,
     resumePractice,
     discardSavedPractice,
+    resumeFlashcards,
+    discardSavedFlashcards,
     saveExamProgress,
+    saveFlashcardProgress,
     startMistakesQuiz,
     startBookmarksQuiz,
     startDueReviewsQuiz,
@@ -164,6 +170,14 @@ export default function QuizContainer() {
           practice={resumablePractice}
           onResume={resumePractice}
           onDiscard={discardSavedPractice}
+        />
+      )
+    if (resumableFlashcards)
+      return (
+        <SavedFlashcardsCard
+          flashcards={resumableFlashcards}
+          onResume={resumeFlashcards}
+          onDiscard={discardSavedFlashcards}
         />
       )
     const attempts = loadHistory()
@@ -289,6 +303,8 @@ export default function QuizContainer() {
           questions={questions}
           onFinish={(items) => finish(items, questions.length)}
           onQuit={returnToSetup}
+          initialProgress={flashcardProgress}
+          onProgress={saveFlashcardProgress}
         />
       </Suspense>
     )

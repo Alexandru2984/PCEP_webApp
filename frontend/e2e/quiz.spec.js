@@ -335,6 +335,82 @@ test('flashcards reveal shows the answer and self-marking advances the deck', as
   )
 })
 
+test('an interrupted flashcard deck restores only already revealed answers', async ({
+  page,
+}) => {
+  let answerRequests = 0
+  page.on('request', (request) => {
+    if (/\/api\/questions\/\d+\/answer\/$/.test(new URL(request.url()).pathname))
+      answerRequests += 1
+  })
+  await mockApi(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByRole('button', { name: /Flashcards/ }).click()
+  await page.getByRole('button', { name: /Start flashcards/ }).click()
+
+  await page.getByRole('button', { name: 'Reveal answer' }).click()
+  await page.getByRole('button', { name: 'Got it' }).click()
+  await page.getByRole('button', { name: 'Reveal answer' }).click()
+  await expect(page.getByText(/the right answer is right because/i)).toBeVisible()
+  expect(answerRequests).toBe(2)
+
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+  )
+  expect(saved).toMatchObject({
+    index: 1,
+    items: [
+      {
+        question: { id: 1 },
+        pickedChoiceId: correctId(1),
+        feedback: { is_correct: true, correct_choice_id: correctId(1) },
+      },
+    ],
+    revealed: { correct_choice_id: correctId(2) },
+  })
+  expect(JSON.stringify(saved.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+
+  await page.reload()
+  await expect(
+    page.getByRole('heading', { name: 'Resume saved flashcards' })
+  ).toBeVisible()
+  await expect(page.getByText(/1\/4 rated/i)).toContainText(
+    'Continue from card 2. The current answer is already revealed.'
+  )
+  let analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+
+  await page.getByRole('button', { name: 'Resume flashcards' }).click()
+  await expect(page.getByText('Flashcard 2 of 4')).toBeVisible()
+  await expect(page.getByText(/the right answer is right because/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Review later' })).toBeFocused()
+  expect(answerRequests).toBe(2)
+
+  await page.getByRole('button', { name: 'Review later' }).click()
+  await expect(page.getByText('Flashcard 3 of 4')).toBeVisible()
+  const advanced = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+  )
+  expect(advanced).toMatchObject({ index: 2, items: [{}, {}], revealed: null })
+  expect(JSON.stringify(advanced.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+
+  analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
+  await page.getByRole('button', { name: 'Quit' }).click()
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  expect(
+    await page.evaluate(() => localStorage.getItem('pcep.activeFlashcards'))
+  ).toBeNull()
+})
+
 test('exam preserves answers through a throttled grading request and retries once', async ({
   page,
 }) => {

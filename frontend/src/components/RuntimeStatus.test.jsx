@@ -33,6 +33,13 @@ describe('application recovery', () => {
       'The active quiz changed in another tab'
     )
   })
+  it('announces when another tab takes over active flashcards', () => {
+    render(<RuntimeStatus />)
+    fireEvent(window, new CustomEvent('pcep-active-flashcards-conflict'))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The active quiz changed in another tab'
+    )
+  })
   it('announces a worker update without reloading an active session', () => {
     const serviceWorker = new EventTarget()
     serviceWorker.controller = {}

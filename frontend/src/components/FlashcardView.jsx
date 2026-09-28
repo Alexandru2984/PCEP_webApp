@@ -10,11 +10,17 @@ import { validateFeedback } from '../questionData'
 // choice + concept come from the server (answer keys never ship to the client).
 // Marks feed the same finish() flow, so the report, drill and mistakes store all
 // work for free — "Review later" lands a card in "Practice your mistakes".
-export default function FlashcardView({ questions, onFinish, onQuit }) {
-  const [index, setIndex] = useState(0)
-  const [revealed, setRevealed] = useState(null)
+export default function FlashcardView({
+  questions,
+  onFinish,
+  onQuit,
+  initialProgress,
+  onProgress,
+}) {
+  const [index, setIndex] = useState(() => initialProgress?.index ?? 0)
+  const [revealed, setRevealed] = useState(() => initialProgress?.revealed ?? null)
   const [revealing, setRevealing] = useState(false)
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(() => initialProgress?.items ?? [])
   const [error, setError] = useState(null)
   const pending = useRef(false)
   const request = useRef(null)
@@ -32,6 +38,9 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
   useEffect(() => {
     marking.current = false
   }, [index])
+  useEffect(() => {
+    onProgress?.({ index, items, revealed })
+  }, [index, items, onProgress, revealed])
   const question = questions[index]
   const heading = useRef(null)
   useEffect(() => {
