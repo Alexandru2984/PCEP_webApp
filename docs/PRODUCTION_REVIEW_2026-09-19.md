@@ -312,6 +312,9 @@ reload after an update, avoiding an automatic mid-exam takeover.
   loopback port 8001. PostgreSQL exposes no host port and keeps its named volume.
 - **systemd:** Nginx, Docker and cloudflared are active. The weekly SEO generator
   remains installed as an existing systemd timer.
+- **External monitoring:** a separate GitHub Actions workflow now performs a
+  privacy-friendly public contract check every six hours and on manual dispatch.
+  It is isolated from push/PR CI so an external outage cannot block code review.
 - **PostgreSQL:** production connectivity/readiness and bank integrity pass. A
   compressed logical backup was made before deployment. No DB restart command
   was issued during this work; the DB container had been recreated by separate
@@ -588,6 +591,17 @@ now implements the same ordered-ID and `count` contract, and the adaptive browse
 flow asserts that Practice, Flashcards and the recovery snapshot all retain that
 order. All 29 Playwright flows, lint and formatting pass.
 
+The production-monitoring follow-up adds a standard-library-only, read-only smoke
+check for the public shell, its fingerprinted JS/CSS entry assets, service worker,
+liveness, database readiness, release and request markers, security/cache headers,
+reconciled question totals, strict answer-safe payloads and exact targeted-drill
+order. Requests use TLS validation, bounded two-megabyte responses, a 20-second
+timeout and three attempts; no write, answer or grade endpoint is called. All 206
+backend tests pass, including nine focused smoke-contract regressions. The live
+command verified backend release `7207b1bc2fb9`, 308 questions, two entry assets
+and an exact three-question targeted order; the pinned scheduled workflow passes
+`actionlint` without network access.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -704,9 +718,10 @@ order. All 29 Playwright flows, lint and formatting pass.
 - `ba13b7a` — record the adaptive Flashcard release.
 - `0091bc7` — preserve targeted study order in the API.
 - `7207b1b` — document ordered targeted drills.
+- `494b862` — add privacy-friendly scheduled production monitoring.
 
-No commit was pushed and no authorship, co-author or generated-by attribution was
-added.
+No commit was pushed by the engineering assistant, and no authorship, co-author or
+generated-by attribution was added.
 
 ## 13. Remaining opportunities
 
@@ -719,9 +734,7 @@ added.
    Official-objective filters and weak-area reports now cover the stable syllabus
    layer; current adaptive ranking remains deliberately explainable through
    performance, due-date, confidence and difficulty signals.
-4. Add external uptime/error monitoring for liveness, readiness and release
-   version, without collecting learner behavior or personal data.
-5. Re-evaluate PostgreSQL random ordering only when bank size or measured query
+4. Re-evaluate PostgreSQL random ordering only when bank size or measured query
    time makes the current implementation material.
 
 ## 14. Deployment notes
@@ -1138,6 +1151,11 @@ declaration resolves to the three existing `pcep_webapp_*` volumes and live
 container mountpoints. No volume, container or data was recreated for that
 configuration change. Fresh installations must create the named volumes once,
 as documented in README and the operations runbook.
+
+The production-smoke stage requires no migration, image rebuild, service restart,
+Nginx reload or environment change. Its local command already validates the live
+domain. The scheduled GitHub workflow becomes active when commit `494b862` is
+pushed to the repository's default branch.
 
 ## 15. Breaking changes
 

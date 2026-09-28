@@ -7,7 +7,7 @@ static Vite build served from `/var/www/pcep/frontend`.
 
 ```bash
 make status
-curl -fsS https://pcep.micutu.com/api/health/
+make production-smoke
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings backend/.venv/bin/python backend/manage.py audit_questions --fail-on-warnings
 ```
 
@@ -49,6 +49,29 @@ development requirements are excluded from the production build context.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime.
+
+## Public Production Smoke
+
+```bash
+make production-smoke
+# Optional for another reviewed deployment:
+make production-smoke PRODUCTION_URL=https://pcep.example.com
+```
+
+The standard-library-only check makes bounded, retryable GET requests with normal
+TLS certificate verification. It verifies the shell, referenced fingerprinted
+JS/CSS entry assets, immutable asset caching, service-worker policy, liveness,
+database readiness, the release marker, request IDs, aggregate question counts,
+security headers and API no-store behavior. It also fetches four public questions,
+rejects any answer metadata and verifies that a three-question targeted drill
+preserves the requested order. It never calls an answer, grade or other write
+endpoint and does not send learner state, cookies or identifiers.
+
+`.github/workflows/production-smoke.yml` runs this contract every six hours and
+on manual dispatch with read-only repository permissions. Its failure appears in
+GitHub Actions and the README badge. The push/pull-request CI remains independent
+of production availability, so a transient Internet or production outage cannot
+block code review.
 
 ## Backend Deploy
 
@@ -568,4 +591,5 @@ CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright
 to two workers, uploads HTML reports/traces, validates the vhost with disposable
 certificates in an isolated Nginx container, and builds the hardened backend.
 Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.
-They never call production from CI.
+The push/pull-request CI never calls production. The separate scheduled smoke
+workflow performs only the bounded public checks documented above.

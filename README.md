@@ -1,6 +1,7 @@
 # PCEP Quiz
 
 [![CI](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml/badge.svg)](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml)
+[![Production smoke](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/production-smoke.yml/badge.svg)](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/production-smoke.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.2_LTS-092E20.svg)](https://www.djangoproject.com/)
@@ -94,7 +95,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - ✅ Scored against the official **70% pass threshold**
 - 🔒 **Answer keys never leave the server** until you submit (no cheating via DevTools)
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
-  and database readiness probes
+  and database readiness probes, plus scheduled read-only production contract
+  monitoring without learner telemetry
 - 🔎 AST-backed question audits catch duplicates, malformed answer sets, short or
   editorial explanations, missing/cross-module objectives and out-of-syllabus syntax
   before release
@@ -105,7 +107,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 | -------- | ----------------------------------------------------------------- |
 | Backend  | Django 5.2 LTS · Django REST Framework · PostgreSQL · Gunicorn    |
 | Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM)         |
-| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI           |
+| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI/smoke     |
 | Deploy   | Docker Compose · system Nginx · Cloudflare Tunnel · Let's Encrypt |
 
 ## Architecture
@@ -176,24 +178,30 @@ make test
 make audit
 make django-check
 make compose-build && make audit-image
+make production-smoke
 
-# Backend — 188 tests (API/security, integrity, startup, release and SEO behavior)
+# Backend — 206 tests (API/security, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 232 Vitest tests, then static checks, the production build and
-# 27 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
-# notes, search, scheduled review, exam resume and Pyodide).
+# Frontend — 276 Vitest tests, then static checks, the production build and
+# 29 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
+# notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e
 ```
 
-CI runs all of the above on every push and pull request, plus
-`manage.py check --deploy` against a production-like config. Its pinned Trivy
-scan fails on HIGH/CRITICAL operating-system or Python findings that have a
-vendor fix, while still reporting separately tracked findings without a patch.
+Push/PR CI runs the backend, frontend, audit and build checks without calling
+production, plus `manage.py check --deploy` against a production-like config.
+Its pinned Trivy scan fails on HIGH/CRITICAL operating-system or Python findings
+that have a vendor fix, while still reporting separately tracked findings without
+a patch.
+The separate **Production smoke** workflow runs every six hours and on manual
+dispatch. It uses bounded read-only requests to verify the public shell and its
+entry assets, liveness/readiness, release consistency, security/cache headers,
+question totals, answer secrecy and ordered targeted drills.
 
 Production builds identify themselves without analytics or an extra API call:
 the frontend revision is shown in the footer and Django API responses include the
@@ -215,7 +223,7 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 | `GET`  | `/api/stats/`                 | Aggregate module/objective/difficulty coverage, without question or answer data      |
 | `GET`  | `/api/search/`                | Search text/code with scope filters; no choices or answer metadata                   |
 | `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata         |
-| `GET`  | `/api/quiz-set/`              | Random scoped set, ordered ID-targeted drill, or answer-safe full-mock preset         |
+| `GET`  | `/api/quiz-set/`              | Random scoped set, ordered ID-targeted drill, or answer-safe full-mock preset        |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
 | `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                       |
@@ -227,7 +235,7 @@ backend/     Django project + DRF quiz app, management commands, tests
 frontend/    React + Vite + Tailwind app
 nginx/       Production vhost and security/proxy header snippets
 scripts/     Atomic publishers, Nginx validation and public study-page generator
-.github/     CI workflow
+.github/     CI and scheduled production-smoke workflows
 docker-compose.yml
 ```
 
