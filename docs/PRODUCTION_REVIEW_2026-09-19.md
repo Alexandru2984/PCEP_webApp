@@ -602,6 +602,21 @@ command verified backend release `7207b1bc2fb9`, 308 questions, two entry assets
 and an exact three-question targeted order; the pinned scheduled workflow passes
 `actionlint` without network access.
 
+The focused-review follow-up turns the existing report queue into an immediate
+Practice or Flashcard action. It preserves session order, refetches current public
+questions by ID and reuses the validated recovery schemas, so missed and
+low-confidence-correct items never become a stored answer bank. All 278 Vitest tests,
+lint, formatting, the production build and all 29 Playwright flows pass. Browser
+coverage verifies exact `[1, 2]` request/response/recovery order and answer secrecy;
+the report remains axe-clean and mobile-fit.
+
+The safe-quit follow-up fixes Practice and Flashcard controls that cleared an active
+recovery snapshot immediately. Both now require an explicit native confirmation;
+cancelling keeps the active request, screen and stored recovery intact, while
+confirming aborts pending Flashcard work before cleanup. Seven targeted component
+tests and all four affected Playwright flows pass alongside lint, formatting and a
+fresh production build.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -719,6 +734,9 @@ and an exact three-question targeted order; the pinned scheduled workflow passes
 - `0091bc7` — preserve targeted study order in the API.
 - `7207b1b` — document ordered targeted drills.
 - `494b862` — add privacy-friendly scheduled production monitoring.
+- `5d1ff63` — document scheduled production smoke checks.
+- `840d042` — add one-click focused review drills.
+- `9a101c9` — confirm before discarding active study sessions.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

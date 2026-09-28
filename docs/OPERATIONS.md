@@ -547,12 +547,16 @@ The exam navigator collapses initially on small screens, uses five mobile
 columns with 44 px targets, and offers next-unanswered/next-flagged jumps.
 The timer stays visible while scrolling, announces the one-minute warning
 without reading every tick, and uses a real deadline. Submit confirmation wraps
-and manages focus; quitting asks before losing unsubmitted answers.
+and manages focus; quitting Practice, Exam or Flashcards asks before clearing the
+recoverable session.
 Question/result headings receive focus on navigation; answer options and
 workspace navigation use native buttons. A skip link, visible focus, scrollable
 keyboard-accessible code and reduced-motion styles apply throughout.
 Keyboard help is available in the footer. Shortcuts ignore typing, modifiers,
 composition and repeated keys. Offline and persistence warnings explain recovery.
+A completed report can immediately refetch its ordered misses and low-confidence
+correct answers as answer-safe Practice or Flashcards; the saved active session
+still contains only public question fields until each answer is submitted/revealed.
 A failed screen/chunk load offers reload and states the unsubmitted-session risk.
 Axe and overflow checks run through the study screens in both themes at
 360/390/430/768/1024/1280/1440 px; they supplement manual inspection, not a claim

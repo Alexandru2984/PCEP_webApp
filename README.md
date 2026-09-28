@@ -77,7 +77,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 📈 **End-of-quiz report** — per-module, per-objective, per-difficulty and optional
   confidence breakdowns, decision timing and a precise "focus area" recommendation you
   can drill in one click, plus a focused review queue combining misses with correct
-  answers given at low confidence
+  answers given at low confidence; launch that exact queue immediately as graded
+  Practice or self-rated Flashcards
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
   as a focused Practice or Flashcard drill; a correct/self-rated success removes the
   question from the list (local-first)
@@ -186,7 +187,7 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 276 Vitest tests, then static checks, the production build and
+# Frontend — 278 Vitest tests, then static checks, the production build and
 # 29 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
