@@ -279,11 +279,13 @@ Completed practice, exam and flashcard sessions update an explainable local revi
 schedule. Consecutive successful reviews use 1, 3, 7 days and then double up to a
 60-day cap. A missed or skipped question becomes due immediately. Due drills send
 at most 20 question IDs to the existing quiz-set endpoint and receive fresh public
-question data; the schedule stores no choices, selected choice IDs, explanations
-or correctness key. An optional per-question confidence value (`low`, `medium` or
-`high`) is stored with the latest review. Dashboard mastery combines observed
-accuracy, repetition and the achieved interval, and should be treated as a study
-signal rather than an exam credential.
+question data. The learner can answer that set in Practice or self-rate it as
+Flashcards; the latter uses the same answer-safe reveal and crash-recovery path as a
+custom deck. The schedule stores no choices, selected choice IDs, explanations or
+correctness key. An optional per-question confidence value (`low`, `medium` or `high`)
+is stored with the latest review. Dashboard mastery combines observed accuracy,
+repetition and the achieved interval, and should be treated as a study signal rather
+than an exam credential.
 
 Adaptive practice is also local and rule based. It ranks at most 20 unique
 question IDs using a documented score: +100 when due, +60 while in the mistakes

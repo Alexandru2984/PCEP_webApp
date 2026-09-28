@@ -58,8 +58,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   Every mode uses a validated local-only copy, requires confirmation before discard and
   keeps answer keys out of every unanswered or unrevealed question.
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
-  due-review drills, per-question mastery and transparent adaptive practice that also
-  prioritizes low-confidence answers, without accounts or tracking
+  due-review drills in Practice or Flashcards, per-question mastery and transparent
+  adaptive practice that also prioritizes low-confidence answers, without accounts or
+  tracking
 - 📅 **Daily challenge** — five deterministic questions with all four syllabus modules,
   a local completion score and the same answer-safe set throughout the Bucharest day
 - 🧩 **Filter by module, syllabus objective & difficulty**, choose how many questions

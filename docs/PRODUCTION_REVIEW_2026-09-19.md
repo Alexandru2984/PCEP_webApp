@@ -274,6 +274,8 @@ assistive-technology certification.
   expiry, strict schema validation and cross-tab ownership transfer.
 - Reload-safe Flashcard decks with revealed-card recovery, answer-safe future cards,
   strict 24-hour snapshots and cross-tab ownership transfer.
+- Due review sets can open as instant-feedback Practice or self-rated Flashcards; both
+  fetch fresh public questions by ID, and the Flashcard path remains recoverable.
 
 ## 9. Performance
 
@@ -543,6 +545,14 @@ lint, formatting, the production build and all 29 Playwright flows pass. The bro
 regression covers reload without a duplicate answer request, answer-key boundaries,
 mobile fit, axe, advancement after resume and cleanup on Quit.
 
+The due-Flashcard follow-up lets the learner choose Practice or Flashcards for the
+same bounded, local review schedule. Both paths fetch fresh public questions by ID;
+the Flashcard path immediately receives the existing answer-safe recovery and
+cross-tab ownership behavior. All 270 Vitest tests across 31 files, lint, formatting,
+the production build and all 29 Playwright flows pass. Browser coverage opens the due
+deck in a second tab, verifies public payload and snapshot secrecy, axe and mobile fit,
+cleans up on Quit, then confirms adaptive Practice still launches normally.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -642,6 +652,8 @@ mobile fit, axe, advancement after resume and cleanup on Quit.
 - `3ddd657` — add the validated Flashcard recovery schema.
 - `072de44` — resume interrupted Flashcard study sessions.
 - `b5b4c4c` — document Flashcard session recovery.
+- `3173277` — record the Flashcard recovery release.
+- `1b7602c` — add due-review Flashcard decks.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
