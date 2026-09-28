@@ -982,6 +982,22 @@ Public liveness/readiness, the 308-question snapshot, asset retention and privil
 `nginx -t` passed. This frontend-only atomic publish recreated no service and required
 no migration, environment or Nginx change.
 
+The Admin question-quality release runs backend revision `5a6a74d844a7` in
+image `sha256:a17df052f4203cb47ff505f26e96b691e7a975f93cc3013ce4187e8bd86138b3`.
+The exact preceding image is retained as
+`pcep-backend-rollback:20260928T143816Z-release-8026db95920d`. The verified
+mode-`0600` database dump is `pcep_db_20260928T143816Z.sql.gz` with SHA-256
+`9f1427a3cb789ac03f0b1e37f1f60334e9fad0e21b34a98761f477e522aa2c12`.
+Candidate and live-container checks found no migrations, and the read-only live
+audit passed all 308 questions. The deployed Admin applies the same snippet,
+syllabus, explanation-quality and exact-duplicate gates as the audit command;
+its answer preview was verified against live data with two queries for ten rows.
+Public liveness, readiness, stats, pre-answer secrecy, post-submit feedback and
+Admin login probes passed. The image has zero fixable HIGH/CRITICAL Trivy
+findings, and privileged `nginx -t` passed. Only the backend was recreated;
+PostgreSQL and Nginx were not restarted, and no schema or environment setting
+changed. The frontend remains on `e2dc67e42cdf`.
+
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
 `/u/script.js` with the existing privacy attributes. The external-volume
