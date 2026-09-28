@@ -868,6 +868,22 @@ cache headers passed; privileged `nginx -t` passed. This was a frontend-only ato
 publish. Backend and PostgreSQL remained healthy, no service was recreated, and no
 migration, environment change or Nginx reload was required.
 
+The Search request-guard release is published at frontend revision
+`afcb584383f8`. Its rollback root is
+`.frontend.previous-20260928T132226Z-55b810ea`, with the external copy
+`frontend.20260928T132226Z-55b810ea`. The entry chunk `index-DCCl6zcZ.js` has
+SHA-256 `3b59332e86be9b0566e82429225cf8aebfd4f0a0f38a58ea6fb727d09a1b9701`,
+and the public service worker matches the live file at SHA-256
+`9d3b0f257538c0b0af731942140c1b198924ca6d7b5f9d33d078932d5085ed8d`.
+The preceding entry chunk remains public and byte-identical for open tabs. Fresh
+live Chromium issued two Search submissions in one render and observed exactly one
+API request, then verified 20 answer-safe previews, an answer-safe selected drill,
+zero horizontal overflow and zero axe violations at 390 px. The only console message
+was the existing Cloudflare JavaScript detection injection blocked by CSP. Public
+liveness/readiness and privileged `nginx -t` passed. This was a frontend-only atomic
+publish; backend, PostgreSQL and Nginx were not restarted or reloaded, and no schema
+or environment setting changed.
+
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
 `/u/script.js` with the existing privacy attributes. The external-volume
