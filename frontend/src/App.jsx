@@ -44,7 +44,9 @@ export default function App() {
               feedback.
             </li>
             <li>Exam: 1–4 or A–D to select; ← and → to navigate; F to flag.</li>
-            <li>Flashcards: Space or Enter to reveal, then choose a self-rating.</li>
+            <li>
+              Flashcards: Space or Enter to reveal; 1 for Review later; 2 for Got it.
+            </li>
             <li>
               Tab moves between controls; Enter or Space activates buttons. Study
               shortcuts pause while typing or using modifier keys.

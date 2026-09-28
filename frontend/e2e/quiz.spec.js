@@ -303,10 +303,16 @@ test('flashcards reveal shows the answer and self-marking advances the deck', as
   await page.getByRole('button', { name: /Flashcards/ }).click()
   await page.getByRole('button', { name: /Start flashcards/ }).click()
 
-  await page.getByRole('button', { name: /Reveal answer/i }).click()
+  await expect(page.getByRole('heading', { name: 'What is the output?' })).toBeFocused()
+  await page.keyboard.press('Space')
   await expect(page.getByText(/the right answer is right because/i)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Review later/i })).toBeFocused()
+  await expect(page.getByRole('button', { name: /Got it/i })).toHaveAttribute(
+    'aria-keyshortcuts',
+    '2'
+  )
 
-  await page.getByRole('button', { name: /Got it/i }).click()
+  await page.keyboard.press('2')
   // Advancing resets the card, so the reveal control is back for card 2.
   await expect(page.getByRole('button', { name: /Reveal answer/i })).toBeVisible()
   for (let index = 1; index < QUESTIONS.length; index += 1) {

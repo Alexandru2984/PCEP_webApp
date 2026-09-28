@@ -74,30 +74,38 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
     onQuit()
   }
 
-  const mark = (gotIt) => {
-    if (!revealed || marking.current) return
-    marking.current = true
-    const item = {
-      question,
-      pickedChoiceId: gotIt ? revealed.correct_choice_id : null,
-      feedback: {
-        is_correct: gotIt,
-        correct_choice_id: revealed.correct_choice_id,
-        correct_explanation: revealed.correct_explanation,
-        explanation: '',
-      },
-    }
-    const next = [...items, item]
-    if (index + 1 >= questions.length) {
-      onFinish(next)
-      return
-    }
-    setItems(next)
-    setIndex((i) => i + 1)
-    setRevealed(null)
-  }
+  const mark = useCallback(
+    (gotIt) => {
+      if (!revealed || marking.current) return
+      marking.current = true
+      const item = {
+        question,
+        pickedChoiceId: gotIt ? revealed.correct_choice_id : null,
+        feedback: {
+          is_correct: gotIt,
+          correct_choice_id: revealed.correct_choice_id,
+          correct_explanation: revealed.correct_explanation,
+          explanation: '',
+        },
+      }
+      const next = [...items, item]
+      if (index + 1 >= questions.length) {
+        onFinish(next)
+        return
+      }
+      setItems(next)
+      setIndex((i) => i + 1)
+      setRevealed(null)
+    },
+    [index, items, onFinish, question, questions.length, revealed]
+  )
 
-  // Space / Enter flips the card (when not typing in the code editor).
+  const firstRating = useRef(null)
+  useEffect(() => {
+    if (revealed) firstRating.current?.focus()
+  }, [revealed])
+
+  // Space / Enter flips the card; 1 / 2 self-rate after reveal.
   useEffect(() => {
     const onKey = (e) => {
       if (ignoreShortcut(e) || nativeActivation(e)) return
@@ -107,11 +115,14 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
       if (!revealed && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault()
         reveal()
+      } else if (revealed && (e.key === '1' || e.key === '2')) {
+        e.preventDefault()
+        mark(e.key === '2')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [revealed, reveal])
+  }, [mark, reveal, revealed])
 
   const progress = Math.round((index / questions.length) * 100)
 
@@ -207,6 +218,7 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
             type="button"
             onClick={reveal}
             disabled={revealing}
+            aria-keyshortcuts="Space Enter"
             className="mt-5 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-60 dark:bg-sky-700 dark:hover:bg-sky-800"
           >
             {revealing ? 'Revealing…' : 'Reveal answer'}
@@ -214,8 +226,10 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3">
             <button
+              ref={firstRating}
               type="button"
               onClick={() => mark(false)}
+              aria-keyshortcuts="1"
               className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 font-medium text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60"
             >
               Review later
@@ -223,6 +237,7 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
             <button
               type="button"
               onClick={() => mark(true)}
+              aria-keyshortcuts="2"
               className="rounded-lg bg-emerald-700 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-600"
             >
               Got it
@@ -231,11 +246,18 @@ export default function FlashcardView({ questions, onFinish, onQuit }) {
         )}
       </div>
 
-      {!revealed && (
-        <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
-          Tip: press <kbd className="font-mono">Space</kbd> to flip the card
-        </p>
-      )}
+      <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+        {revealed ? (
+          <>
+            Tip: press <kbd className="font-mono">1</kbd> for Review later or{' '}
+            <kbd className="font-mono">2</kbd> for Got it
+          </>
+        ) : (
+          <>
+            Tip: press <kbd className="font-mono">Space</kbd> to flip the card
+          </>
+        )}
+      </p>
     </div>
   )
 }

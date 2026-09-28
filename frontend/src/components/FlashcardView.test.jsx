@@ -43,6 +43,7 @@ describe('FlashcardView', () => {
     // Card 1: flip, then mark "Got it".
     fireEvent.click(screen.getByRole('button', { name: /Reveal answer/i }))
     expect(await screen.findByText(/first concept/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Review later/i })).toHaveFocus()
     // The reveal POSTs a throwaway guess (the first choice) to learn the key.
     expect(submitAnswer).toHaveBeenCalledWith(
       10,
@@ -147,5 +148,52 @@ describe('FlashcardView', () => {
 
     expect(signal.aborted).toBe(true)
     expect(onQuit).toHaveBeenCalledOnce()
+  })
+
+  it('reveals and self-rates with discoverable keyboard shortcuts', async () => {
+    submitAnswer
+      .mockResolvedValueOnce({
+        is_correct: false,
+        correct_choice_id: 2,
+        explanation: 'first choice',
+        correct_explanation: 'first concept',
+      })
+      .mockResolvedValueOnce({
+        is_correct: true,
+        correct_choice_id: 3,
+        explanation: 'second concept',
+        correct_explanation: 'second concept',
+      })
+    const onFinish = vi.fn()
+    render(
+      <FlashcardView
+        questions={[card(10, [1, 2]), card(20, [3, 4])]}
+        onFinish={onFinish}
+        onQuit={() => {}}
+      />
+    )
+
+    fireEvent.keyDown(window, { key: ' ' })
+    expect(await screen.findByText('first concept')).toBeVisible()
+    expect(screen.getByRole('button', { name: /Review later/i })).toHaveAttribute(
+      'aria-keyshortcuts',
+      '1'
+    )
+    expect(screen.getByRole('button', { name: /Got it/i })).toHaveAttribute(
+      'aria-keyshortcuts',
+      '2'
+    )
+    fireEvent.keyDown(window, { key: '2' })
+    expect(screen.getByText(/Flashcard/)).toHaveTextContent('Flashcard 2 of 2')
+
+    fireEvent.keyDown(window, { key: 'Enter' })
+    expect(await screen.findByText('second concept')).toBeVisible()
+    fireEvent.keyDown(window, { key: '1' })
+
+    expect(onFinish).toHaveBeenCalledOnce()
+    expect(onFinish.mock.calls[0][0].map((item) => item.feedback.is_correct)).toEqual([
+      true,
+      false,
+    ])
   })
 })
