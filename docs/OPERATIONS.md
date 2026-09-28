@@ -203,9 +203,11 @@ performs one bounded query and returns only question ID, text, code, module,
 objective and difficulty. Choices,
 explanations and answer metadata are deliberately absent. A selected drill sends
 only unique IDs to `quiz-set`, which returns fresh public choices under the
-existing answer-leakage contract. The learner may launch those selected IDs as
-Practice or Flashcards; Flashcards use the same validated recovery format and
-never persist answer metadata for an unrevealed question.
+existing answer-leakage contract. ID-targeted requests preserve the requested order
+after optional scope filters and apply `count` to that order; only ordinary unlisted
+quiz sets are randomized. The learner may launch those selected IDs as Practice or
+Flashcards; Flashcards use the same validated recovery format and never persist
+answer metadata for an unrevealed question.
 `GET /api/stats/` reports counts for all 15 objectives, and `quiz-set` accepts the
 same objective filter. A module/objective mismatch is rejected instead of silently
 returning an empty set. The full-mock preset rejects objective filters because its
@@ -300,8 +302,9 @@ mastery are omitted unless currently due, missed or their latest recorded confid
 is low. Equal scores prefer the least recently attempted question, then its numeric
 ID, so the plan is deterministic and testable. The ranked set can launch graded
 Practice or self-rated Flashcards. Only the selected IDs are sent to `quiz-set`;
-fresh public questions come back without answer metadata, and Flashcards use the same
-validated answer-safe recovery path as every other custom deck.
+fresh public questions come back in the ranked priority order without answer metadata,
+and Flashcards use the same validated answer-safe recovery path as every other custom
+deck.
 
 Dashboard momentum is derived only from the bounded local attempt history. Study
 streaks count unique local calendar days and remain current through the day after

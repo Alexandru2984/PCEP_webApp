@@ -125,7 +125,9 @@ not printed or copied. No database or Docker volume was deleted.
   bounded coverage matrix without question or answer data.
 - Added strict grade/answer request serializers, deterministic error semantics,
   invalid-key 503 behavior, public `ids` filtering for targeted local drills and
-  consistent cache/error middleware.
+  consistent cache/error middleware. Targeted drills preserve their validated ID
+  order after filtering, so due and adaptive priority reaches the learner unchanged;
+  ordinary quiz sets remain randomized.
 - Added reusable question-bank validation, database-aware audit diagnostics,
   admin inline enforcement and safe seed preflight.
 - Changed `seed_questions --update` to update choices in their existing order
@@ -575,6 +577,13 @@ answer-safe recovery and cross-tab ownership behavior. All 276 Vitest tests acro
 31 files, lint, formatting, the production build and all 29 Playwright flows pass.
 Browser coverage verifies the ranked request, public payload and recovery secrecy,
 both launch modes, axe and mobile horizontal fit.
+
+The targeted-order follow-up fixes a server-side mismatch that randomized every
+`ids` drill after the browser had ranked it. The API now restores the validated
+request order after optional filters and applies `count` to that order, while
+unscoped quiz sets retain database randomization. All 197 backend tests pass,
+including two-query prefetch coverage, filtered-order and answer-leakage regressions;
+the 308-question audit and Django production check also pass.
 
 ## 12. Commits
 

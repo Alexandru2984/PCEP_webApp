@@ -215,7 +215,7 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 | `GET`  | `/api/stats/`                 | Aggregate module/objective/difficulty coverage, without question or answer data      |
 | `GET`  | `/api/search/`                | Search text/code with scope filters; no choices or answer metadata                   |
 | `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata         |
-| `GET`  | `/api/quiz-set/`              | Random public set with scope filters, or the answer-safe full-mock preset            |
+| `GET`  | `/api/quiz-set/`              | Random scoped set, ordered ID-targeted drill, or answer-safe full-mock preset         |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
 | `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                       |
