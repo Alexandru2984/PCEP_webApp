@@ -203,7 +203,9 @@ performs one bounded query and returns only question ID, text, code, module,
 objective and difficulty. Choices,
 explanations and answer metadata are deliberately absent. A selected drill sends
 only unique IDs to `quiz-set`, which returns fresh public choices under the
-existing answer-leakage contract.
+existing answer-leakage contract. The learner may launch those selected IDs as
+Practice or Flashcards; Flashcards use the same validated recovery format and
+never persist answer metadata for an unrevealed question.
 `GET /api/stats/` reports counts for all 15 objectives, and `quiz-set` accepts the
 same objective filter. A module/objective mismatch is rejected instead of silently
 returning an empty set. The full-mock preset rejects objective filters because its

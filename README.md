@@ -66,8 +66,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   a local completion score and the same answer-safe set throughout the Bucharest day
 - 🧩 **Filter by module, syllabus objective & difficulty**, choose how many questions
   to take
-- 🔎 **Search question text or Python code** and build a focused practice drill from
-  up to 20 matches; search previews deliberately exclude choices and answer metadata
+- 🔎 **Search question text or Python code** and build a focused Practice or Flashcard
+  drill from up to 20 matches; search previews deliberately exclude choices and answer
+  metadata
 - 📊 **Progress dashboard** — bounded attempt history, weighted module/objective/
   difficulty accuracy, confidence calibration, local-day study streaks, score trends,
   measured response pace, separate full-mock history and separate flashcard self-ratings

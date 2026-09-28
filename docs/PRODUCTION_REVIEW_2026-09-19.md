@@ -560,6 +560,14 @@ All 274 Vitest tests across 31 files, lint, formatting, the production build and
 29 Playwright flows pass. Browser coverage exercises bookmark persistence, both drill
 modes, the answer-safe API payload and recovery snapshot, axe and mobile overflow.
 
+The Search Flashcard follow-up lets a learner launch selected answer-safe search
+results as Practice or Flashcards. Both paths refetch current public questions by
+the selected IDs; the Flashcard path receives the existing recovery, validation and
+cross-tab protections. All 275 Vitest tests across 31 files, lint, formatting, the
+production build and all 29 Playwright flows pass. The mobile browser flow verifies
+both the search preview and selected deck payloads, the recovery snapshot, axe and
+horizontal fit without exposing answer metadata.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
