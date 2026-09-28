@@ -390,6 +390,12 @@ the answer for the current card only after that learner has revealed it; all lat
 cards still pass through the public-question whitelist and contain no answer metadata.
 The snapshot is local to the browser and excluded from progress exports.
 
+Due reviews, saved mistakes and bookmarks may all start Flashcard decks. Each path
+sends only bounded question IDs, fetches the current public question representation
+from the API and then uses the same recovery boundary described above. A Flashcard
+self-rating updates the existing local mistake and review schedule semantics; saved
+bookmarks remain explicitly managed by the learner.
+
 Reload offers explicit Resume or confirmed Discard. A revealed current card resumes
 without repeating its answer request, while an unrevealed card returns cleanly.
 Successful completion records one attempt and clears the snapshot; Quit discards it.

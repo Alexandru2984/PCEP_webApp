@@ -553,6 +553,13 @@ the production build and all 29 Playwright flows pass. Browser coverage opens th
 deck in a second tab, verifies public payload and snapshot secrecy, axe and mobile fit,
 cleans up on Quit, then confirms adaptive Practice still launches normally.
 
+The saved-list Flashcard follow-up gives mistakes and bookmarks the same Practice or
+Flashcards choice. Both modes fetch fresh public questions by bounded local IDs, and
+Flashcards inherit strict recovery, stale-tab ownership and answer-key boundaries.
+All 274 Vitest tests across 31 files, lint, formatting, the production build and all
+29 Playwright flows pass. Browser coverage exercises bookmark persistence, both drill
+modes, the answer-safe API payload and recovery snapshot, axe and mobile overflow.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.

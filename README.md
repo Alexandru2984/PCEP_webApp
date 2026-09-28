@@ -60,7 +60,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
   due-review drills in Practice or Flashcards, per-question mastery and transparent
   adaptive practice that also prioritizes low-confidence answers, without accounts or
-  tracking
+  tracking. Saved mistakes and bookmarks can also be studied as graded Practice or
+  self-rated Flashcard decks.
 - 📅 **Daily challenge** — five deterministic questions with all four syllabus modules,
   a local completion score and the same answer-safe set throughout the Bucharest day
 - 🧩 **Filter by module, syllabus objective & difficulty**, choose how many questions
@@ -76,8 +77,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   can drill in one click, plus a focused review queue combining misses with correct
   answers given at low confidence
 - 🔁 **Practice your mistakes** — missed questions are saved locally and re-served
-  as a focused drill; answer one correctly and it drops off the list (local-first)
-- 🔖 **Bookmarks and portable progress** — bookmark drills plus validated,
+  as a focused Practice or Flashcard drill; a correct/self-rated success removes the
+  question from the list (local-first)
+- 🔖 **Bookmarks and portable progress** — Practice and Flashcard bookmark drills plus validated,
   versioned JSON export/import and selective history, review, mistake, note and bookmark resets
 - 📝 **Private personal notes** — keep bounded local notes beside practice questions and
   review them after a session; notes are included in validated progress backups
