@@ -1005,6 +1005,28 @@ findings, and privileged `nginx -t` passed. Only the backend was recreated;
 PostgreSQL and Nginx were not restarted, and no schema or environment setting
 changed. The frontend remains on `e2dc67e42cdf`.
 
+The saved-list Flashcard release is published at frontend revision
+`ba418410e9ab`. Its rollback root is
+`.frontend.previous-20260928T181456Z-8f25cad1`, with the external copy
+`frontend.20260928T181456Z-8f25cad1`. The entry chunk
+`index-BHgfBIlK.js` has SHA-256
+`59ea8eae67d97e13edf7fc2cfb8b3735b3e3de4639796f14c8ecf1ead36bcb3b`,
+the Flashcard chunk `FlashcardView-D0CSQAd1.js` has SHA-256
+`dc875c3ee5ecf8591395aee9d45afde0e0dcb856f97918d4b5b6269934d49af6`,
+the Dashboard chunk `Dashboard-7M7QyFKq.js` has SHA-256
+`4b7d834fb5231553e0778df36b8f09d9844e04db1147f490e661e8aa31d055c2`,
+and the public service worker matches the live root at SHA-256
+`7b8cfa20d9676adcd0b55761e713518e209a7f5d2c642d7c3db04b32608af0d5`.
+The preceding entry chunk remains public. Fresh live Chromium at 390 px used
+separate production questions for the bookmark and mistake Flashcard paths,
+verified the exact ID requests, found no answer metadata in either public payload
+or recovery snapshot, and confirmed cleanup on Quit. Both decks had zero axe
+violations and no horizontal overflow. The existing Cloudflare JavaScript-detection
+injection blocked by CSP remained the only console message. Public liveness,
+readiness, the 308-question snapshot, security/cache headers and privileged
+`nginx -t` passed. This frontend-only atomic publish recreated no service and
+required no migration, environment or Nginx change.
+
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
 `/u/script.js` with the existing privacy attributes. The external-volume
