@@ -233,7 +233,10 @@ live data with `docker compose exec backend python manage.py audit_questions --d
 The database audit is read-only and reports affected database IDs. Questions
 require four unique non-empty options, one boolean correct flag, an explanation
 per option, valid module/difficulty and a non-empty prompt. The question admin
-validates the complete inline set; the separate choice admin is view-only.
+validates the complete inline set with the same snippet, syllabus, explanation
+quality and exact-duplicate rules as the audit command. Its question list shows
+the correct option (or an invalid-count warning) from one prefetched choice set;
+the separate choice admin is view-only.
 Seed validation runs before any writes, including an explicitly requested reset.
 Every question has one reviewed primary syllabus objective. The audit rejects
 unknown or cross-module objectives and warns if any of the 15 objectives is empty.
