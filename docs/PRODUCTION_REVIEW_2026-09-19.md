@@ -517,6 +517,12 @@ All 250 Vitest tests, lint, formatting and the production build pass. Playwright
 passes the full Flashcard flow plus axe and horizontal-fit checks in both themes at
 seven viewport widths.
 
+The Search reliability follow-up replaces render-delayed loading state as the
+duplicate-submit guard with the synchronous request ref. Two submissions in one
+render now issue exactly one request instead of aborting the first and spending a
+second API call. All 251 Vitest tests, lint, formatting and the production build pass;
+the answer-safe mobile Search-to-drill Playwright flow also passes.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -607,6 +613,7 @@ seven viewport widths.
 - `8026db9` — document the explanation quality gates.
 - `20453df` — cancel stale Flashcard reveals and reject malformed feedback.
 - `698aed9` — document resilient Flashcard reveal behavior.
+- `c7a7fb6` — prevent duplicate Search requests in the same render.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
