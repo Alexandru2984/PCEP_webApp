@@ -19,8 +19,15 @@ const NOTE_MAX_LENGTH = 2000
 const PROGRESS_KEY = 'pcep.progress'
 const ACTIVE_EXAM_KEY = 'pcep.activeExam'
 const ACTIVE_PRACTICE_KEY = 'pcep.activePractice'
+const ACTIVE_FLASHCARDS_KEY = 'pcep.activeFlashcards'
 const SETTINGS_KEY = 'pcep.settings'
-const VERSIONED_KEYS = [PROGRESS_KEY, ACTIVE_EXAM_KEY, ACTIVE_PRACTICE_KEY, SETTINGS_KEY]
+const VERSIONED_KEYS = [
+  PROGRESS_KEY,
+  ACTIVE_EXAM_KEY,
+  ACTIVE_PRACTICE_KEY,
+  ACTIVE_FLASHCARDS_KEY,
+  SETTINGS_KEY,
+]
 const BACKUP_MAX_BYTES = 8 * 1024 * 1024
 const ACTIVE_EXAM_MAX_AGE_MS = 24 * 60 * 60 * 1000
 const ACTIVE_EXAM_MAX_DURATION_MS = MAX_RESPONSE_MS
@@ -649,6 +656,158 @@ export function clearActivePractice(expectedSessionId) {
   }
   try {
     localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+    return true
+  } catch {
+    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    return false
+  }
+}
+
+function normalizeFlashcardItem(value, question) {
+  const allowed = new Set(['question', 'pickedChoiceId', 'feedback'])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    publicQuestion(value.question)?.id !== question.id ||
+    (value.pickedChoiceId !== null &&
+      !question.choices.some((choice) => choice.id === value.pickedChoiceId))
+  )
+    return null
+  const feedback = normalizeStoredFeedback(value.feedback, question, value.pickedChoiceId)
+  if (!feedback || feedback.explanation !== '') return null
+  return {
+    question,
+    pickedChoiceId: value.pickedChoiceId,
+    feedback,
+  }
+}
+
+function normalizeFlashcardReveal(value, question) {
+  if (value === null) return null
+  const allowed = new Set(['correct_choice_id', 'correct_explanation'])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    !question.choices.some((choice) => choice.id === value.correct_choice_id) ||
+    typeof value.correct_explanation !== 'string' ||
+    value.correct_explanation.length > 20_000
+  )
+    return undefined
+  return {
+    correct_choice_id: value.correct_choice_id,
+    correct_explanation: value.correct_explanation,
+  }
+}
+
+function normalizeActiveFlashcards(value, now = Date.now()) {
+  const allowed = new Set([
+    'config',
+    'questions',
+    'startedAt',
+    'index',
+    'items',
+    'revealed',
+    'sessionId',
+  ])
+  if (
+    !object(value) ||
+    Object.keys(value).some((key) => !allowed.has(key)) ||
+    !Array.isArray(value.questions) ||
+    value.questions.length < 1 ||
+    value.questions.length > LIMIT
+  )
+    return null
+  const normalizedQuestions = value.questions.map(publicQuestion)
+  if (
+    normalizedQuestions.some((question) => !question) ||
+    new Set(normalizedQuestions.map((question) => question.id)).size !==
+      normalizedQuestions.length
+  )
+    return null
+  const config = normalizeSettings(value.config)
+  if (
+    config?.mode !== 'flashcards' ||
+    config.count !== normalizedQuestions.length ||
+    !integer(value.startedAt, 1, Number.MAX_SAFE_INTEGER) ||
+    value.startedAt > now + 5 * 60 * 1000 ||
+    now - value.startedAt > ACTIVE_EXAM_MAX_AGE_MS ||
+    !integer(value.index, 0, normalizedQuestions.length - 1) ||
+    !Array.isArray(value.items) ||
+    value.items.length !== value.index ||
+    !SESSION_ID_PATTERN.test(value.sessionId ?? '')
+  )
+    return null
+  const items = value.items.map((item, index) =>
+    normalizeFlashcardItem(item, normalizedQuestions[index])
+  )
+  if (items.some((item) => !item)) return null
+  const revealed = normalizeFlashcardReveal(
+    value.revealed ?? null,
+    normalizedQuestions[value.index]
+  )
+  if (revealed === undefined) return null
+  return {
+    config,
+    questions: normalizedQuestions,
+    startedAt: value.startedAt,
+    index: value.index,
+    items,
+    revealed,
+    sessionId: value.sessionId,
+  }
+}
+
+export function loadActiveFlashcards() {
+  const saved = read(ACTIVE_FLASHCARDS_KEY, null)
+  if (newerSchema(saved)) {
+    warnNewerSchema()
+    return null
+  }
+  const normalized =
+    saved?.version === VERSION ? normalizeActiveFlashcards(saved.data) : null
+  if (!normalized) {
+    try {
+      localStorage.removeItem(ACTIVE_FLASHCARDS_KEY)
+    } catch {
+      /* unavailable */
+    }
+  }
+  return normalized
+}
+export function saveActiveFlashcards(
+  flashcards,
+  expectedSessionId = flashcards?.sessionId
+) {
+  if (newerSchema(read(ACTIVE_FLASHCARDS_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
+  const normalized = normalizeActiveFlashcards(flashcards)
+  const existing = loadActiveFlashcards()
+  if (
+    normalized &&
+    existing &&
+    (!expectedSessionId || existing.sessionId !== expectedSessionId)
+  ) {
+    window.dispatchEvent(new CustomEvent('pcep-active-flashcards-conflict'))
+    return false
+  }
+  return normalized
+    ? write(ACTIVE_FLASHCARDS_KEY, { version: VERSION, data: normalized })
+    : false
+}
+export function clearActiveFlashcards(expectedSessionId) {
+  if (newerSchema(read(ACTIVE_FLASHCARDS_KEY, null))) {
+    warnNewerSchema()
+    return false
+  }
+  const existing = loadActiveFlashcards()
+  if (existing && existing.sessionId !== expectedSessionId) {
+    window.dispatchEvent(new CustomEvent('pcep-active-flashcards-conflict'))
+    return false
+  }
+  try {
+    localStorage.removeItem(ACTIVE_FLASHCARDS_KEY)
     return true
   } catch {
     window.dispatchEvent(new CustomEvent('pcep-storage-warning'))

@@ -20,6 +20,9 @@ import {
   loadActivePractice,
   saveActivePractice,
   clearActivePractice,
+  loadActiveFlashcards,
+  saveActiveFlashcards,
+  clearActiveFlashcards,
   clearStudyProgress,
   loadDueReviews,
   loadAdaptivePlan,
@@ -96,6 +99,25 @@ const activePractice = (override = {}) => ({
     },
   ],
   confidence: 'low',
+  ...override,
+})
+const activeFlashcards = (override = {}) => ({
+  config: { mode: 'flashcards', module: '', difficulty: '', count: 3 },
+  questions: [question(1), question(2), question(3)],
+  startedAt: Date.now(),
+  sessionId: 'flashcards-a',
+  index: 1,
+  items: [
+    {
+      question: question(1),
+      pickedChoiceId: 11,
+      feedback: { ...practiceFeedback(), explanation: '' },
+    },
+  ],
+  revealed: {
+    correct_choice_id: 21,
+    correct_explanation: 'Second explanation',
+  },
   ...override,
 })
 
@@ -541,6 +563,118 @@ describe('active practice recovery', () => {
     expect(saveActivePractice(activePractice())).toBe(false)
     expect(clearActivePractice()).toBe(false)
     expect(localStorage.getItem('pcep.activePractice')).toBe(future)
+  })
+})
+
+describe('active flashcard recovery', () => {
+  it('round-trips only revealed feedback and strips future answer metadata', () => {
+    const unsafe = activeFlashcards({
+      questions: [
+        question(1),
+        question(2),
+        {
+          ...question(3),
+          correct_choice_id: 31,
+          choices: question(3).choices.map((choice) => ({
+            ...choice,
+            is_correct: choice.id === 31,
+            explanation: 'UNREVEALED_SECRET',
+          })),
+        },
+      ],
+    })
+
+    expect(saveActiveFlashcards(unsafe)).toBe(true)
+    const raw = JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+    expect(JSON.stringify(raw.questions)).not.toMatch(
+      /UNREVEALED_SECRET|is_correct|correct_choice_id|explanation/
+    )
+    expect(loadActiveFlashcards()).toMatchObject({
+      index: 1,
+      items: [
+        {
+          question: { id: 1 },
+          pickedChoiceId: 11,
+          feedback: { is_correct: true, correct_choice_id: 11 },
+        },
+      ],
+      revealed: {
+        correct_choice_id: 21,
+        correct_explanation: 'Second explanation',
+      },
+    })
+  })
+
+  it.each([
+    { items: [] },
+    { index: 0 },
+    { sessionId: '' },
+    { revealed: { correct_choice_id: 999, correct_explanation: 'Wrong' } },
+    { revealed: { correct_choice_id: 21, correct_explanation: {}, debug: true } },
+    {
+      items: [
+        {
+          question: question(2),
+          pickedChoiceId: 21,
+          feedback: {
+            ...practiceFeedback(),
+            correct_choice_id: 21,
+            explanation: '',
+          },
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          question: question(1),
+          pickedChoiceId: null,
+          feedback: { ...practiceFeedback(), explanation: '' },
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          question: question(1),
+          pickedChoiceId: 11,
+          feedback: { ...practiceFeedback(), explanation: '', debug: true },
+        },
+      ],
+    },
+  ])('rejects malformed flashcard recovery data: %j', (override) => {
+    expect(saveActiveFlashcards(activeFlashcards(override))).toBe(false)
+    expect(loadActiveFlashcards()).toBeNull()
+  })
+
+  it('expires old data and preserves a replacement owned by another tab', () => {
+    localStorage.setItem(
+      'pcep.activeFlashcards',
+      JSON.stringify({
+        version: 1,
+        data: activeFlashcards({
+          startedAt: Date.now() - 24 * 60 * 60 * 1000 - 1,
+        }),
+      })
+    )
+    expect(loadActiveFlashcards()).toBeNull()
+
+    const first = activeFlashcards()
+    expect(saveActiveFlashcards(first)).toBe(true)
+    const replacement = { ...first, sessionId: 'flashcards-replacement' }
+    expect(saveActiveFlashcards(replacement, first.sessionId)).toBe(true)
+    expect(clearActiveFlashcards(first.sessionId)).toBe(false)
+    expect(loadActiveFlashcards().sessionId).toBe('flashcards-replacement')
+  })
+
+  it('protects flashcard recovery written by a newer app version', () => {
+    const future = JSON.stringify({ version: 2, data: { future: true } })
+    localStorage.setItem('pcep.activeFlashcards', future)
+    expect(hasNewerStoredSchema()).toBe(true)
+    expect(loadActiveFlashcards()).toBeNull()
+    expect(saveActiveFlashcards(activeFlashcards())).toBe(false)
+    expect(clearActiveFlashcards()).toBe(false)
+    expect(localStorage.getItem('pcep.activeFlashcards')).toBe(future)
   })
 })
 
