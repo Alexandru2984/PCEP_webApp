@@ -2,12 +2,13 @@ from io import StringIO
 from unittest.mock import patch
 
 import pytest
+from django.contrib.admin.sites import AdminSite
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import IntegrityError, transaction
 from django.forms.models import inlineformset_factory
 
-from quiz.admin import ChoiceFormSet
+from quiz.admin import ChoiceFormSet, QuestionAdmin
 from quiz.models import Question, Choice
 from quiz.question_bank import (
     duplicate_questions,
@@ -207,6 +208,91 @@ def test_admin_inline_requires_one_correct_answer(make_question, correct_count):
     assert formset.is_valid() is (correct_count == 1)
     if correct_count != 1:
         assert 'exactly one' in str(formset.non_form_errors())
+
+
+def _admin_choice_formset(question, overrides=None):
+    cls = inlineformset_factory(
+        Question,
+        Choice,
+        formset=ChoiceFormSet,
+        fields=('text', 'is_correct', 'explanation'),
+        extra=0,
+    )
+    choices = list(question.choices.all())
+    data = {
+        'choices-TOTAL_FORMS': str(len(choices)),
+        'choices-INITIAL_FORMS': str(len(choices)),
+        'choices-MIN_NUM_FORMS': '0',
+        'choices-MAX_NUM_FORMS': '1000',
+    }
+    for index, choice in enumerate(choices):
+        data.update({
+            f'choices-{index}-id': choice.id,
+            f'choices-{index}-question': question.id,
+            f'choices-{index}-text': choice.text,
+            f'choices-{index}-explanation': choice.explanation,
+        })
+        if choice.is_correct:
+            data[f'choices-{index}-is_correct'] = 'on'
+    data.update(overrides or {})
+    return cls(data=data, instance=question, prefix='choices')
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ('question_updates', 'choice_updates', 'expected'),
+    [
+        ({'code_snippet': 'if ready:\nprint("bad")'}, {}, 'invalid Python'),
+        ({'code_snippet': 'items = {1, 2}'}, {}, 'outside the PCEP-30-02'),
+        ({}, {'choices-1-explanation': 'Wrong. No.'}, 'fewer than 20 characters'),
+        (
+            {},
+            {'choices-2-explanation': 'Wrong. TODO: replace this draft explanation.'},
+            'editorial artifact',
+        ),
+    ],
+)
+def test_admin_rejects_question_quality_failures(
+    make_question, question_updates, choice_updates, expected
+):
+    q = make_question(text='Admin quality candidate?')
+    for field, value in question_updates.items():
+        setattr(q, field, value)
+
+    formset = _admin_choice_formset(q, choice_updates)
+
+    assert not formset.is_valid()
+    assert expected in str(formset.non_form_errors())
+
+
+@pytest.mark.django_db
+def test_admin_rejects_an_exact_existing_question(make_question):
+    original = make_question(text='Existing question?', code_snippet='print("same")')
+    candidate = make_question(text='Candidate question?', code_snippet='print("other")')
+    candidate.text = original.text
+    candidate.code_snippet = original.code_snippet
+
+    formset = _admin_choice_formset(candidate)
+
+    assert not formset.is_valid()
+    assert f'existing question ID {original.id}' in str(formset.non_form_errors())
+
+
+@pytest.mark.django_db
+def test_admin_list_prefetches_answer_previews(
+    make_question, django_assert_num_queries
+):
+    valid = make_question(text='Valid preview?')
+    invalid = make_question(text='Invalid preview?')
+    invalid.choices.update(is_correct=False)
+    question_admin = QuestionAdmin(Question, AdminSite())
+
+    with django_assert_num_queries(2):
+        rows = list(question_admin.get_queryset(None))
+        previews = {row.id: question_admin.correct_answer(row) for row in rows}
+
+    assert previews[valid.id] == 'Choice 0'
+    assert previews[invalid.id] == '⚠ 0 correct choices'
 
 
 @pytest.mark.django_db

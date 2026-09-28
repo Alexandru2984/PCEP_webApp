@@ -161,15 +161,24 @@ def similar_questions(questions=ALL_QUESTIONS, threshold=NEAR_DUPLICATE_THRESHOL
     return sorted(candidates, key=lambda item: (-item[2], item[0], item[1]))
 
 
-def validation_errors(questions=ALL_QUESTIONS):
+def _question_label(question, index, labeler, *, include_text=True):
+    if labeler:
+        return labeler(question, index)
+    label = (
+        f'database question id={question["id"]}'
+        if 'id' in question
+        else f'question #{index}'
+    )
+    return f'{label}: {question.get("text", "")!r}' if include_text else label
+
+
+def validation_errors(questions=ALL_QUESTIONS, *, labeler=None):
     errors = []
     valid_modules = set(VALID_MODULES)
     valid_difficulties = set(VALID_DIFFICULTIES)
 
     for index, question in enumerate(questions, start=1):
-        label = f'question #{index}: {question.get("text", "")!r}'
-        if 'id' in question:
-            label = f'database question id={question["id"]}: {question.get("text", "")!r}'
+        label = _question_label(question, index, labeler)
         choices = question.get('choices', [])
         correct_count = sum(1 for c in choices if c.get('is_correct'))
 
@@ -236,13 +245,11 @@ def validation_errors(questions=ALL_QUESTIONS):
     return errors
 
 
-def syllabus_warnings(questions=ALL_QUESTIONS):
+def syllabus_warnings(questions=ALL_QUESTIONS, *, labeler=None):
     warnings = []
     for index, question in enumerate(questions, start=1):
         snippet = question.get('code_snippet', '').strip()
-        label = f'question #{index}'
-        if 'id' in question:
-            label = f'database question id={question["id"]}'
+        label = _question_label(question, index, labeler, include_text=False)
 
         nodes = ()
         if snippet:
