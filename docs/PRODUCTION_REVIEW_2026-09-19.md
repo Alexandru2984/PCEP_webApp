@@ -568,6 +568,14 @@ production build and all 29 Playwright flows pass. The mobile browser flow verif
 both the search preview and selected deck payloads, the recovery snapshot, axe and
 horizontal fit without exposing answer metadata.
 
+The adaptive-Flashcard follow-up exposes the same explainable ranked study set as
+graded Practice or self-rated Flashcards. Both paths request the exact bounded local
+IDs and receive fresh public questions, while Flashcards retain the validated
+answer-safe recovery and cross-tab ownership behavior. All 276 Vitest tests across
+31 files, lint, formatting, the production build and all 29 Playwright flows pass.
+Browser coverage verifies the ranked request, public payload and recovery secrecy,
+both launch modes, axe and mobile horizontal fit.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.

@@ -292,15 +292,16 @@ is stored with the latest review. Dashboard mastery combines observed accuracy,
 repetition and the achieved interval, and should be treated as a study signal rather
 than an exam credential.
 
-Adaptive practice is also local and rule based. It ranks at most 20 unique
-question IDs using a documented score: +100 when due, +60 while in the mistakes
-list, up to +40 from observed error rate, up to +30 from the mastery gap, +20 when
-the latest confidence is low, and a small +5/+10 medium/hard bonus. Questions at
-or above 80% mastery are omitted unless currently due, missed or their latest
-recorded confidence is low. Equal scores prefer the least recently attempted
-question, then its numeric ID, so the plan is deterministic and testable. Only
-the selected IDs are sent to `quiz-set`; fresh public questions come back without
-answer metadata.
+Adaptive study is also local and rule based. It ranks at most 20 unique question
+IDs using a documented score: +100 when due, +60 while in the mistakes list, up to
++40 from observed error rate, up to +30 from the mastery gap, +20 when the latest
+confidence is low, and a small +5/+10 medium/hard bonus. Questions at or above 80%
+mastery are omitted unless currently due, missed or their latest recorded confidence
+is low. Equal scores prefer the least recently attempted question, then its numeric
+ID, so the plan is deterministic and testable. The ranked set can launch graded
+Practice or self-rated Flashcards. Only the selected IDs are sent to `quiz-set`;
+fresh public questions come back without answer metadata, and Flashcards use the same
+validated answer-safe recovery path as every other custom deck.
 
 Dashboard momentum is derived only from the bounded local attempt history. Study
 streaks count unique local calendar days and remain current through the day after
