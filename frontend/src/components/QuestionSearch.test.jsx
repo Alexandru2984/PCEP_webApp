@@ -54,8 +54,10 @@ describe('QuestionSearch', () => {
     )
     fireEvent.click(screen.getByLabelText(/Which slice creates a copy/))
     fireEvent.click(screen.getByLabelText(/What does this slicing expression return/))
-    fireEvent.click(screen.getByRole('button', { name: 'Start selected (2)' }))
-    expect(onStart).toHaveBeenCalledWith([7, 9])
+    fireEvent.click(screen.getByRole('button', { name: 'Practice selected (2)' }))
+    expect(onStart).toHaveBeenCalledWith([7, 9], 'practice')
+    fireEvent.click(screen.getByRole('button', { name: 'Flashcards selected (2)' }))
+    expect(onStart).toHaveBeenLastCalledWith([7, 9], 'flashcards')
   })
 
   it('selects and clears every result without losing the search', async () => {
@@ -69,9 +71,11 @@ describe('QuestionSearch', () => {
       name: 'Select all results',
     })
     fireEvent.click(selectAll)
-    expect(screen.getByRole('button', { name: 'Start selected (2)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Practice selected (2)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Flashcards selected (2)' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }))
-    expect(screen.getByRole('button', { name: 'Start selected (0)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Practice selected (0)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Flashcards selected (0)' })).toBeDisabled()
   })
 
   it('rejects unexpected answer metadata in a search response', async () => {

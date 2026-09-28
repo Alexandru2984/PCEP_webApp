@@ -125,7 +125,9 @@ test('full mock uses the PCEP-30-02 size, timer and syllabus distribution', asyn
   expect(violations.map((violation) => violation.id)).toEqual([])
 })
 
-test('search builds an answer-safe custom drill on mobile', async ({ page }) => {
+test('search builds an answer-safe custom flashcard drill on mobile', async ({
+  page,
+}) => {
   await mockApi(page)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
@@ -148,14 +150,24 @@ test('search builds an answer-safe custom drill on mobile', async ({ page }) => 
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   ).toBe(true)
-  const requestPromise = page.waitForRequest((request) => {
-    const url = new URL(request.url())
+  const drillResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url())
     return url.pathname.endsWith('/api/quiz-set/') && url.searchParams.has('ids')
   })
-  await page.getByRole('button', { name: 'Start selected (2)' }).click()
-  const request = await requestPromise
-  expect(new URL(request.url()).searchParams.get('ids')).toBe('1,2')
-  await expect(page.getByText(/Tip: press/)).toBeVisible()
+  await page.getByRole('button', { name: 'Flashcards selected (2)' }).click()
+  const drillResponse = await drillResponsePromise
+  expect(new URL(drillResponse.url()).searchParams.get('ids')).toBe('1,2')
+  const drillPayload = await drillResponse.json()
+  expect(JSON.stringify(drillPayload)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  await expect(page.getByText('Flashcard 1 of 2')).toBeVisible()
+  const saved = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('pcep.activeFlashcards')).data
+  )
+  expect(JSON.stringify(saved.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
 
   analysis = await new AxeBuilder({ page }).analyze()
   expect(analysis.violations.map((violation) => violation.id)).toEqual([])

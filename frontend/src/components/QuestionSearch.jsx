@@ -107,8 +107,8 @@ export default function QuestionSearch({
         id="question-search-help"
         className="mt-1 text-sm text-slate-600 dark:text-slate-400"
       >
-        Search question text or Python code, choose up to 20 matches, then practise them.
-        {scope ? ` Current scope: ${scope}.` : ''}
+        Search question text or Python code, choose up to 20 matches, then study them with
+        graded answers or self-rated recall.{scope ? ` Current scope: ${scope}.` : ''}
       </p>
       <form onSubmit={search} className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
         <label htmlFor="question-search" className="sr-only">
@@ -205,14 +205,24 @@ export default function QuestionSearch({
               </label>
             ))}
           </fieldset>
-          <button
-            type="button"
-            disabled={selected.size === 0}
-            onClick={() => onStart([...selected])}
-            className="mt-3 w-full rounded-lg bg-sky-700 px-4 py-2.5 font-medium text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-          >
-            Start selected ({selected.size})
-          </button>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={() => onStart([...selected], 'practice')}
+              className="min-h-11 rounded-lg bg-sky-700 px-4 py-2.5 font-medium text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+            >
+              Practice selected ({selected.size})
+            </button>
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={() => onStart([...selected], 'flashcards')}
+              className="min-h-11 rounded-lg border border-sky-600 bg-white px-4 py-2.5 font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500 dark:bg-slate-900 dark:text-sky-300 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+            >
+              Flashcards selected ({selected.size})
+            </button>
+          </div>
         </div>
       )}
     </section>

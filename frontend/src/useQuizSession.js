@@ -822,7 +822,8 @@ export default function useQuizSession() {
   const startDueReviewsFlashcards = () =>
     startSavedDrill(loadDueReviews().slice(0, 20), 'due-reviews', 'flashcards')
   const startAdaptiveQuiz = () => startSavedDrill(loadAdaptivePlan().ids, 'adaptive')
-  const startSearchDrill = (ids) => startSavedDrill(ids, 'search')
+  const startSearchDrill = (ids, mode = 'practice') =>
+    startSavedDrill(ids, 'search', mode === 'flashcards' ? 'flashcards' : 'practice')
   return {
     ...state,
     startQuiz,

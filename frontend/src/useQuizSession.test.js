@@ -761,6 +761,29 @@ describe('quiz session requests', () => {
     expect(result.current.phase).toBe('answering')
   })
 
+  it('starts a selected search set as recoverable flashcards', async () => {
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startSearchDrill([1], 'flashcards'))
+
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'flashcards',
+        source: 'search',
+        ids: [1],
+        count: 1,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.phase).toBe('flashcards')
+    expect(loadActiveFlashcards()).toMatchObject({
+      config: { mode: 'flashcards', count: 1 },
+      questions: [{ id: 1 }],
+      index: 0,
+      revealed: null,
+    })
+  })
+
   it('starts an objective drill and rejects a response outside that scope', async () => {
     const scopedQuestion = {
       ...question,
