@@ -3,6 +3,7 @@
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime
 from html.parser import HTMLParser
 import json
 import re
@@ -12,6 +13,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -256,16 +258,7 @@ def check_answer_safe(value, label):
     require(not leaked, f'{label} leaked pre-answer fields: {sorted(leaked)}.')
 
 
-def check_question_set(payload, label, expected_ids=None):
-    require(isinstance(payload, dict), f'{label} is not an object.')
-    require(set(payload) == {'count', 'questions'}, f'{label} has unexpected fields.')
-    questions = payload.get('questions')
-    require(isinstance(questions, list), f'{label} questions are not a list.')
-    require(
-        type(payload.get('count')) is int and payload['count'] == len(questions),
-        f'{label} count does not match.',
-    )
-    ids = []
+def check_public_question(question, label):
     question_fields = {
         'id',
         'text',
@@ -275,53 +268,192 @@ def check_question_set(payload, label, expected_ids=None):
         'objective',
         'choices',
     }
-    for question in questions:
-        require(
-            isinstance(question, dict) and set(question) == question_fields,
-            f'{label} contains a malformed question.',
-        )
-        require(
-            type(question['id']) is int and question['id'] > 0,
-            f'{label} contains an invalid question ID.',
-        )
-        require(
-            all(
-                isinstance(question[field], str)
-                for field in (
-                    'text',
-                    'code_snippet',
-                    'difficulty',
-                    'module',
-                    'objective',
-                )
-            ),
-            f'{label} contains malformed public question fields.',
-        )
-        require(
-            isinstance(question['choices'], list) and len(question['choices']) == 4,
-            f'{label} contains an invalid choice set.',
-        )
-        require(
-            all(
-                isinstance(choice, dict)
-                and set(choice) == {'id', 'text'}
-                and type(choice['id']) is int
-                and choice['id'] > 0
-                and isinstance(choice['text'], str)
-                for choice in question['choices']
-            ),
-            f'{label} contains a malformed public choice.',
-        )
-        require(
-            len({choice['id'] for choice in question['choices']}) == 4,
-            f'{label} contains duplicate choice IDs.',
-        )
-        ids.append(question['id'])
+    require(
+        isinstance(question, dict) and set(question) == question_fields,
+        f'{label} contains a malformed question.',
+    )
+    require(
+        type(question['id']) is int and question['id'] > 0,
+        f'{label} contains an invalid question ID.',
+    )
+    require(
+        all(
+            isinstance(question[field], str)
+            for field in ('text', 'code_snippet', 'difficulty', 'module', 'objective')
+        ),
+        f'{label} contains malformed public question fields.',
+    )
+    require(
+        isinstance(question['choices'], list) and len(question['choices']) == 4,
+        f'{label} contains an invalid choice set.',
+    )
+    require(
+        all(
+            isinstance(choice, dict)
+            and set(choice) == {'id', 'text'}
+            and type(choice['id']) is int
+            and choice['id'] > 0
+            and isinstance(choice['text'], str)
+            for choice in question['choices']
+        ),
+        f'{label} contains a malformed public choice.',
+    )
+    require(
+        len({choice['id'] for choice in question['choices']}) == 4,
+        f'{label} contains duplicate choice IDs.',
+    )
+    check_answer_safe(question, label)
+    return question['id']
+
+
+def check_question_set(payload, label, expected_ids=None):
+    require(isinstance(payload, dict), f'{label} is not an object.')
+    require(set(payload) == {'count', 'questions'}, f'{label} has unexpected fields.')
+    questions = payload.get('questions')
+    require(isinstance(questions, list), f'{label} questions are not a list.')
+    require(
+        type(payload.get('count')) is int and payload['count'] == len(questions),
+        f'{label} count does not match.',
+    )
+    ids = [
+        check_public_question(question, f'{label} question')
+        for question in questions
+    ]
     require(len(ids) == len(set(ids)), f'{label} contains duplicate question IDs.')
     if expected_ids is not None:
         require(ids == expected_ids, f'{label} did not preserve the requested ID order.')
     check_answer_safe(payload, label)
     return ids
+
+
+def count_map(value):
+    return (
+        isinstance(value, dict)
+        and value
+        and all(
+            isinstance(key, str) and type(count) is int and count >= 0
+            for key, count in value.items()
+        )
+    )
+
+
+def check_stats(payload):
+    fields = {
+        'total',
+        'by_module',
+        'by_difficulty',
+        'by_objective',
+        'objective_matrix',
+        'matrix',
+        'modules',
+        'pass_threshold',
+    }
+    require(isinstance(payload, dict) and set(payload) == fields, 'Stats shape drifted.')
+    total = payload['total']
+    require(type(total) is int and 1 <= total <= 100_000, 'Stats total is invalid.')
+    by_module = payload['by_module']
+    by_difficulty = payload['by_difficulty']
+    by_objective = payload['by_objective']
+    require(count_map(by_module), 'Stats module totals are invalid.')
+    require(count_map(by_difficulty), 'Stats difficulty totals are invalid.')
+    require(count_map(by_objective), 'Stats objective totals are invalid.')
+    require(sum(by_module.values()) == total, 'Stats module totals do not reconcile.')
+    require(
+        sum(by_difficulty.values()) == total,
+        'Stats difficulty totals do not reconcile.',
+    )
+    require(
+        sum(by_objective.values()) == total,
+        'Stats objective totals do not reconcile.',
+    )
+
+    def check_matrix(value, row_totals, label):
+        require(
+            isinstance(value, dict) and set(value) == set(row_totals),
+            f'{label} rows drifted.',
+        )
+        for key, row in value.items():
+            require(
+                count_map(row) and set(row) == set(by_difficulty),
+                f'{label} row {key} drifted.',
+            )
+            require(
+                sum(row.values()) == row_totals[key],
+                f'{label} row {key} does not reconcile.',
+            )
+        for difficulty, expected in by_difficulty.items():
+            require(
+                sum(row[difficulty] for row in value.values()) == expected,
+                f'{label} difficulty {difficulty} does not reconcile.',
+            )
+
+    check_matrix(payload['matrix'], by_module, 'Stats module matrix')
+    check_matrix(payload['objective_matrix'], by_objective, 'Stats objective matrix')
+
+    modules = payload['modules']
+    require(
+        isinstance(modules, list) and len(modules) == len(by_module),
+        'Stats module summaries drifted.',
+    )
+    summaries = {}
+    summary_fields = {'value', 'label', 'total', *by_difficulty}
+    for summary in modules:
+        require(
+            isinstance(summary, dict)
+            and set(summary) == summary_fields
+            and summary['value'] in by_module
+            and summary['value'] not in summaries
+            and isinstance(summary['label'], str)
+            and 1 <= len(summary['label']) <= 100,
+            'Stats contains an invalid module summary.',
+        )
+        module = summary['value']
+        require(
+            summary['total'] == by_module[module]
+            and all(
+                summary[difficulty] == payload['matrix'][module][difficulty]
+                for difficulty in by_difficulty
+            ),
+            f'Stats module summary {module} does not reconcile.',
+        )
+        summaries[module] = summary
+    require(set(summaries) == set(by_module), 'Stats module summaries are incomplete.')
+    require(
+        type(payload['pass_threshold']) is int
+        and 1 <= payload['pass_threshold'] <= 100,
+        'Stats pass threshold is invalid.',
+    )
+    check_answer_safe(payload, 'Stats')
+    return total
+
+
+def check_search(payload):
+    require(
+        isinstance(payload, dict) and set(payload) == {'count', 'results'},
+        'Search shape drifted.',
+    )
+    results = payload['results']
+    require(
+        isinstance(results, list)
+        and type(payload['count']) is int
+        and payload['count'] == len(results),
+        'Search count does not match.',
+    )
+    fields = {'id', 'text', 'code_snippet', 'difficulty', 'module', 'objective'}
+    for result in results:
+        require(
+            isinstance(result, dict)
+            and set(result) == fields
+            and type(result['id']) is int
+            and result['id'] > 0
+            and all(
+                isinstance(result[field], str)
+                for field in fields - {'id'}
+            ),
+            'Search contains a malformed preview.',
+        )
+    check_answer_safe(payload, 'Search')
+    return results
 
 
 def run(origin):
@@ -347,31 +479,47 @@ def run(origin):
     stats_response = public_get(origin, '/api/stats/')
     check_api_headers(stats_response, releases, 'Stats')
     stats = json_payload(stats_response, 'Stats')
-    total = stats.get('total') if isinstance(stats, dict) else None
-    require(type(total) is int and 1 <= total <= 100_000, 'Stats total is invalid.')
-    by_module = stats.get('by_module')
-    by_difficulty = stats.get('by_difficulty')
-    require(
-        isinstance(by_module, dict)
-        and by_module
-        and all(type(value) is int and value >= 0 for value in by_module.values())
-        and sum(by_module.values()) == total,
-        'Stats module totals do not reconcile.',
-    )
-    require(
-        isinstance(by_difficulty, dict)
-        and by_difficulty
-        and all(type(value) is int and value >= 0 for value in by_difficulty.values())
-        and sum(by_difficulty.values()) == total,
-        'Stats difficulty totals do not reconcile.',
-    )
-    check_answer_safe(stats, 'Stats')
+    total = check_stats(stats)
 
     random_response = public_get(origin, '/api/quiz-set/?count=4')
     check_api_headers(random_response, releases, 'Public quiz set')
     random_payload = json_payload(random_response, 'Public quiz set')
     random_ids = check_question_set(random_payload, 'Public quiz set')
     require(len(random_ids) == 4, 'Public quiz set returned the wrong number of questions.')
+
+    detail_response = public_get(origin, f'/api/questions/{random_ids[0]}/')
+    check_api_headers(detail_response, releases, 'Question detail')
+    detail = json_payload(detail_response, 'Question detail')
+    require(
+        check_public_question(detail, 'Question detail') == random_ids[0],
+        'Question detail returned the wrong question.',
+    )
+
+    daily_response = public_get(origin, '/api/daily/')
+    check_api_headers(daily_response, releases, 'Daily challenge')
+    daily = json_payload(daily_response, 'Daily challenge')
+    require(
+        isinstance(daily, dict) and set(daily) == {'date', 'count', 'questions'},
+        'Daily challenge shape drifted.',
+    )
+    require(
+        daily['date'] == datetime.now(ZoneInfo('Europe/Bucharest')).date().isoformat(),
+        'Daily challenge date drifted.',
+    )
+    daily_ids = check_question_set(
+        {'count': daily['count'], 'questions': daily['questions']},
+        'Daily challenge',
+    )
+    require(len(daily_ids) == 5, 'Daily challenge returned the wrong number of questions.')
+
+    search_source = random_payload['questions'][0]
+    search_match = re.search(r'[A-Za-z]{2,20}', search_source['text'])
+    require(search_match is not None, 'Could not derive a safe public search probe.')
+    search_query = urlencode({'q': search_match.group(), 'limit': 1})
+    search_response = public_get(origin, f'/api/search/?{search_query}')
+    check_api_headers(search_response, releases, 'Search')
+    search_results = check_search(json_payload(search_response, 'Search'))
+    require(len(search_results) == 1, 'Search returned the wrong number of previews.')
 
     requested_ids = list(reversed(random_ids))
     query = urlencode({'ids': ','.join(map(str, requested_ids)), 'count': 3})

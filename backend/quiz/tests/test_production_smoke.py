@@ -1,4 +1,5 @@
 import importlib.util
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -45,6 +46,30 @@ def public_question(question_id):
     }
 
 
+def stats_payload():
+    return {
+        'total': 3,
+        'by_module': {'module1': 3},
+        'by_difficulty': {'easy': 1, 'medium': 2},
+        'by_objective': {'1.1': 1, '1.4': 2},
+        'matrix': {'module1': {'easy': 1, 'medium': 2}},
+        'objective_matrix': {
+            '1.1': {'easy': 1, 'medium': 0},
+            '1.4': {'easy': 0, 'medium': 2},
+        },
+        'modules': [
+            {
+                'value': 'module1',
+                'label': 'Module 1',
+                'total': 3,
+                'easy': 1,
+                'medium': 2,
+            }
+        ],
+        'pass_threshold': 70,
+    }
+
+
 def test_question_set_requires_order_and_rejects_answer_metadata():
     payload = {
         'count': 2,
@@ -64,6 +89,43 @@ def test_question_set_rejects_a_valid_but_wrong_order():
     }
     with pytest.raises(smoke.SmokeError, match='requested ID order'):
         smoke.check_question_set(payload, 'Targeted', [3, 1])
+
+
+def test_stats_contract_reconciles_every_public_breakdown():
+    payload = stats_payload()
+    assert smoke.check_stats(payload) == 3
+
+    invalid = deepcopy(payload)
+    invalid['objective_matrix']['1.4']['medium'] = 1
+    with pytest.raises(smoke.SmokeError, match='objective matrix row 1.4'):
+        smoke.check_stats(invalid)
+
+
+def test_search_contract_excludes_choices_and_answer_metadata():
+    payload = {
+        'count': 1,
+        'results': [
+            {
+                key: value
+                for key, value in public_question(1).items()
+                if key != 'choices'
+            }
+        ],
+    }
+    assert smoke.check_search(payload) == payload['results']
+
+    payload['results'][0]['choices'] = []
+    with pytest.raises(smoke.SmokeError, match='malformed preview'):
+        smoke.check_search(payload)
+
+
+def test_question_detail_rejects_extra_answer_fields():
+    question = public_question(4)
+    assert smoke.check_public_question(question, 'Detail') == 4
+
+    question['choices'][0]['explanation'] = 'leak'
+    with pytest.raises(smoke.SmokeError, match='malformed public choice'):
+        smoke.check_public_question(question, 'Detail')
 
 
 def test_api_headers_require_release_request_id_no_store_and_strict_csp():
