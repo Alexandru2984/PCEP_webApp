@@ -371,6 +371,13 @@ explanation strings must all be valid. A malformed or failed response leaves the
 unrevealed and offers the normal retry path; it cannot be self-rated until valid
 feedback arrives.
 
+After a successful reveal, focus moves to **Review later** so the removed Reveal
+button never leaves keyboard focus stranded. `1` selects **Review later** and `2`
+selects **Got it**; Space or Enter reveals an unrevealed card. The controls expose
+the same bindings through `aria-keyshortcuts`, the footer lists them, and the shared
+shortcut guard suppresses them in editable fields, during composition, on key repeat
+and with browser modifier keys.
+
 Progress, settings and active-session writes refuse to replace a storage schema
 with a higher version number. A stale tab also leaves newer recovery data untouched
 on read and clear, and shows a reload warning immediately or after a cross-tab

@@ -523,6 +523,13 @@ render now issue exactly one request instead of aborting the first and spending 
 second API call. All 251 Vitest tests, lint, formatting and the production build pass;
 the answer-safe mobile Search-to-drill Playwright flow also passes.
 
+The Flashcard keyboard follow-up restores focus after the asynchronous Reveal button
+is removed, publishes `aria-keyshortcuts` and adds Space/Enter reveal plus `1`/`2`
+self-rating controls. The visible shortcut guide matches the actual bindings. All 252
+Vitest tests, lint, formatting and the production build pass. Browser coverage uses
+the shortcuts end to end and the Flashcard screens remain axe-clean without overflow
+in both themes across seven viewport widths.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -614,6 +621,7 @@ the answer-safe mobile Search-to-drill Playwright flow also passes.
 - `20453df` — cancel stale Flashcard reveals and reject malformed feedback.
 - `698aed9` — document resilient Flashcard reveal behavior.
 - `c7a7fb6` — prevent duplicate Search requests in the same render.
+- `02b23e0` — add focus-safe Flashcard keyboard self-rating.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
