@@ -47,7 +47,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   _and_ why the correct answer is right (skipped exam questions included)
 - ⏱️ **Three study modes** — Practice (instant feedback), a timed **Exam
   simulation** (question navigator, flagging, auto-submit), and **Flashcards**
-  (flip to reveal the answer, self-mark what you know). Exam mode includes a
+  (flip to reveal the answer, self-mark what you know). Reveal failures are retryable,
+  and leaving the deck cancels pending work. Exam mode includes a
   [PCEP-30-02](https://pythoninstitute.org/pcep) full-mock preset with 30 questions,
   40 minutes and the official 7/8/7/8 module item distribution; the UI clearly notes
   that this trainer does not reproduce the official interactive item formats.
@@ -95,11 +96,11 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ## Tech stack
 
-| Layer    | Tech                                                      |
-| -------- | --------------------------------------------------------- |
-| Backend  | Django 5.2 LTS · Django REST Framework · PostgreSQL · Gunicorn |
-| Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM) |
-| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI   |
+| Layer    | Tech                                                              |
+| -------- | ----------------------------------------------------------------- |
+| Backend  | Django 5.2 LTS · Django REST Framework · PostgreSQL · Gunicorn    |
+| Frontend | React 18 · Vite · Tailwind CSS 4 · Axios · Pyodide (WASM)         |
+| Tooling  | pytest · Vitest · ESLint · Prettier · GitHub Actions CI           |
 | Deploy   | Docker Compose · system Nginx · Cloudflare Tunnel · Let's Encrypt |
 
 ## Architecture
@@ -204,15 +205,15 @@ Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIO
 
 | Method | Endpoint                      | Description                                                                          |
 | ------ | ----------------------------- | ------------------------------------------------------------------------------------ |
-| `GET`  | `/api/live/`                  | Process liveness; deliberately independent of PostgreSQL                              |
-| `GET`  | `/api/health/`                | Readiness; returns 200 only if PostgreSQL is reachable                                |
-| `GET`  | `/api/stats/`                 | Aggregate module/objective/difficulty coverage, without question or answer data        |
-| `GET`  | `/api/search/`                | Search text/code with scope filters; no choices or answer metadata                     |
-| `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata          |
-| `GET`  | `/api/quiz-set/`              | Random public set with scope filters, or the answer-safe full-mock preset             |
+| `GET`  | `/api/live/`                  | Process liveness; deliberately independent of PostgreSQL                             |
+| `GET`  | `/api/health/`                | Readiness; returns 200 only if PostgreSQL is reachable                               |
+| `GET`  | `/api/stats/`                 | Aggregate module/objective/difficulty coverage, without question or answer data      |
+| `GET`  | `/api/search/`                | Search text/code with scope filters; no choices or answer metadata                   |
+| `GET`  | `/api/daily/`                 | Stable five-question daily set spanning all four modules; no answer metadata         |
+| `GET`  | `/api/quiz-set/`              | Random public set with scope filters, or the answer-safe full-mock preset            |
 | `GET`  | `/api/questions/<id>/`        | Single question (choices only — no answer key)                                       |
 | `POST` | `/api/questions/<id>/answer/` | Submit `{ "choice_id": N }`; returns correctness + the picked & correct explanations |
-| `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                        |
+| `POST` | `/api/grade/`                 | Grade 1–100 unique questions; null choices count as unanswered                       |
 
 ## Project layout
 

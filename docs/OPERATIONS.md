@@ -360,6 +360,17 @@ aborts an answer request in flight, returns to the recovery screen and cannot
 overwrite or clear the new owner's copy. Browser storage failure raises the normal
 persistence warning but does not block the in-memory session.
 
+### Flashcards
+
+Flashcards obtain the answer through the same rate-limited submission endpoint as
+Practice, so the initial deck remains answer-safe. The reveal request carries an
+AbortSignal and is cancelled on Quit or component teardown. Late responses cannot
+update a different card. Returned feedback passes the shared strict validator before
+rendering: the question and correct-choice relationship, booleans and bounded
+explanation strings must all be valid. A malformed or failed response leaves the card
+unrevealed and offers the normal retry path; it cannot be self-rated until valid
+feedback arrives.
+
 Progress, settings and active-session writes refuse to replace a storage schema
 with a higher version number. A stale tab also leaves newer recovery data untouched
 on read and clear, and shows a reload warning immediately or after a cross-tab
@@ -501,7 +512,6 @@ offline use.
 Existing Umami tracking respects Do Not Track and excludes URL query/hash data
 ([tracker configuration](https://docs.umami.is/docs/tracker-configuration));
 no new analytics service or user identifier was added.
-
 
 ## Static assets and CI
 

@@ -510,6 +510,13 @@ also reject explanations shorter than 20 characters and strong editorial draftin
 markers. All 189 backend tests, the 308-question seed audit, Django checks and a
 read-only live database audit pass; the live bank already had zero violations.
 
+The Flashcard reliability follow-up cancels a reveal request immediately on Quit or
+unmount, ignores stale responses and validates the complete feedback schema before
+React renders it. Invalid or incomplete feedback keeps the card hidden and retryable.
+All 250 Vitest tests, lint, formatting and the production build pass. Playwright
+passes the full Flashcard flow plus axe and horizontal-fit checks in both themes at
+seven viewport widths.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -598,6 +605,7 @@ read-only live database audit pass; the live bank already had zero violations.
 - `d21757e` — document Practice recovery and its storage boundary.
 - `e8fc01e` — reject short/editorial explanations and remove a dead draft question.
 - `8026db9` — document the explanation quality gates.
+- `20453df` — cancel stale Flashcard reveals and reject malformed feedback.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
