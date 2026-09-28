@@ -670,6 +670,14 @@ horizontal fit without exposing answer metadata.
 - `3173277` — record the Flashcard recovery release.
 - `1b7602c` — add due-review Flashcard decks.
 - `e2dc67e` — document scheduled Flashcard reviews.
+- `571f010` — enforce shared question-quality rules in Django Admin.
+- `5a6a74d` — document the Admin question-quality gates.
+- `b94a760` — record the Admin question-quality release.
+- `1b311cb` — add Flashcard drills for mistakes and bookmarks.
+- `ba41841` — document saved-list Flashcard drills.
+- `4bf62b3` — record the saved-list Flashcard release.
+- `49f31ee` — add Flashcard mode to selected Search drills.
+- `bb77e0d` — document Search Flashcard drills.
 
 No commit was pushed and no authorship, co-author or generated-by attribution was
 added.
@@ -1034,6 +1042,26 @@ injection blocked by CSP remained the only console message. Public liveness,
 readiness, the 308-question snapshot, security/cache headers and privileged
 `nginx -t` passed. This frontend-only atomic publish recreated no service and
 required no migration, environment or Nginx change.
+
+The Search Flashcard release is published at frontend revision
+`bb77e0d3ec0a`. Its rollback root is
+`.frontend.previous-20260928T182601Z-fed676ad`, with the external copy
+`frontend.20260928T182601Z-fed676ad`. The entry chunk `index-OCiJNGCE.js`
+has SHA-256
+`0efcb71dfa7a732298e49f67dd8a0c2a03ff452c3bf8ad8a0a8c09fa67300acf`,
+the Flashcard chunk `FlashcardView-ngBszpfV.js` has SHA-256
+`cbe25e5c13a9b9a345b5c167d396404b37d55e65fd2e4baab47620964f468c8c`,
+and the public service worker matches the live root at SHA-256
+`6168464cea2ad157ebdbed6b08c7e5f5211f26ff6a2e710b20469f0357420cb3`.
+The preceding entry chunk remains public. Fresh live Chromium at 390 px selected
+production Search results 152 and 185, observed those exact IDs in the public
+quiz-set request, found no answer metadata in the Search payload, deck payload or
+recovery snapshot, and verified reload, resume and cleanup on Quit. The active
+deck had zero axe violations and no horizontal overflow. The existing Cloudflare
+JavaScript-detection injection blocked by CSP remained the only console message.
+Public liveness, readiness, the 308-question snapshot, cache headers and
+privileged `nginx -t` passed. This frontend-only atomic publish recreated no
+service and required no migration, environment or Nginx change.
 
 The analytics build marker has no runtime deployment requirement because Vite
 removes it from `dist/index.html`; the verified output still loads the same
