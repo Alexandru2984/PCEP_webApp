@@ -35,8 +35,7 @@ export default function QuestionSearch({
   const search = async (event) => {
     event.preventDefault()
     const term = query.trim()
-    if (term.length < 2 || term.length > 80 || loading) return
-    request.current?.abort()
+    if (term.length < 2 || term.length > 80 || request.current) return
     const controller = new AbortController()
     request.current = controller
     setLoading(true)

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { searchQuestions } from '../api'
 import QuestionSearch from './QuestionSearch'
@@ -105,5 +105,21 @@ describe('QuestionSearch', () => {
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('No questions matched')
     )
+  })
+
+  it('uses a synchronous guard against duplicate search submissions', () => {
+    searchQuestions.mockImplementation(() => new Promise(() => {}))
+    render(<QuestionSearch onStart={() => {}} />)
+    fireEvent.change(screen.getByLabelText('Search question text or code'), {
+      target: { value: 'slice' },
+    })
+    const form = screen.getByLabelText('Search question text or code').closest('form')
+
+    act(() => {
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+    })
+
+    expect(searchQuestions).toHaveBeenCalledOnce()
   })
 })
