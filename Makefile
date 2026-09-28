@@ -12,8 +12,9 @@ BACKEND_DEPLOY_FLAGS ?=
 TRIVY_IMAGE ?= ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
 TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
+PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend audit-image build build-frontend fetch-pyodide django-check compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend audit-image build build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -24,6 +25,7 @@ help:
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  build            Build the frontend production bundle' \
 		'  django-check     Run Django production deploy checks' \
+		'  production-smoke Check the read-only public production contract' \
 		'  compose-build    Rebuild the backend image with its release revision' \
 		'  deploy-backend   Backup, validate and deploy one backend release' \
 		'  compose-up       Start db + backend' \
@@ -78,6 +80,9 @@ fetch-pyodide:
 
 django-check:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.settings DJANGO_DEBUG=False DJANGO_SECRET_KEY=a-sufficiently-long-production-secret-key-for-local-check DJANGO_ALLOWED_HOSTS=pcep.micutu.com POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=dummy POSTGRES_HOST=localhost POSTGRES_PORT=5432 "$(PYTHON_BIN)" manage.py check --deploy --fail-level WARNING
+
+production-smoke:
+	"$(PYTHON_BIN)" scripts/production_smoke.py --base-url "$(PRODUCTION_URL)"
 
 compose-build:
 	PCEP_RELEASE="$(RELEASE)" $(COMPOSE) build backend
