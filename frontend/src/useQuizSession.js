@@ -492,14 +492,14 @@ export default function useQuizSession() {
         signal: controller.signal,
       })
       if (!current(controller)) return
-      validateFeedback(data, question)
+      const feedback = validateFeedback(data, question, choiceId)
       dispatch({
         type: 'feedback',
-        feedback: data,
+        feedback,
         item: {
           question,
           pickedChoiceId: choiceId,
-          feedback: data,
+          feedback,
           confidence,
           responseMs,
         },
@@ -651,11 +651,11 @@ export default function useQuizSession() {
         )
       const byQuestion = new Map(data.results.map((r) => [r.question_id, r]))
       const items = state.questions.map((question, i) => {
-        const feedback = validateFeedback(byQuestion.get(question.id), question)
-        if (feedback.choice_id !== payload[i].choice_id)
-          throw new Error(
-            'The server returned invalid grading. Your answers are kept; please retry.'
-          )
+        const feedback = validateFeedback(
+          byQuestion.get(question.id),
+          question,
+          payload[i].choice_id
+        )
         const confidence = metadata.confidences?.[question.id]
         const responseMs = metadata.responseMs?.[question.id]
         return {

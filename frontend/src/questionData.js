@@ -70,14 +70,40 @@ export function publicQuestionSummary(q) {
   }
 }
 
-export function validateFeedback(data, question) {
+export function validateFeedback(data, question, pickedChoiceId) {
+  const allowed = new Set([
+    'question_id',
+    'choice_id',
+    'is_correct',
+    'correct_choice_id',
+    'explanation',
+    'correct_explanation',
+  ])
+  const hasQuestionId = Object.prototype.hasOwnProperty.call(data ?? {}, 'question_id')
+  const hasChoiceId = Object.prototype.hasOwnProperty.call(data ?? {}, 'choice_id')
   if (
     !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    Object.keys(data).some((key) => !allowed.has(key)) ||
+    !Array.isArray(question?.choices) ||
+    (pickedChoiceId !== null &&
+      !question.choices.some((choice) => choice.id === pickedChoiceId)) ||
+    hasQuestionId !== hasChoiceId ||
+    (hasQuestionId && data.question_id !== question.id) ||
+    (hasChoiceId && data.choice_id !== pickedChoiceId) ||
     typeof data.is_correct !== 'boolean' ||
     !question.choices.some((c) => c.id === data.correct_choice_id) ||
-    !text(data.explanation ?? '', 20_000, true) ||
-    !text(data.correct_explanation ?? '', 20_000, true)
+    data.is_correct !==
+      (pickedChoiceId !== null && pickedChoiceId === data.correct_choice_id) ||
+    !text(data.explanation, 20_000, true) ||
+    !text(data.correct_explanation, 20_000, true)
   )
     throw new Error('The server returned invalid feedback. Please retry.')
-  return data
+  return {
+    is_correct: data.is_correct,
+    correct_choice_id: data.correct_choice_id,
+    explanation: data.explanation,
+    correct_explanation: data.correct_explanation,
+  }
 }

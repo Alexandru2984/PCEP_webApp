@@ -217,6 +217,25 @@ describe('quiz session requests', () => {
     ])
   })
 
+  it('keeps a practice question retryable after contradictory feedback', async () => {
+    submitAnswer
+      .mockResolvedValueOnce({ ...feedback, is_correct: true, correct_choice_id: 11 })
+      .mockResolvedValueOnce({ ...feedback, is_correct: false, correct_choice_id: 11 })
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+
+    await act(async () => result.current.handleSelect(12))
+    expect(result.current.phase).toBe('answering')
+    expect(result.current.error).toMatch(/invalid feedback/i)
+    expect(result.current.history).toEqual([])
+
+    await act(async () => result.current.handleSelect(12))
+    expect(result.current.phase).toBe('reviewing')
+    expect(result.current.history).toMatchObject([
+      { pickedChoiceId: 12, feedback: { is_correct: false, correct_choice_id: 11 } },
+    ])
+  })
+
   it('keeps the requested setup size when the server returns a smaller scope', async () => {
     const { result } = renderHook(useQuizSession)
 

@@ -59,10 +59,10 @@ export default function FlashcardView({
         signal: controller.signal,
       })
       if (!mounted.current || request.current !== controller) return
-      validateFeedback(data, question)
+      const feedback = validateFeedback(data, question, question.choices[0].id)
       setRevealed({
-        correct_choice_id: data.correct_choice_id,
-        correct_explanation: data.correct_explanation,
+        correct_choice_id: feedback.correct_choice_id,
+        correct_explanation: feedback.correct_explanation,
       })
     } catch (error) {
       if (mounted.current && request.current === controller && !controller.signal.aborted)
