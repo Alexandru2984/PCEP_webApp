@@ -176,6 +176,16 @@ test('search builds an answer-safe custom flashcard drill on mobile', async ({
   expect(JSON.stringify(searchPayload)).not.toMatch(
     /is_correct|correct_choice|explanation|choices/
   )
+  await page.getByLabel('Search question text or code').fill('outputs')
+  await expect(page.getByText('4 results · 0 selected')).toHaveCount(0)
+  await expect(page.getByRole('checkbox')).toHaveCount(0)
+  await page.getByLabel('Search question text or code').fill('output')
+  const refreshedSearch = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('/api/search/')
+  )
+  await page.getByRole('button', { name: 'Search' }).click()
+  await refreshedSearch
+  await expect(page.getByText('4 results · 0 selected')).toBeVisible()
   const checkboxes = page.getByRole('checkbox')
   await checkboxes.nth(0).check()
   await checkboxes.nth(1).check()

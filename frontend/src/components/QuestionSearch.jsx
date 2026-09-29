@@ -84,6 +84,17 @@ export default function QuestionSearch({
     })
   }
 
+  const changeQuery = (event) => {
+    request.current?.abort()
+    request.current = null
+    setQuery(event.target.value)
+    setResults([])
+    setSelected(new Set())
+    setSearched(false)
+    setLoading(false)
+    setError('')
+  }
+
   const scope = [
     module && MODULE_LABELS[module],
     objective && OBJECTIVE_LABELS[objective],
@@ -120,7 +131,7 @@ export default function QuestionSearch({
           minLength={2}
           maxLength={80}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={changeQuery}
           aria-describedby="question-search-help"
           placeholder="Search question text or code"
           className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400"

@@ -27,6 +27,14 @@ const results = [
   },
 ]
 
+const deferred = () => {
+  let resolve
+  const promise = new Promise((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   searchQuestions.mockResolvedValue({ count: results.length, results })
@@ -125,5 +133,36 @@ describe('QuestionSearch', () => {
     })
 
     expect(searchQuestions).toHaveBeenCalledOnce()
+  })
+
+  it('aborts and clears stale results when the search term changes', async () => {
+    const pending = deferred()
+    searchQuestions.mockReturnValueOnce(pending.promise)
+    render(<QuestionSearch onStart={() => {}} />)
+    const input = screen.getByLabelText('Search question text or code')
+    fireEvent.change(input, { target: { value: 'slice' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    const firstSignal = searchQuestions.mock.calls[0][1].signal
+
+    fireEvent.change(input, { target: { value: 'loops' } })
+    expect(firstSignal.aborted).toBe(true)
+    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+
+    await act(async () => pending.resolve({ count: results.length, results }))
+    expect(screen.queryByText('Which slice creates a copy?')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    await screen.findByText('Which slice creates a copy?')
+    expect(searchQuestions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ query: 'loops' }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+
+    fireEvent.click(screen.getByLabelText(/Which slice creates a copy/))
+    fireEvent.change(input, { target: { value: 'exceptions' } })
+    expect(screen.queryByText('Which slice creates a copy?')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /selected \(1\)/i })
+    ).not.toBeInTheDocument()
   })
 })
