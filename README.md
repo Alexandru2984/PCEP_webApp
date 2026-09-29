@@ -181,7 +181,7 @@ make django-check
 make compose-build && make audit-image
 make production-smoke
 
-# Backend — 206 tests (API/security, integrity, startup, release, SEO and smoke behavior)
+# Backend — 209 tests (API/security, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
@@ -202,7 +202,8 @@ a patch.
 The separate **Production smoke** workflow runs every six hours and on manual
 dispatch. It uses bounded read-only requests to verify the public shell and its
 entry assets, liveness/readiness, release consistency, security/cache headers,
-question totals, answer secrecy and ordered targeted drills.
+all aggregate matrices, answer secrecy across quiz, daily, detail and search
+responses, and ordered targeted drills.
 
 Production builds identify themselves without analytics or an extra API call:
 the frontend revision is shown in the footer and Django API responses include the

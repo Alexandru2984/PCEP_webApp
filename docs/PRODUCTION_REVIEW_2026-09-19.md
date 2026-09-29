@@ -594,10 +594,11 @@ order. All 29 Playwright flows, lint and formatting pass.
 The production-monitoring follow-up adds a standard-library-only, read-only smoke
 check for the public shell, its fingerprinted JS/CSS entry assets, service worker,
 liveness, database readiness, release and request markers, security/cache headers,
-reconciled question totals, strict answer-safe payloads and exact targeted-drill
+fully reconciled module/objective/difficulty matrices, strict answer-safe random,
+daily, detail and search payloads, and exact targeted-drill
 order. Requests use TLS validation, bounded two-megabyte responses, a 20-second
-timeout and three attempts; no write, answer or grade endpoint is called. All 206
-backend tests pass, including nine focused smoke-contract regressions. The live
+timeout and three attempts; no write, answer or grade endpoint is called. All 209
+backend tests pass, including twelve focused smoke-contract regressions. The live
 command verified backend release `7207b1bc2fb9`, 308 questions, two entry assets
 and an exact three-question targeted order; the pinned scheduled workflow passes
 `actionlint` without network access.
@@ -738,6 +739,7 @@ fresh production build.
 - `840d042` — add one-click focused review drills.
 - `9a101c9` — confirm before discarding active study sessions.
 - `c9e084a` — document focused review and safe session exit.
+- `eb38ca4` — cover every answer-safe public endpoint in production smoke checks.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1173,8 +1175,8 @@ as documented in README and the operations runbook.
 
 The production-smoke stage requires no migration, image rebuild, service restart,
 Nginx reload or environment change. Its local command already validates the live
-domain. The scheduled GitHub workflow becomes active when commit `494b862` is
-pushed to the repository's default branch.
+domain. The scheduled GitHub workflow and expanded contract become active when
+the monitoring commits are pushed to the repository's default branch.
 
 The focused-review/safe-quit frontend release is published at revision
 `c9e084aeb6d0`. Its rollback root is

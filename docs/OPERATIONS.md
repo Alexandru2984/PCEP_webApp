@@ -62,10 +62,11 @@ The standard-library-only check makes bounded, retryable GET requests with norma
 TLS certificate verification. It verifies the shell, referenced fingerprinted
 JS/CSS entry assets, immutable asset caching, service-worker policy, liveness,
 database readiness, the release marker, request IDs, aggregate question counts,
-security headers and API no-store behavior. It also fetches four public questions,
-rejects any answer metadata and verifies that a three-question targeted drill
-preserves the requested order. It never calls an answer, grade or other write
-endpoint and does not send learner state, cookies or identifiers.
+module/objective/difficulty matrices, security headers and API no-store behavior.
+It validates strict answer-safe shapes for random, daily, detail and search
+responses, then verifies that a three-question targeted drill preserves the
+requested order. It never calls an answer, grade or other write endpoint and does
+not send learner state, cookies or identifiers.
 
 `.github/workflows/production-smoke.yml` runs this contract every six hours and
 on manual dispatch with read-only repository permissions. Its failure appears in
