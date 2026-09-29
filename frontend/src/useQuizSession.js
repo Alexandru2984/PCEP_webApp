@@ -793,20 +793,19 @@ export default function useQuizSession() {
     const ids = [
       ...new Set(
         list
-          .slice(0, 100)
           .map((item) =>
             Number.isSafeInteger(item) ? item : (item?.id ?? item?.questionId)
           )
           .filter((id) => Number.isSafeInteger(id) && id > 0)
       ),
-    ]
+    ].slice(0, 100)
     if (!ids.length) return
     return startQuiz({
       mode,
       module: '',
       objective: '',
       difficulty: '',
-      count: Math.min(50, ids.length),
+      count: ids.length,
       source,
       ids,
     })

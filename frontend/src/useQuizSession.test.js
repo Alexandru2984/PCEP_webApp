@@ -836,6 +836,37 @@ describe('quiz session requests', () => {
       })
   })
 
+  it('keeps the full ordered 100-question targeted drill', async () => {
+    const questions = Array.from({ length: 100 }, (_, index) => {
+      const id = index + 1
+      return {
+        ...question,
+        id,
+        choices: [
+          { id: id * 10 + 1, text: 'One' },
+          { id: id * 10 + 2, text: 'Two' },
+        ],
+      }
+    })
+    fetchQuizSet.mockResolvedValueOnce({ questions })
+    const requestedIds = [1, ...questions.map(({ id }) => id), 101]
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startSessionReview(requestedIds))
+
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'practice',
+        source: 'session-review',
+        ids: questions.map(({ id }) => id),
+        count: 100,
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(result.current.questions).toHaveLength(100)
+    expect(result.current.questions.at(-1).id).toBe(100)
+  })
+
   it('starts an objective drill and rejects a response outside that scope', async () => {
     const scopedQuestion = {
       ...question,
