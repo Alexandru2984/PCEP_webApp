@@ -24,12 +24,22 @@ async function answerConfirmation(page, action, accept = true) {
 // --- Tests ------------------------------------------------------------------
 test('setup screen loads and shows the question-bank snapshot', async ({ page }) => {
   await mockApi(page)
+  await page.setViewportSize({ width: 360, height: 800 })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Start a new quiz/i })).toBeVisible()
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
   await expect(page.getByLabel(/Application release/)).toHaveText(
     /^(local|[A-Za-z0-9][A-Za-z0-9._-]{0,11})$/
   )
+  await page.getByRole('button', { name: '5 questions' }).click()
+  const requestPromise = page.waitForRequest((request) =>
+    new URL(request.url()).pathname.endsWith('/api/quiz-set/')
+  )
+  await page.getByRole('button', { name: 'Start practice' }).click()
+  expect(new URL((await requestPromise).url()).searchParams.get('count')).toBe('5')
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
 })
 
 test('question-bank snapshot recovers from a temporary API failure', async ({ page }) => {
@@ -192,7 +202,7 @@ test('practice run produces a report with a one-click objective drill', async ({
 }) => {
   await mockApi(page)
   await page.goto('/')
-  await page.getByRole('button', { name: '10', exact: true }).click()
+  await page.getByRole('button', { name: '10 questions' }).click()
   await page.getByRole('button', { name: /Start practice/ }).click()
   await page.getByText(/Tip: press/).waitFor()
 

@@ -91,6 +91,28 @@ describe('QuizSetup — practice your mistakes', () => {
     })
   })
 
+  it('offers a five-question session for a quick filtered drill', () => {
+    const onStart = vi.fn()
+    render(<QuizSetup {...baseProps} onStart={onStart} />)
+
+    fireEvent.change(screen.getByLabelText('Module'), {
+      target: { value: 'module2' },
+    })
+    fireEvent.change(screen.getByLabelText('Difficulty'), {
+      target: { value: 'hard' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '5 questions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start practice' }))
+
+    expect(onStart).toHaveBeenCalledWith({
+      mode: 'practice',
+      module: 'module2',
+      objective: '',
+      difficulty: 'hard',
+      count: 5,
+    })
+  })
+
   it('clears an objective when the learner switches to another module', () => {
     render(<QuizSetup {...baseProps} />)
     fireEvent.change(screen.getByLabelText('Module'), {

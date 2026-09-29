@@ -20,7 +20,7 @@ const DIFFICULTIES = [
   { value: 'hard', label: 'Hard' },
 ]
 
-const COUNTS = [10, 20, 30, 50]
+const COUNTS = [5, 10, 20, 30, 50]
 
 const selectClass =
   'rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-slate-500'
@@ -426,18 +426,19 @@ export default function QuizSetup({
           </select>
         </label>
 
-        <div className="flex flex-col text-sm sm:col-span-2 lg:col-span-3">
-          <span className="mb-1 font-medium text-slate-700 dark:text-slate-300">
+        <fieldset className="flex min-w-0 flex-col text-sm sm:col-span-2 lg:col-span-3">
+          <legend className="mb-1 font-medium text-slate-700 dark:text-slate-300">
             Questions: {count}
-          </span>
-          <div className="flex gap-2">
+          </legend>
+          <div className="grid w-full max-w-md grid-cols-5 gap-2">
             {COUNTS.map((n) => (
               <button
                 type="button"
                 key={n}
                 onClick={() => setCount(n)}
                 aria-pressed={count === n}
-                className={`rounded-lg border px-4 py-2 transition-colors ${
+                aria-label={`${n} questions`}
+                className={`min-h-11 min-w-0 rounded-lg border px-2 py-2 transition-colors ${
                   count === n
                     ? 'border-slate-900 bg-slate-900 text-white dark:border-sky-600 dark:bg-sky-700'
                     : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300'
@@ -460,7 +461,7 @@ export default function QuizSetup({
               </span>
             )}
           </p>
-        </div>
+        </fieldset>
       </div>
 
       <button
