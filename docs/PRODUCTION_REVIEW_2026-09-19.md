@@ -785,6 +785,7 @@ lint, formatting, the production build and the focused 360 px Playwright flow pa
 - `cc26d3a` — preserve the learner's preferred session size.
 - `a4d088d` — document stable session-size preferences.
 - `b65f5dc` — migrate unsupported legacy quiz-size preferences.
+- `5ebac4c` — document legacy quiz-size migration behavior.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1301,6 +1302,28 @@ violations and the page had no horizontal overflow. The complete public smoke,
 healthy Compose services and privileged `nginx -t` passed. This frontend-only atomic
 publish recreated no service and required no migration, environment, Nginx or
 Cloudflare change; the backend remains on `7207b1bc2fb9`.
+
+The legacy-session-size-migration frontend release is published at revision
+`5ebac4c24946`. Its rollback root is
+`.frontend.previous-20260929T005732Z-f7a29d2d`, with external copy
+`frontend.20260929T005732Z-f7a29d2d`. The entry chunk `index-Ck3w9S7S.js`
+has SHA-256
+`509d8370714c6f95e18602e79ffe527c70f58d06365cc850a8d86df17e9d2c38`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`2847ea8dc69cc0fadac639f88d0c72321508d9c14c7880b8a7df5724a044ace4`.
+Fresh live Chromium at 360 px started with a version-1 setup preference containing
+the formerly persisted count 1. Setup displayed and selected 30 without rewriting
+that record; explicit Start then requested and received 30 public questions, saved
+the supported preference and created a 30-question answer-safe recovery snapshot.
+Neither payload contained answer metadata or explanations. Axe reported zero
+violations, the active page had no horizontal overflow, no page error occurred and
+confirmed Quit cleared recovery. The only console error was the already tracked CSP
+rejection of Cloudflare's injected inline script. The complete public smoke, healthy
+Compose services and privileged `nginx -t` passed. This frontend-only atomic publish
+recreated no service and required no migration, environment, Nginx or Cloudflare
+change; the backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
