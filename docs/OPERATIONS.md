@@ -243,6 +243,9 @@ if any module lacks enough questions, and use the same public serializer as
 other question reads. The preset models PCEP-30-02 timing and syllabus item
 counts; the product discloses that its questions are single-choice while the
 official exam also has multiple-select and interactive formats.
+Custom Practice, Exam and Flashcard setup offers 5, 10, 20, 30 and 50 questions.
+The five-question option remains random and filter-aware; it is separate from the
+deterministic, syllabus-balanced daily challenge.
 `GET /api/daily/` returns five public questions for the current
 `Europe/Bucharest` date. Selection is deterministic for the date and production
 secret, covers every populated syllabus module before filling the fifth slot, and

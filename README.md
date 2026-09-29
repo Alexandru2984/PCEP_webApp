@@ -65,8 +65,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   studied as graded Practice or self-rated Flashcard decks.
 - 📅 **Daily challenge** — five deterministic questions with all four syllabus modules,
   a local completion score and the same answer-safe set throughout the Bucharest day
-- 🧩 **Filter by module, syllabus objective & difficulty**, choose how many questions
-  to take
+- 🧩 **Filter by module, syllabus objective & difficulty**, then choose a quick 5-question
+  drill or a 10, 20, 30 or 50-question session
 - 🔎 **Search question text or Python code** and build a focused Practice or Flashcard
   drill from up to 20 matches; search previews deliberately exclude choices and answer
   metadata
@@ -187,7 +187,7 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 279 Vitest tests, then static checks, the production build and
+# Frontend — 280 Vitest tests, then static checks, the production build and
 # 29 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build

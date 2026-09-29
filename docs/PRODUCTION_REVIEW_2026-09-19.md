@@ -632,6 +632,14 @@ uses a duplicate ahead of a 100-question list to prove deduplication happens bef
 the bound and that the final question is retained. All 279 Vitest tests, lint,
 formatting and the production build pass.
 
+The quick-session follow-up adds a five-question size to custom Practice, Exam and
+Flashcard setup. Unlike the deterministic daily challenge, it remains random and
+honors the selected module, objective and difficulty. The count selector is now a
+semantic fieldset with explicit accessible button names, 44 px minimum targets and
+a five-column mobile grid. All 280 Vitest tests pass; the full browser coverage plus
+the corrected focused flow account for all 29 Playwright scenarios, including the
+new `count=5` request and horizontal fit at 360 px.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -758,6 +766,7 @@ formatting and the production build pass.
 - `a7550b4` — record measured database randomization cost.
 - `757ee0c` — preserve complete targeted drill lists.
 - `5bb2313` — document complete targeted study lists.
+- `e8cc50d` — add quick five-question sessions.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
