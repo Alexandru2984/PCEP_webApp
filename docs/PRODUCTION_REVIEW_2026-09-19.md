@@ -640,6 +640,13 @@ a five-column mobile grid. All 280 Vitest tests pass; the full browser coverage 
 the corrected focused flow account for all 29 Playwright scenarios, including the
 new `count=5` request and horizontal fit at 360 px.
 
+The session-preference follow-up fixes a capped scope silently replacing the learner's
+chosen quiz size. Setup now sends and persists the requested size, while the existing
+validated response continues to define the actual session length and exam deadline.
+Returning from a one-question scope therefore restores the chosen 5/10/20/30/50
+option instead of an impossible unselected `Questions: 1` state. All 281 Vitest tests,
+lint, formatting and the production build pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -768,6 +775,7 @@ new `count=5` request and horizontal fit at 360 px.
 - `5bb2313` — document complete targeted study lists.
 - `e8cc50d` — add quick five-question sessions.
 - `394106b` — document quick study sessions.
+- `cc26d3a` — preserve the learner's preferred session size.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

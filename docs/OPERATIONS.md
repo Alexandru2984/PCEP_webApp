@@ -245,7 +245,10 @@ counts; the product discloses that its questions are single-choice while the
 official exam also has multiple-select and interactive formats.
 Custom Practice, Exam and Flashcard setup offers 5, 10, 20, 30 and 50 questions.
 The five-question option remains random and filter-aware; it is separate from the
-deterministic, syllabus-balanced daily challenge.
+deterministic, syllabus-balanced daily challenge. If a selected scope contains fewer
+questions than the chosen size, the API returns every available match and the active
+session/timer use that actual count. The chosen size remains the setup preference for
+the next quiz instead of being replaced by the temporary smaller result.
 `GET /api/daily/` returns five public questions for the current
 `Europe/Bucharest` date. Selection is deterministic for the date and production
 secret, covers every populated syllabus module before filling the fifth slot, and
