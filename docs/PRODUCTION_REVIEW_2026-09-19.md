@@ -767,6 +767,7 @@ new `count=5` request and horizontal fit at 360 px.
 - `757ee0c` — preserve complete targeted drill lists.
 - `5bb2313` — document complete targeted study lists.
 - `e8cc50d` — add quick five-question sessions.
+- `394106b` — document quick study sessions.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1245,6 +1246,24 @@ No answer metadata entered any payload or recovery record; the active session ha
 zero axe violations and no horizontal overflow, and confirmed Quit cleared recovery.
 All 279 Vitest tests, lint, formatting, the production build, all 29 Playwright flows,
 the complete public smoke, healthy Compose services and privileged `nginx -t` passed.
+This frontend-only atomic publish recreated no service and required no migration,
+environment, Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
+
+The quick-session frontend release is published at revision `394106bdd184`. Its
+rollback root is `.frontend.previous-20260929T002821Z-0a318f94`, with external
+copy `frontend.20260929T002821Z-0a318f94`. The entry chunk
+`index-DF72O0dT.js` has SHA-256
+`b4db4adf4230023a84cc34eb18e5f67d74f171a4c7e520d7bd1ee7440986ce06`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`ef1f1128f258c770e05d1cf77baa34a920c97905c1f255024f41d8a313a0018b`.
+The preceding entry chunk remains public with immutable caching. Fresh live Chromium
+at 360 px verified all five size controls at 49×44 px, then requested five hard
+objective-3.1 questions from module 3. The public response and answer-safe Practice
+recovery each contained exactly five questions; the active session had zero axe
+violations and no horizontal overflow, and confirmed Quit cleared recovery. The
+complete public smoke, healthy Compose services and privileged `nginx -t` passed.
 This frontend-only atomic publish recreated no service and required no migration,
 environment, Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
 
