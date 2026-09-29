@@ -238,6 +238,10 @@ after optional scope filters and apply `count` to that order; only ordinary unli
 quiz sets are randomized. The learner may launch those selected IDs as Practice or
 Flashcards; Flashcards use the same validated recovery format and never persist
 answer metadata for an unrevealed question.
+Editing the search term immediately aborts an in-flight request and clears its
+results and selection. A late response for an older term therefore cannot appear
+under the new query or launch a stale drill. Changing module, objective or difficulty
+remounts the search boundary and provides the same cancellation behavior.
 `GET /api/stats/` reports counts for all 15 objectives, and `quiz-set` accepts the
 same objective filter. A module/objective mismatch is rejected instead of silently
 returning an empty set. The full-mock preset rejects objective filters because its

@@ -662,6 +662,13 @@ object reaches session state. Contradictory Practice feedback leaves the questio
 retryable and records no attempt. All 293 Vitest tests across 32 files, lint,
 formatting, the production build and all 29 Playwright flows pass.
 
+The search-consistency follow-up invalidates results as soon as the learner edits the
+query. It aborts an in-flight request, clears the old selection and ignores a late
+response, preventing a drill built for one term from appearing under another. Scope
+changes retain their existing keyed remount and cancellation boundary. All 294
+Vitest tests across 32 files, lint, formatting and the production build pass; the
+answer-safe mobile Search-to-Flashcards Playwright flow passes with the new refresh.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -796,6 +803,7 @@ formatting, the production build and all 29 Playwright flows pass.
 - `5ebac4c` — document legacy quiz-size migration behavior.
 - `4925f47` — reject inconsistent or unscoped grading feedback.
 - `6347f25` — document strict frontend feedback validation.
+- `9d01aa2` — invalidate stale question-search results.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

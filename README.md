@@ -187,7 +187,7 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 293 Vitest tests, then static checks, the production build and
+# Frontend — 294 Vitest tests, then static checks, the production build and
 # 29 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
