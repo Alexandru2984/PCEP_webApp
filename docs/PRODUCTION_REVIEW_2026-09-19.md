@@ -654,6 +654,14 @@ its separate 1-through-100 actual-length contract. Unit and component regression
 cover both the storage boundary and the selected setup control. All 283 Vitest tests,
 lint, formatting, the production build and the focused 360 px Playwright flow pass.
 
+The feedback-integrity follow-up closes a frontend trust-boundary gap shared by all
+three study modes. Feedback is now bound to the requested question and selected
+choice, its correctness flag must agree with the returned correct choice, explanation
+fields are required, undocumented fields are rejected and only a canonical four-field
+object reaches session state. Contradictory Practice feedback leaves the question
+retryable and records no attempt. All 293 Vitest tests across 32 files, lint,
+formatting, the production build and all 29 Playwright flows pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -786,6 +794,7 @@ lint, formatting, the production build and the focused 360 px Playwright flow pa
 - `a4d088d` — document stable session-size preferences.
 - `b65f5dc` — migrate unsupported legacy quiz-size preferences.
 - `5ebac4c` — document legacy quiz-size migration behavior.
+- `4925f47` — reject inconsistent or unscoped grading feedback.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

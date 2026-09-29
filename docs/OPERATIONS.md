@@ -221,6 +221,12 @@ IDs must be positive JSON integers within signed 64-bit range. Omitted/null
 choices count as wrong; foreign choices and duplicate questions return 400 with
 no answer feedback. Retrying the same valid submission is safe and stateless.
 An invalid answer key returns 503 instead of an ambiguous score.
+The frontend treats feedback as an untrusted API boundary: Practice, Exam and
+Flashcards bind it to the requested question and selected choice, verify that the
+correctness flag agrees with the returned correct choice, require both explanation
+strings, reject fields outside the documented response contract and retain only the
+four canonical feedback fields. A rejected Practice response leaves the current
+question answerable so the learner can retry without recording a false result.
 `GET /api/search/` accepts a required 2–80 character `q`, optional valid module,
 PCEP-30-02 objective and difficulty filters, and a `limit` from 1 to 20. It
 performs one bounded query and returns only question ID, text, code, module,
