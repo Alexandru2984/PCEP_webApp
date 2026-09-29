@@ -113,6 +113,16 @@ describe('QuizSetup — practice your mistakes', () => {
     })
   })
 
+  it('falls back from a legacy unsupported count to a visible option', () => {
+    render(<QuizSetup {...baseProps} initial={{ mode: 'practice', count: 1 }} />)
+
+    expect(screen.getByText('Questions: 30')).toBeVisible()
+    expect(screen.getByRole('button', { name: '30 questions' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
   it('clears an objective when the learner switches to another module', () => {
     render(<QuizSetup {...baseProps} />)
     fireEvent.change(screen.getByLabelText('Module'), {

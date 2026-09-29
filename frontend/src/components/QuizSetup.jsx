@@ -4,6 +4,11 @@ import QuestionBankStats from './QuestionBankStats'
 import QuestionSearch from './QuestionSearch'
 import { examDurationLabel, PCEP_30_02_PRESET } from '../exam'
 import { OBJECTIVE_MODULE, objectivesForModule } from '../syllabus'
+import {
+  DEFAULT_SESSION_COUNT,
+  preferredSessionCount,
+  SESSION_COUNTS,
+} from '../sessionConfig'
 
 const MODULES = [
   { value: '', label: 'All modules' },
@@ -19,8 +24,6 @@ const DIFFICULTIES = [
   { value: 'medium', label: 'Medium' },
   { value: 'hard', label: 'Hard' },
 ]
-
-const COUNTS = [5, 10, 20, 30, 50]
 
 const selectClass =
   'rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-slate-500'
@@ -70,7 +73,9 @@ export default function QuizSetup({
   const [module, setModule] = useState(initial?.module ?? '')
   const [objective, setObjective] = useState(initial?.objective ?? '')
   const [difficulty, setDifficulty] = useState(initial?.difficulty ?? '')
-  const [count, setCount] = useState(initial?.count ?? 30)
+  const [count, setCount] = useState(() =>
+    preferredSessionCount(initial?.count ?? DEFAULT_SESSION_COUNT)
+  )
   const canUseStats = stats && !statsLoading && !statsError
   const scopeTotal = canUseStats
     ? getScopeTotal(stats, module, difficulty, objective)
@@ -431,7 +436,7 @@ export default function QuizSetup({
             Questions: {count}
           </legend>
           <div className="grid w-full max-w-md grid-cols-5 gap-2">
-            {COUNTS.map((n) => (
+            {SESSION_COUNTS.map((n) => (
               <button
                 type="button"
                 key={n}

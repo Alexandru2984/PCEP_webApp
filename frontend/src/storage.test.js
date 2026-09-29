@@ -264,6 +264,17 @@ describe('settings', () => {
     expect(loadSettings()).toEqual(settings)
   })
 
+  it('normalizes a legacy unsupported setup count without rewriting storage', () => {
+    const raw = JSON.stringify({
+      version: 1,
+      data: { mode: 'practice', module: '', difficulty: '', count: 1 },
+    })
+    localStorage.setItem('pcep.settings', raw)
+
+    expect(loadSettings()).toMatchObject({ mode: 'practice', count: 30 })
+    expect(localStorage.getItem('pcep.settings')).toBe(raw)
+  })
+
   it('round-trips a valid objective scope and rejects a mismatched module', () => {
     const settings = {
       mode: 'practice',

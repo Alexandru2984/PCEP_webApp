@@ -25,9 +25,22 @@ async function answerConfirmation(page, action, accept = true) {
 test('setup screen loads and shows the question-bank snapshot', async ({ page }) => {
   await mockApi(page)
   await page.setViewportSize({ width: 360, height: 800 })
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'pcep.settings',
+      JSON.stringify({
+        version: 1,
+        data: { mode: 'practice', module: '', difficulty: '', count: 1 },
+      })
+    )
+  })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: /Start a new quiz/i })).toBeVisible()
   await expect(page.getByText('Question-bank snapshot')).toBeVisible()
+  await expect(page.getByRole('button', { name: '30 questions' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
   await expect(page.getByLabel(/Application release/)).toHaveText(
     /^(local|[A-Za-z0-9][A-Za-z0-9._-]{0,11})$/
   )

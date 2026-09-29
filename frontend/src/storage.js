@@ -3,6 +3,7 @@ import { CONFIDENCE_VALUES, MAX_RESPONSE_MS, validConfidence } from './confidenc
 import { validDateKey } from './daily'
 import { PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
 import { OBJECTIVE_VALUES, validObjective } from './syllabus'
+import { preferredSessionCount } from './sessionConfig'
 import {
   STUDY_LIMIT,
   adaptivePracticePlan,
@@ -274,7 +275,8 @@ function normalizeSettings(s) {
 }
 export function loadSettings() {
   const saved = read(SETTINGS_KEY, null)
-  return normalizeSettings(saved?.version === VERSION ? saved.data : saved)
+  const settings = normalizeSettings(saved?.version === VERSION ? saved.data : saved)
+  return settings ? { ...settings, count: preferredSessionCount(settings.count) } : null
 }
 export function saveSettings(settings) {
   if (newerSchema(read(SETTINGS_KEY, null))) {
