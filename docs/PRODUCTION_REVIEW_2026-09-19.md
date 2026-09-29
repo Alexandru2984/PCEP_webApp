@@ -776,6 +776,7 @@ lint, formatting and the production build pass.
 - `e8cc50d` — add quick five-question sessions.
 - `394106b` — document quick study sessions.
 - `cc26d3a` — preserve the learner's preferred session size.
+- `a4d088d` — document stable session-size preferences.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1274,6 +1275,24 @@ violations and no horizontal overflow, and confirmed Quit cleared recovery. The
 complete public smoke, healthy Compose services and privileged `nginx -t` passed.
 This frontend-only atomic publish recreated no service and required no migration,
 environment, Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
+
+The stable-session-preference frontend release is published at revision
+`a4d088d59f68`. Its rollback root is
+`.frontend.previous-20260929T003822Z-7171d3a4`, with external copy
+`frontend.20260929T003822Z-7171d3a4`. The entry chunk `index-Dp8gSLJn.js`
+has SHA-256
+`a3daa51b9466b6087fa84ce3dbe5fd898ea5ee91c55b5a92f023a89b98699ddf`,
+and `sw.js` has SHA-256
+`8735f7d2050476db16dc1eb58dfd672423e1a8dab1c2123fdb750f3cc48044f1`.
+The preceding entry chunk remains public with immutable caching. Fresh live Chromium
+at 390 px selected a real two-question module-3/objective-3.2/hard scope while the
+preferred size was 30. It observed `count=30` in the request, two answer-safe public
+questions, a two-question recovery snapshot and the stored preference still at 30;
+after confirmed Quit, setup restored the 30-question control. Axe reported zero
+violations and the page had no horizontal overflow. The complete public smoke,
+healthy Compose services and privileged `nginx -t` passed. This frontend-only atomic
+publish recreated no service and required no migration, environment, Nginx or
+Cloudflare change; the backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
