@@ -795,6 +795,7 @@ formatting, the production build and all 29 Playwright flows pass.
 - `b65f5dc` — migrate unsupported legacy quiz-size preferences.
 - `5ebac4c` — document legacy quiz-size migration behavior.
 - `4925f47` — reject inconsistent or unscoped grading feedback.
+- `6347f25` — document strict frontend feedback validation.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1333,6 +1334,27 @@ rejection of Cloudflare's injected inline script. The complete public smoke, hea
 Compose services and privileged `nginx -t` passed. This frontend-only atomic publish
 recreated no service and required no migration, environment, Nginx or Cloudflare
 change; the backend remains on `7207b1bc2fb9`.
+
+The strict-feedback-validation frontend release is published at revision
+`6347f257013c`. Its rollback root is
+`.frontend.previous-20260929T010701Z-dce05b0a`, with external copy
+`frontend.20260929T010701Z-dce05b0a`. The entry chunk `index-DMN60Fwh.js`
+has SHA-256
+`85f7e85da06e88e532e0d913b4108d2dfac6d8c5b1819368cf912e937555b883`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`36c60543c3cef56fda72fd50c359855453163c7dd207405a4fb423da881d6690`.
+Fresh live Chromium at 390 px exercised all three study modes against production.
+Practice accepted exactly the four canonical feedback fields, stored that same shape,
+remained axe-clean and had no horizontal overflow. Flashcards accepted the same API
+contract and retained only the correct choice ID and explanation after Reveal. A
+five-question Exam returned exact question/choice-bound results with consistent
+correctness and cleared recovery after grading. Every initial question response and
+recovery question list remained answer-safe, and no page error occurred. The complete
+public smoke, healthy Compose services and privileged `nginx -t` passed. This
+frontend-only atomic publish recreated no service and required no migration,
+environment, Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
