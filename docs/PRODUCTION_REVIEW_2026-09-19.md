@@ -293,6 +293,13 @@ The release process retains older lazy chunks so tabs open across deployment do
 not fail. The service worker cleans old named caches and waits for the user to
 reload after an update, avoiding an automatic mid-exam takeover.
 
+The remaining database-side random ordering was measured on the live 308-question
+PostgreSQL bank inside a read-only transaction. `ORDER BY random() LIMIT 50`
+completed in 0.307 ms with 14 shared-buffer hits; a module+difficulty filtered
+sample completed in 0.157 ms with 11 hits. The simple query is retained at this
+scale and should be reconsidered only after bank growth or observed latency makes
+its cost material.
+
 ## 10. Infrastructure
 
 - **Nginx:** tracked production vhost, centralized headers/CSP, verified proxy
@@ -755,8 +762,6 @@ generated-by attribution was added.
    Official-objective filters and weak-area reports now cover the stable syllabus
    layer; current adaptive ranking remains deliberately explainable through
    performance, due-date, confidence and difficulty signals.
-4. Re-evaluate PostgreSQL random ordering only when bank size or measured query
-   time makes the current implementation material.
 
 ## 14. Deployment notes
 
