@@ -87,7 +87,7 @@ describe('QuizSetup — practice your mistakes', () => {
       module: 'module3',
       objective: '3.3',
       difficulty: 'hard',
-      count: 1,
+      count: 30,
     })
   })
 

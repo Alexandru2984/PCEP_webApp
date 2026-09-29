@@ -6,6 +6,7 @@ import {
   loadActiveFlashcards,
   loadActivePractice,
   loadHistory,
+  loadSettings,
   loadStudyProgress,
   saveActiveExam,
   saveActiveFlashcards,
@@ -214,6 +215,20 @@ describe('quiz session requests', () => {
     expect(loadStudyProgress()).toMatchObject([
       { questionId: 1, attempts: 1, correct: 1, intervalDays: 1 },
     ])
+  })
+
+  it('keeps the requested setup size when the server returns a smaller scope', async () => {
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startQuiz(config))
+
+    expect(fetchQuizSet).toHaveBeenCalledWith(
+      expect.objectContaining({ count: 10 }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(loadSettings()).toMatchObject({ count: 10 })
+    expect(result.current.lastConfig).toMatchObject({ count: 1 })
+    expect(result.current.questions).toHaveLength(1)
   })
 
   it('still shows completed results when browser storage rejects the snapshot', async () => {

@@ -467,9 +467,7 @@ export default function QuizSetup({
       <button
         type="button"
         disabled={isEmptyScope}
-        onClick={() =>
-          onStart({ mode, module, objective, difficulty, count: effectiveCount })
-        }
+        onClick={() => onStart({ mode, module, objective, difficulty, count })}
         className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:bg-sky-700 dark:hover:bg-sky-800 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
       >
         {isEmptyScope
