@@ -647,6 +647,13 @@ Returning from a one-question scope therefore restores the chosen 5/10/20/30/50
 option instead of an impossible unselected `Questions: 1` state. All 281 Vitest tests,
 lint, formatting and the production build pass.
 
+The legacy-session-size follow-up repairs browsers that already stored one of those
+unsupported setup values before the preceding fix. Setup normalizes unsupported
+preferences to 30 on read without rewriting localStorage, while active recovery keeps
+its separate 1-through-100 actual-length contract. Unit and component regressions
+cover both the storage boundary and the selected setup control. All 283 Vitest tests,
+lint, formatting, the production build and the focused 360 px Playwright flow pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -777,6 +784,7 @@ lint, formatting and the production build pass.
 - `394106b` — document quick study sessions.
 - `cc26d3a` — preserve the learner's preferred session size.
 - `a4d088d` — document stable session-size preferences.
+- `b65f5dc` — migrate unsupported legacy quiz-size preferences.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

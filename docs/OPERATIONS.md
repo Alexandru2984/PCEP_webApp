@@ -300,6 +300,15 @@ bounded response-time totals, the optional `pcep-30-02` full-mock marker, review
 dates and user-written notes, never answer keys or explanations. Keep backups
 private if you want to keep your study history and notes private; nothing is
 uploaded by these features.
+
+Quiz setup accepts only the supported 5, 10, 20, 30 and 50 question preferences.
+Older `pcep.settings` records that contain an actual short-scope result such as 1
+are normalized to the 30-question default when setup reads them. This read is
+non-destructive; storage changes only after the learner explicitly starts another
+session. Active Practice, Exam and Flashcard recovery records continue to accept
+their validated actual lengths from 1 through 100, so a short saved session is not
+discarded by the preference migration.
+
 Bookmarks are available on question cards. Bookmark and mistake drills fetch
 current public question data using the bounded `ids` quiz-set filter, avoiding
 stale choice IDs after admin edits. Targeted lists retain their intent order and
