@@ -613,7 +613,7 @@ and an exact three-question targeted order; the pinned scheduled workflow passes
 The focused-review follow-up turns the existing report queue into an immediate
 Practice or Flashcard action. It preserves session order, refetches current public
 questions by ID and reuses the validated recovery schemas, so missed and
-low-confidence-correct items never become a stored answer bank. All 278 Vitest tests,
+low-confidence-correct items never become a stored answer bank. All 279 Vitest tests,
 lint, formatting, the production build and all 29 Playwright flows pass. Browser
 coverage verifies exact `[1, 2]` request/response/recovery order and answer secrecy;
 the report remains axe-clean and mobile-fit.
@@ -624,6 +624,13 @@ cancelling keeps the active request, screen and stored recovery intact, while
 confirming aborts pending Flashcard work before cleanup. Seven targeted component
 tests and all four affected Playwright flows pass alongside lint, formatting and a
 fresh production build.
+
+The targeted-list follow-up removes an inconsistent frontend-only 50-question cap.
+Saved mistakes, bookmarks and review queues now preserve up to 100 unique IDs in
+their intended order, matching the existing API and recovery contracts. A regression
+uses a duplicate ahead of a 100-question list to prove deduplication happens before
+the bound and that the final question is retained. All 279 Vitest tests, lint,
+formatting and the production build pass.
 
 ## 12. Commits
 
@@ -747,6 +754,7 @@ fresh production build.
 - `9a101c9` — confirm before discarding active study sessions.
 - `c9e084a` — document focused review and safe session exit.
 - `eb38ca4` — cover every answer-safe public endpoint in production smoke checks.
+- `757ee0c` — preserve complete targeted drill lists.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

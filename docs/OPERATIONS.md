@@ -285,9 +285,9 @@ Progress now uses the versioned `pcep.progress` record. Valid legacy
 successful write. A failed import leaves the previous record intact. Each list
 for history, mistakes, bookmarks and personal notes is bounded to 100 records;
 each note is limited to 2,000 characters. The per-question review schedule is
-bounded to 1,000 compact records. The progress screen exports backup format v3,
+bounded to 1,000 compact records. The progress screen exports backup format v4,
 previews and merges strictly validated imports up to 8 MB, and still accepts
-existing v1 and v2 backups. History, mistakes, bookmarks, notes and the review
+existing v1, v2 and v3 backups. History, mistakes, bookmarks, notes and the review
 schedule can be reset independently. Backups contain public question options,
 aggregate performance, optional confidence ratings, daily challenge dates,
 bounded response-time totals, the optional `pcep-30-02` full-mock marker, review
@@ -296,7 +296,9 @@ private if you want to keep your study history and notes private; nothing is
 uploaded by these features.
 Bookmarks are available on question cards. Bookmark and mistake drills fetch
 current public question data using the bounded `ids` quiz-set filter, avoiding
-stale choice IDs after admin edits. Module/difficulty accuracy includes mixed
+stale choice IDs after admin edits. Targeted lists retain their intent order and
+include up to 100 unique questions, matching the API and recovery limits instead
+of silently truncating longer saved lists. Module/difficulty accuracy includes mixed
 sessions completed in this version. Flashcard self-ratings are excluded from
 graded accuracy. Older mixed attempts lack detailed breakdowns and remain visible
 in history without invented module performance.
