@@ -754,7 +754,10 @@ formatting and the production build pass.
 - `9a101c9` — confirm before discarding active study sessions.
 - `c9e084a` — document focused review and safe session exit.
 - `eb38ca4` — cover every answer-safe public endpoint in production smoke checks.
+- `961670f` — document complete public smoke coverage.
+- `a7550b4` — record measured database randomization cost.
 - `757ee0c` — preserve complete targeted drill lists.
+- `5bb2313` — document complete targeted study lists.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1215,6 +1218,26 @@ HTTPS redirect, dependency audits, Django deploy checks, Compose validation and
 privileged `nginx -t` passed. This frontend-only atomic publish recreated no
 service and required no migration, environment, Nginx or Cloudflare change; the
 backend remains on `7207b1bc2fb9`.
+
+The complete-targeted-list frontend release is published at revision
+`5bb231373a9e`. Its rollback root is
+`.frontend.previous-20260929T000906Z-36df0112`, with external copy
+`frontend.20260929T000906Z-36df0112`. The entry chunk
+`index-CucivH6J.js` has SHA-256
+`36152ba055bb3fdd67c4b000eb9efd2ca71235d76b3b9d965f72de77078a5657`,
+the stylesheet `index-BiaZTj8j.css` has SHA-256
+`3e8f0c0cbed485b50c4243657c08a0465381b7b07a706372de8ae519c8b26c0c`,
+and `sw.js` has SHA-256
+`d6cd4b9ef74667d2b97340fe211568d7d41b84be29c03b4c801994f588029ee4`.
+The preceding entry chunk remains public with immutable caching. Fresh live Chromium
+at 390 px seeded 100 answer-safe production bookmarks and observed all 100 IDs in
+the same order in the request, public response and Practice recovery snapshot.
+No answer metadata entered any payload or recovery record; the active session had
+zero axe violations and no horizontal overflow, and confirmed Quit cleared recovery.
+All 279 Vitest tests, lint, formatting, the production build, all 29 Playwright flows,
+the complete public smoke, healthy Compose services and privileged `nginx -t` passed.
+This frontend-only atomic publish recreated no service and required no migration,
+environment, Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
