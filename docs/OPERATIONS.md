@@ -259,6 +259,10 @@ deterministic, syllabus-balanced daily challenge. If a selected scope contains f
 questions than the chosen size, the API returns every available match and the active
 session/timer use that actual count. The chosen size remains the setup preference for
 the next quiz instead of being replaced by the temporary smaller result.
+If the initial question request fails, the error screen offers a direct Retry with the
+exact saved mode, filters, preset or targeted IDs. Back to setup remains available.
+The normal loading guard prevents a second concurrent start while either request is in
+flight; no active recovery record is created until a valid public question set arrives.
 `GET /api/daily/` returns five public questions for the current
 `Europe/Bucharest` date. Selection is deterministic for the date and production
 secret, covers every populated syllabus module before filling the fifth slot, and

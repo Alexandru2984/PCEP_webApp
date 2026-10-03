@@ -669,6 +669,15 @@ changes retain their existing keyed remount and cancellation boundary. All 294
 Vitest tests across 32 files, lint, formatting and the production build pass; the
 answer-safe mobile Search-to-Flashcards Playwright flow passes with the new refresh.
 
+The quiz-load-recovery follow-up gives an initial Practice, Exam, Flashcard, daily,
+full-mock or targeted request a direct Retry from the error screen. The retry reuses
+the exact validated setup instead of asking the learner to reconstruct it, while Back
+to setup remains available. Recovery storage is still created only after a valid
+answer-safe question set arrives. All 294 Vitest tests across 32 files, lint,
+formatting, the production build and all 30 Playwright flows pass. Mobile browser
+coverage forces the first request to return 503, verifies the exact module,
+difficulty and count on retry, and checks answer-safe recovery plus horizontal fit.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -805,6 +814,7 @@ answer-safe mobile Search-to-Flashcards Playwright flow passes with the new refr
 - `6347f25` — document strict frontend feedback validation.
 - `9d01aa2` — invalidate stale question-search results.
 - `b9cc1f4` — document search result invalidation.
+- `2a92ee7` — retry failed quiz loads with the exact saved setup.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
