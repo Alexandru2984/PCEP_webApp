@@ -826,6 +826,7 @@ opens all four results and verifies four correct selections with zero skipped la
 - `2a92ee7` — retry failed quiz loads with the exact saved setup.
 - `895bc22` — document recoverable quiz loading.
 - `31718b7` — preserve submitted Exam choices in completed review.
+- `1b4414f` — document accurate Exam review choices.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1429,6 +1430,29 @@ only the known CSP rejection of Cloudflare's injected inline script plus the del
 privileged `nginx -t` passed. This frontend-only atomic publish recreated no service
 and required no migration, environment, Nginx or Cloudflare change; the backend
 remains on `7207b1bc2fb9`.
+
+The accurate-exam-review frontend release is published at revision
+`1b4414fffe8f`. Its rollback root is
+`.frontend.previous-20261003T195545Z-583f3e53`, with external copy
+`frontend.20261003T195545Z-583f3e53`. The entry chunk `index-XRzmLEw1.js`
+has SHA-256
+`7f1d8179b384f0de3a7f52c22101d520828cdbd73d2646f75b7b4adfa8c4ed1a`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`724b684a24bfb7b2fca640f64fe557f5dceeef40d42926693cb3562ec80d2932`.
+Fresh live Chromium at 390 px completed a real five-question Exam by selecting
+the first public choice for each question. The grading request exactly matched
+those five local selections and returned three correct plus two wrong results.
+Opening the full review showed three correct outcomes, two wrong outcomes and the
+two corresponding `your pick` labels, with zero questions marked skipped. The
+pre-submit question payload and persisted progress remained answer-safe, completed
+grading cleared active recovery, axe reported zero violations, the page fit the
+viewport and no page error occurred. The only console error was the already tracked
+CSP rejection of Cloudflare's injected inline script. The complete public smoke,
+healthy Compose services and privileged `nginx -t` passed. This frontend-only
+atomic publish recreated no service and required no migration, environment, Nginx
+or Cloudflare change; the backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
