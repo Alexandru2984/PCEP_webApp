@@ -65,6 +65,53 @@ test('question-bank snapshot recovers from a temporary API failure', async ({ pa
   await expect(page.getByText('308', { exact: true }).first()).toBeVisible()
 })
 
+test('quiz loading failure retries the exact saved setup', async ({ page }) => {
+  await mockApi(page, { quizFailures: 1 })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByLabel('Module').selectOption('module3')
+  await page.getByLabel('Difficulty').selectOption('medium')
+  await page.getByRole('button', { name: '5 questions' }).click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('Quiz temporarily unavailable.')
+  await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
+  const retryRequest = page.waitForRequest((request) =>
+    new URL(request.url()).pathname.endsWith('/api/quiz-set/')
+  )
+  await page.getByRole('button', { name: 'Retry' }).click()
+  const params = new URL((await retryRequest).url()).searchParams
+  expect(Object.fromEntries(params)).toEqual({
+    count: '5',
+    module: 'module3',
+    difficulty: 'medium',
+  })
+
+  await expect(page.getByText('Question 1 of 1')).toBeVisible()
+  const saved = await page.evaluate(() => ({
+    settings: JSON.parse(localStorage.getItem('pcep.settings')).data,
+    recovery: JSON.parse(localStorage.getItem('pcep.activePractice')).data,
+  }))
+  expect(saved.settings).toMatchObject({
+    mode: 'practice',
+    module: 'module3',
+    difficulty: 'medium',
+    count: 5,
+  })
+  expect(saved.recovery.config).toMatchObject({
+    mode: 'practice',
+    module: 'module3',
+    difficulty: 'medium',
+    count: 1,
+  })
+  expect(JSON.stringify(saved.recovery.questions)).not.toMatch(
+    /is_correct|correct_choice_id|explanation/
+  )
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+})
+
 test('syllabus objective filter requests and displays the precise scope', async ({
   page,
 }) => {

@@ -282,13 +282,24 @@ export default function QuizContainer() {
           Something went wrong.
         </p>
         <p className="mb-4 text-slate-700 dark:text-slate-300">{error}</p>
-        <button
-          type="button"
-          onClick={returnToSetup}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
-        >
-          Back to setup
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {lastConfig && (
+            <button
+              type="button"
+              onClick={() => startQuiz(lastConfig)}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
+            >
+              Retry
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={returnToSetup}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Back to setup
+          </button>
+        </div>
       </div>
     )
   }
