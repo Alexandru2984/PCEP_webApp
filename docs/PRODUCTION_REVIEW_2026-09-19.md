@@ -678,6 +678,15 @@ formatting, the production build and all 30 Playwright flows pass. Mobile browse
 coverage forces the first request to return 503, verifies the exact module,
 difficulty and count on retry, and checks answer-safe recovery plus horizontal fit.
 
+The exam-review-integrity follow-up fixes a regression introduced when grading
+feedback became canonical. The canonical object deliberately drops echoed request
+identifiers, so completed exams now retain the selected choice from the already
+validated local grading payload. Correct answers no longer appear as skipped when
+the learner opens the full review, while unanswered questions remain explicitly
+skipped. All 294 Vitest tests across 32 files, lint, formatting, the production build
+and all 30 Playwright flows pass. Browser coverage grades through a throttled retry,
+opens all four results and verifies four correct selections with zero skipped labels.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -816,6 +825,7 @@ difficulty and count on retry, and checks answer-safe recovery plus horizontal f
 - `b9cc1f4` — document search result invalidation.
 - `2a92ee7` — retry failed quiz loads with the exact saved setup.
 - `895bc22` — document recoverable quiz loading.
+- `31718b7` — preserve submitted Exam choices in completed review.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

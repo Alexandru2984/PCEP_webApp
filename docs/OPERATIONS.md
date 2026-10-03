@@ -227,6 +227,8 @@ correctness flag agrees with the returned correct choice, require both explanati
 strings, reject fields outside the documented response contract and retain only the
 four canonical feedback fields. A rejected Practice response leaves the current
 question answerable so the learner can retry without recording a false result.
+Exam review keeps each picked choice from the validated local grading payload; it
+does not depend on identifiers being copied into the canonical feedback object.
 `GET /api/search/` accepts a required 2–80 character `q`, optional valid module,
 PCEP-30-02 objective and difficulty filters, and a `limit` from 1 to 20. It
 performs one bounded query and returns only question ID, text, code, module,
