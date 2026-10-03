@@ -815,6 +815,7 @@ difficulty and count on retry, and checks answer-safe recovery plus horizontal f
 - `9d01aa2` — invalidate stale question-search results.
 - `b9cc1f4` — document search result invalidation.
 - `2a92ee7` — retry failed quiz loads with the exact saved setup.
+- `895bc22` — document recoverable quiz loading.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1395,6 +1396,29 @@ recovery. The complete public smoke, healthy Compose services and privileged
 `nginx -t` passed. This frontend-only atomic publish recreated no service and required
 no migration, environment, Nginx or Cloudflare change; the backend remains on
 `7207b1bc2fb9`.
+
+The recoverable-quiz-loading frontend release is published at revision
+`895bc228f00a`. Its rollback root is
+`.frontend.previous-20261003T194740Z-21fbb148`, with external copy
+`frontend.20261003T194740Z-21fbb148`. The entry chunk `index-Dfq68GhQ.js`
+has SHA-256
+`787b6182ada5dd27c892ef5d5ea82ecaa0c51e1435682c4193fda42890a69998`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`723bd15ee8d493e67c7d363290d8d32732b3172bc2ef40163c03d6f37cb6ee28`.
+Fresh live Chromium at 390 px replaced only its first question request with a
+synthetic 503. The error screen was axe-clean and offered Retry; that action sent
+the same `count=5`, `module3`, `medium` parameters to the real production API,
+which returned five answer-safe questions. Settings retained the requested size,
+active recovery used the validated five-question result, and neither public data nor
+recovery exposed answer metadata. The active screen was also axe-clean and fit the
+viewport, with no page errors; confirmed Quit cleared recovery. The browser recorded
+only the known CSP rejection of Cloudflare's injected inline script plus the deliberate
+503 resource message. The complete public smoke, healthy Compose services and
+privileged `nginx -t` passed. This frontend-only atomic publish recreated no service
+and required no migration, environment, Nginx or Cloudflare change; the backend
+remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
