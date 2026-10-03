@@ -804,6 +804,7 @@ answer-safe mobile Search-to-Flashcards Playwright flow passes with the new refr
 - `4925f47` — reject inconsistent or unscoped grading feedback.
 - `6347f25` — document strict frontend feedback validation.
 - `9d01aa2` — invalidate stale question-search results.
+- `b9cc1f4` — document search result invalidation.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1363,6 +1364,27 @@ recovery question list remained answer-safe, and no page error occurred. The com
 public smoke, healthy Compose services and privileged `nginx -t` passed. This
 frontend-only atomic publish recreated no service and required no migration,
 environment, Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
+
+The search-result-invalidation frontend release is published at revision
+`b9cc1f4e7ce5`. Its rollback root is
+`.frontend.previous-20260929T134000Z-69753513`, with external copy
+`frontend.20260929T134000Z-69753513`. The entry chunk `index-BnfnBZPS.js`
+has SHA-256
+`0e7f1a17e26ae6658d33e82712a413b6169bcc561bf36c12717d750861e0f04c`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`7abffe73c5f2f68f3195acd3b58052182640764dc7bcbcf4bbff65f58e883443`.
+Fresh live Chromium at 390 px loaded 20 answer-safe `output` results, selected one,
+then changed the query to `list` and observed the old results and selection disappear
+before submission. The refreshed query returned seven answer-safe previews. Selecting
+the first two launched IDs 264 and 269 in the same order through the request, public
+response and Flashcard recovery, with no answer metadata. The active deck had zero
+axe violations, no horizontal overflow and no page error; confirmed Quit cleared its
+recovery. The complete public smoke, healthy Compose services and privileged
+`nginx -t` passed. This frontend-only atomic publish recreated no service and required
+no migration, environment, Nginx or Cloudflare change; the backend remains on
+`7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
