@@ -128,14 +128,18 @@ curl -fsS https://pcep.micutu.com/ >/dev/null
 
 The target checks the pinned runtime, completes the build and validates required
 files and referenced HTML assets. It copies to a staging directory on the live
-filesystem, backs up the current root under BACKUP_ROOT, retains older hashed
-assets for open tabs, then uses Linux renameat2 directory exchange. Copy,
-validation and exchange failures leave the live root intact. The previous root
-is retained beside it as `.frontend.previous-<timestamp>-<id>`.
-`FRONTEND_ROOT`, `BACKUP_ROOT` and `PYTHON` can be overridden. Python accepts
-relative paths, absolute paths or executables from PATH. Linux atomic exchange
-support is required; the script refuses to fall back to delete-then-copy.
-No automatic deletion is performed. Preview bounded retention with
+filesystem, backs up the current root under BACKUP_ROOT, retains hashed assets
+from the last seven days for open tabs, then uses Linux renameat2 directory
+exchange. The complete immediately previous asset generation is always retained,
+even after a longer deployment gap. Older generations are omitted only from the
+new staging root; the complete previous root and external backup remain available.
+Copy, validation and exchange failures leave the live root intact. The previous
+root is retained beside it as `.frontend.previous-<timestamp>-<id>`.
+`FRONTEND_ROOT`, `BACKUP_ROOT`, `PYTHON` and `ASSET_RETENTION_DAYS` can be
+overridden; asset retention accepts 1 through 365 days. Python accepts relative
+paths, absolute paths or executables from PATH. Linux atomic exchange support is
+required; the script refuses to fall back to delete-then-copy.
+No automatic snapshot deletion is performed. Preview bounded retention with
 `make release-retention` (five newest rollback roots and five newest backup
 copies by default). The preview recognizes only exact `frontend`/`static`
 release names and reports allocated space without following symlinks. It cannot

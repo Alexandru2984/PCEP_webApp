@@ -687,6 +687,16 @@ skipped. All 294 Vitest tests across 32 files, lint, formatting, the production 
 and all 30 Playwright flows pass. Browser coverage grades through a throttled retry,
 opens all four results and verifies four correct selections with zero skipped labels.
 
+The frontend-asset-retention follow-up bounds release-root growth without making an
+open tab depend on the new build. Publication keeps hashed chunks from the last seven
+days and always keeps every chunk built with the immediately previous entry assets,
+even after a long quiet period. Expired generations are omitted only from the atomic
+staging root; the full previous root and external backup remain rollback copies. The
+window is configurable from 1 through 365 days. The production plan currently keeps
+196 of 318 assets and expires 122 historical chunks (about 6 MB). All 211 backend
+tests and the Django production check pass; regressions cover an old previous build,
+its lazy chunk, a recent chunk, one expired generation and invalid configuration.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -827,6 +837,7 @@ opens all four results and verifies four correct selections with zero skipped la
 - `895bc22` — document recoverable quiz loading.
 - `31718b7` — preserve submitted Exam choices in completed review.
 - `1b4414f` — document accurate Exam review choices.
+- `dc371dc` — bound retained frontend asset generations.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
