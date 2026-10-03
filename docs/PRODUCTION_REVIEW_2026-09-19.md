@@ -838,6 +838,7 @@ its lazy chunk, a recent chunk, one expired generation and invalid configuration
 - `31718b7` — preserve submitted Exam choices in completed review.
 - `1b4414f` — document accurate Exam review choices.
 - `dc371dc` — bound retained frontend asset generations.
+- `217ead0` — document bounded frontend assets.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1464,6 +1465,26 @@ CSP rejection of Cloudflare's injected inline script. The complete public smoke,
 healthy Compose services and privileged `nginx -t` passed. This frontend-only
 atomic publish recreated no service and required no migration, environment, Nginx
 or Cloudflare change; the backend remains on `7207b1bc2fb9`.
+
+The bounded-frontend-assets release is published at revision `217ead04cbb9`.
+Its rollback root is `.frontend.previous-20261003T200342Z-609df6e6`, with
+external copy `frontend.20261003T200342Z-609df6e6`. The entry chunk
+`index-1PWEO9Xo.js` has SHA-256
+`7c30932fbb48266390f05a56f7fde818c9a0868d67949d1461ac735a6d7d57d4`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`e2e5bf6bc11aaf2e4c2fc7638448ad001bdd5a159358fa7b78bf901075f7e9da`.
+The live asset directory decreased from 318 files to 202; both the rollback root
+and external backup retain all 318 prior files. The preceding entry chunk and its
+lazy Review chunk return 200, while a deliberately checked expired chunk returns
+404. Fresh live Chromium at 390 px loaded the new entry, Dashboard and Exam lazy
+chunks with 200 responses. The active Exam was axe-clean, fit the viewport, raised
+no page error and cleared recovery after confirmed Quit. The only console error was
+the already tracked CSP rejection of Cloudflare's injected inline script. The
+complete public smoke, healthy Compose services and privileged `nginx -t` passed.
+This atomic publish recreated no service and required no migration, environment,
+Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
