@@ -660,7 +660,9 @@ export default function useQuizSession() {
         const responseMs = metadata.responseMs?.[question.id]
         return {
           question,
-          pickedChoiceId: feedback.choice_id,
+          // The canonical feedback object intentionally contains no echoed request
+          // identifiers. Keep the learner's validated local submission for review.
+          pickedChoiceId: payload[i].choice_id,
           feedback,
           confidence: validConfidence(confidence) ? confidence : null,
           responseMs:

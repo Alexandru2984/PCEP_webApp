@@ -534,6 +534,9 @@ describe('quiz session requests', () => {
     await act(async () => result.current.handleExamSubmit({ 1: 11 }))
     expect(result.current.phase).toBe('done')
     expect(gradeAnswers.mock.calls[0][0]).toEqual(gradeAnswers.mock.calls[1][0])
+    expect(result.current.history).toMatchObject([
+      { pickedChoiceId: 11, feedback: { is_correct: true, correct_choice_id: 11 } },
+    ])
     expect(loadHistory()).toHaveLength(1)
   })
 
