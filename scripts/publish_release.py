@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import unquote, urlsplit
 
+ASSET_RETENTION_DAYS = 7
+
 
 class AssetReferences(HTMLParser):
     def __init__(self):
@@ -69,8 +71,37 @@ def exchange_directories(first, second):
         raise OSError(code, os.strerror(code))
 
 
-def publish(source, target, backup_root=None, kind='frontend'):
+def previous_asset_mtimes(target):
+    """Identify every chunk built with the currently referenced entry assets."""
+    index = target / 'index.html'
+    assets = (target / 'assets').resolve()
+    if not index.is_file() or not assets.is_dir():
+        return set()
+    parser = AssetReferences()
+    parser.feed(index.read_text())
+    mtimes = set()
+    for reference in parser.paths:
+        parsed = urlsplit(reference)
+        path = (target / unquote(parsed.path).lstrip('/')).resolve()
+        if path.is_relative_to(assets) and path.is_file() and not path.is_symlink():
+            mtimes.add(path.stat().st_mtime_ns)
+    return mtimes
+
+
+def publish(
+    source,
+    target,
+    backup_root=None,
+    kind='frontend',
+    asset_retention_days=ASSET_RETENTION_DAYS,
+):
     source, target = Path(source).resolve(), Path(target).absolute()
+    if (
+        isinstance(asset_retention_days, bool)
+        or not isinstance(asset_retention_days, int)
+        or not 1 <= asset_retention_days <= 365
+    ):
+        raise ValueError('Asset retention days must be between 1 and 365.')
     if target.is_symlink() or (target.exists() and not target.is_dir()):
         raise ValueError('The live root must be a real directory.')
     resolved_target = target.resolve()
@@ -92,9 +123,19 @@ def publish(source, target, backup_root=None, kind='frontend'):
             elif published.is_file():
                 published.chmod(published.stat().st_mode | 0o444)
         # Old tabs can still import their original lazy chunks after an update.
+        # Bound older generations so repeated releases cannot grow the live root
+        # forever. The complete immediately previous generation survives even if
+        # it is older than the time window (for example after a long quiet period).
         if kind == 'frontend' and (target / 'assets').is_dir():
+            cutoff = datetime.now(timezone.utc).timestamp() - (
+                asset_retention_days * 24 * 60 * 60
+            )
+            previous_mtimes = previous_asset_mtimes(target)
             for asset in (target / 'assets').rglob('*'):
                 if asset.is_file() and not asset.is_symlink():
+                    stat = asset.stat()
+                    if stat.st_mtime < cutoff and stat.st_mtime_ns not in previous_mtimes:
+                        continue
                     destination = stage / asset.relative_to(target)
                     if not destination.exists():
                         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -130,9 +171,21 @@ def main():
     parser.add_argument('target', type=Path)
     parser.add_argument('--backup-root', type=Path)
     parser.add_argument('--kind', choices=('frontend', 'static'), default='frontend')
+    parser.add_argument(
+        '--asset-retention-days',
+        type=int,
+        default=ASSET_RETENTION_DAYS,
+        help='keep old frontend chunks this many days (1-365; previous build always kept)',
+    )
     args = parser.parse_args()
     try:
-        previous = publish(args.source, args.target, args.backup_root, args.kind)
+        previous = publish(
+            args.source,
+            args.target,
+            args.backup_root,
+            args.kind,
+            args.asset_retention_days,
+        )
     except (OSError, ValueError) as error:
         parser.exit(1, f'Publication failed before swap: {error}\n')
     print(f'Published complete {args.kind} release to {args.target}')

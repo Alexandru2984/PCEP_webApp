@@ -7,6 +7,7 @@ COMPOSE ?= docker compose
 FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
 RELEASE_KEEP ?= 5
+ASSET_RETENTION_DAYS ?= 7
 RELEASE ?= $(shell git describe --always --dirty --abbrev=12 --match '__pcep_no_matching_tag__' 2>/dev/null || printf development)
 BACKEND_DEPLOY_FLAGS ?=
 TRIVY_IMAGE ?= ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
@@ -99,7 +100,7 @@ seed-reset:
 	$(COMPOSE) exec backend python manage.py seed_questions --reset
 
 deploy-frontend: build-frontend
-	"$(PYTHON_BIN)" scripts/publish_release.py frontend/dist "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)"
+	"$(PYTHON_BIN)" scripts/publish_release.py frontend/dist "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)" --asset-retention-days "$(ASSET_RETENTION_DAYS)"
 
 release-retention:
 	"$(PYTHON_BIN)" scripts/release_retention.py "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)" --keep "$(RELEASE_KEEP)"
