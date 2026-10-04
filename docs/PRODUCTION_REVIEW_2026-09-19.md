@@ -896,6 +896,7 @@ production build pass.
 - `fc10228` — scan each immutable backend candidate before replacement.
 - `2915c62` — document the pre-replacement image gate.
 - `d3c5585` — validate quiz-set counts and targeted response scope.
+- `443dcb8` — document strict quiz-set response validation.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1593,6 +1594,28 @@ the scan succeeded did Compose recreate the backend. Post-start Django checks,
 the read-only 308-question audit, the complete public smoke, healthy Compose
 services and privileged `nginx -t` passed with no backend error. No migration,
 environment, Nginx or Cloudflare change was required; PostgreSQL was not restarted.
+
+The strict-quiz-set-validation frontend release is published at revision
+`443dcb89dc6c`. Its rollback root is
+`.frontend.previous-20261004T005558Z-338697e7`, with external copy
+`frontend.20261004T005558Z-338697e7`. The entry chunk `index-CE5D4ae1.js`
+has SHA-256
+`7628fc17f30275a2f7f7768c5a5d0dea99c9a46a51c4706c05f926b15012daf3`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`0925cdb2a75c8fff3989c37ca7668e41737959493194b5d32fe1c67a4b78e19c`.
+Fresh live Chromium at 390 px fetched a real answer-safe five-question response
+and changed only its count to six inside the browser. The app rejected it without
+creating Practice, Exam or Flashcard recovery; Retry fetched five current questions,
+started Practice and persisted the exact validated public order without answer
+metadata. Confirmed Quit cleared recovery. Both states had zero axe violations,
+no horizontal overflow and no page error; the only console error was the tracked
+Cloudflare inline-script CSP rejection. All 299 Vitest tests, lint, formatting, the
+production build and all 31 Playwright flows passed. The complete public smoke,
+healthy Compose services and privileged `nginx -t` also passed. This frontend-only
+atomic publish recreated no service and required no migration, environment, Nginx
+or Cloudflare change; the backend remains on `2915c622166b`.
 
 ## 15. Breaking changes
 
