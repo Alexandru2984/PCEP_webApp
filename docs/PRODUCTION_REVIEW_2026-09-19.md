@@ -758,6 +758,12 @@ an accessible status and busy state. A deferred-file regression test reproduces 
 race; all 300 Vitest tests across 32 files, lint, formatting and the production build
 pass.
 
+The first live mobile validation also exposed a skipped heading level on an empty
+Progress dashboard: the standalone backup section used an `h3` directly after the
+application `h1`. It now uses the same top-level `h2` hierarchy as the populated
+dashboard. The backup Playwright flow runs axe on this exact empty state, and the
+component test pins the heading level.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -912,6 +918,7 @@ pass.
 - `443dcb8` — document strict quiz-set response validation.
 - `0f5cf62` — update the digest-pinned Trivy scanner to 0.75.0.
 - `3f30e8e` — keep stale backup reads from replacing a newer selection.
+- `d6cb023` — preserve heading order on an empty Progress dashboard.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
