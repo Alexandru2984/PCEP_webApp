@@ -502,6 +502,8 @@ a newer schema prevents that write, the current mode and its active recovery rec
 remain intact. Practice exposes **Retry saving results**, Exam exposes **Retry
 submission**, and the final Flashcard rating becomes selectable again. A successful
 retry records the attempt once and only then clears the active recovery record.
+The global persistence warning clears after a later storage write succeeds, so a
+recovered browser does not continue reporting a stale failure.
 
 Progress, settings and active-session writes refuse to replace a storage schema
 with a higher version number. A stale tab also leaves newer recovery data untouched

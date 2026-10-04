@@ -809,6 +809,14 @@ only after the combined progress snapshot succeeds. All 302 Vitest tests, lint,
 formatting, the production build and all 31 Playwright flows pass, including the
 throttled-grading retry contract.
 
+Live validation of that recovery path found the global persistence warning still
+visible after the retry had successfully stored progress. Successful storage writes
+now emit a recovery signal consumed by the runtime status banner, while failed writes
+continue to emit the existing warning. The browser-level offline/storage recovery
+flow and a component regression pin both transitions. All 303 Vitest tests, lint,
+formatting and the production build pass; the focused Playwright recovery flow also
+passes.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -977,6 +985,7 @@ throttled-grading retry contract.
 - `e72a4f4` — run dependency advisory audits daily and on manual dispatch.
 - `943a98b` — keep failed completed-session snapshots recoverable and retryable.
 - `4064106` — document recoverable completion behavior and validation.
+- `a8c7cb6` — clear a stale persistence warning after storage recovers.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
