@@ -797,6 +797,20 @@ describe('completed sessions', () => {
     setItem.mockRestore()
   })
 
+  it('does not apply a completed session twice when its ID is retried', () => {
+    const completed = attempt('practice-session', 1, { total: 2, pct: 50 })
+    const items = [right(1), wrong(2)]
+
+    expect(recordCompletedSession(completed, items, Date.UTC(2026, 8, 20))).toBe(true)
+    expect(recordCompletedSession(completed, items, Date.UTC(2026, 8, 20))).toBe(true)
+
+    expect(loadHistory().map((entry) => entry.id)).toEqual(['practice-session'])
+    expect(loadStudyProgress()).toMatchObject([
+      { questionId: 1, attempts: 1, correct: 1 },
+      { questionId: 2, attempts: 1, correct: 0 },
+    ])
+  })
+
   it('keeps the entire previous snapshot when the browser rejects the write', () => {
     appendAttempt(attempt('existing'))
     updateMistakes([wrong(3)])

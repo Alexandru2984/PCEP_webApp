@@ -298,6 +298,41 @@ describe('quiz session requests', () => {
     window.removeEventListener('pcep-storage-warning', warning)
   })
 
+  it('retries recovery cleanup without recording practice progress twice', async () => {
+    submitAnswer.mockResolvedValue(feedback)
+    const { result } = renderHook(useQuizSession)
+    await act(async () => result.current.startQuiz(config))
+    await act(async () => result.current.handleSelect(11))
+    const originalRemoveItem = Storage.prototype.removeItem
+    let rejectCleanup = true
+    const removeItem = vi
+      .spyOn(Storage.prototype, 'removeItem')
+      .mockImplementation(function (key) {
+        if (key === 'pcep.activePractice' && rejectCleanup)
+          throw new DOMException('Blocked', 'SecurityError')
+        return originalRemoveItem.call(this, key)
+      })
+
+    act(() => result.current.handleNext())
+    expect(result.current.phase).toBe('reviewing')
+    expect(result.current.error).toMatch(/could not be saved safely/i)
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadStudyProgress()).toMatchObject([
+      { questionId: 1, attempts: 1, correct: 1 },
+    ])
+    expect(loadActivePractice()).not.toBeNull()
+
+    rejectCleanup = false
+    act(() => result.current.handleNext())
+    expect(result.current.phase).toBe('done')
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadStudyProgress()).toMatchObject([
+      { questionId: 1, attempts: 1, correct: 1 },
+    ])
+    expect(loadActivePractice()).toBeNull()
+    removeItem.mockRestore()
+  })
+
   it('keeps exam recovery until the completed snapshot is safely stored', async () => {
     gradeAnswers.mockResolvedValue({
       results: [{ ...feedback, question_id: 1, choice_id: 11 }],

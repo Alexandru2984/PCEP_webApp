@@ -535,26 +535,34 @@ export default function useQuizSession() {
 
   const finish = (items, total) => {
     if (finished.current || !mounted.current) return false
-    if (state.lastConfig?.mode === 'exam') {
+    const mode = state.lastConfig?.mode ?? 'practice'
+    const sessionId =
+      mode === 'exam'
+        ? state.examProgress?.sessionId
+        : mode === 'flashcards'
+          ? state.flashcardProgress?.sessionId
+          : state.practiceSessionId
+    if (!sessionId) {
+      dispatch({ type: 'save-error' })
+      return false
+    }
+    if (mode === 'exam') {
       const currentExam = loadActiveExam()
-      if (currentExam && currentExam.sessionId !== state.examProgress?.sessionId) {
+      if (currentExam && currentExam.sessionId !== sessionId) {
         window.dispatchEvent(new CustomEvent('pcep-active-exam-conflict'))
         return false
       }
     }
-    if (state.lastConfig?.mode === 'practice') {
+    if (mode === 'practice') {
       const currentPractice = loadActivePractice()
-      if (currentPractice && currentPractice.sessionId !== state.practiceSessionId) {
+      if (currentPractice && currentPractice.sessionId !== sessionId) {
         window.dispatchEvent(new CustomEvent('pcep-active-practice-conflict'))
         return false
       }
     }
-    if (state.lastConfig?.mode === 'flashcards') {
+    if (mode === 'flashcards') {
       const currentFlashcards = loadActiveFlashcards()
-      if (
-        currentFlashcards &&
-        currentFlashcards.sessionId !== state.flashcardProgress?.sessionId
-      ) {
+      if (currentFlashcards && currentFlashcards.sessionId !== sessionId) {
         window.dispatchEvent(new CustomEvent('pcep-active-flashcards-conflict'))
         return false
       }
@@ -586,8 +594,9 @@ export default function useQuizSession() {
     )
     const saved = recordCompletedSession(
       {
+        id: sessionId,
         date: new Date(completedAt).toISOString(),
-        mode: state.lastConfig?.mode ?? 'practice',
+        mode,
         module: state.lastConfig?.module ?? '',
         objective: state.lastConfig?.objective ?? '',
         difficulty: state.lastConfig?.difficulty ?? '',
@@ -620,28 +629,31 @@ export default function useQuizSession() {
       dispatch({ type: 'save-error' })
       return false
     }
-    finished.current = true
-    if (state.lastConfig?.mode === 'exam') {
-      const sessionId = state.examProgress?.sessionId
+    if (mode === 'exam') {
       if (!clearActiveExam(sessionId)) {
         const currentExam = loadActiveExam()
         if (currentExam && currentExam.sessionId !== sessionId) return false
+        dispatch({ type: 'save-error' })
+        return false
       }
     }
-    if (state.lastConfig?.mode === 'practice') {
-      const sessionId = state.practiceSessionId
+    if (mode === 'practice') {
       if (!clearActivePractice(sessionId)) {
         const currentPractice = loadActivePractice()
         if (currentPractice && currentPractice.sessionId !== sessionId) return false
+        dispatch({ type: 'save-error' })
+        return false
       }
     }
-    if (state.lastConfig?.mode === 'flashcards') {
-      const sessionId = state.flashcardProgress?.sessionId
+    if (mode === 'flashcards') {
       if (!clearActiveFlashcards(sessionId)) {
         const currentFlashcards = loadActiveFlashcards()
         if (currentFlashcards && currentFlashcards.sessionId !== sessionId) return false
+        dispatch({ type: 'save-error' })
+        return false
       }
     }
+    finished.current = true
     dispatch({ type: 'done', items, elapsed })
     return true
   }

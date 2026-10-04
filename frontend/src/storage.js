@@ -872,6 +872,11 @@ export function recordCompletedSession(attempt, items, now = Date.now()) {
   const normalized = validAttempt({ ...attempt, id: attempt.id ?? crypto.randomUUID() })
   if (!normalized || !Array.isArray(items)) return false
   const progress = loadProgress()
+  // Completion can be retried after the progress write succeeds but removing the
+  // active-session recovery record fails. Reusing its session ID makes that retry
+  // safe for history, mistakes and spaced-repetition counters.
+  if (normalized.id && progress.history.some((entry) => entry.id === normalized.id))
+    return true
   const history = [normalized, ...progress.history].slice(0, LIMIT)
   const mistakes = mergeMistakes(progress.mistakes, items)
   const study = updateStudyRecords(progress.study, items, now)
