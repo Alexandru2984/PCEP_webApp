@@ -118,8 +118,11 @@ Remaining security work:
   HIGH and five CRITICAL findings, also without vendor fixes. CI blocks new
   fixable HIGH/CRITICAL findings; the unfixed set still requires periodic review.
 
-No secrets were added to Git. The production `.env` remains mode 0600 and was
-not printed or copied. No database or Docker volume was deleted.
+No secrets were added to Git. A broad Docker process-inspection command surfaced
+the database credential in session output; it was treated as exposed and rotated
+immediately after the database runtime change. The replacement is 256-bit random
+hex, the production `.env` and its protected rollback copy are mode 0600, and the
+old value is no longer active. No database or Docker volume was deleted.
 
 ## 4. Backend changes
 
@@ -1985,6 +1988,30 @@ console error occurred. Public smoke passes with this frontend and backend
 `32d3b643f71e`; Compose is healthy, cloudflared is active and privileged `nginx -t`
 passes. This atomic frontend publication recreated no service and required no
 migration, environment, Nginx or Cloudflare change.
+
+The PostgreSQL hardening is deployed from commit `c917fa6`. Production now runs
+image `sha256:286dc161b78dcd0ccc5e9d5e62bb07a3e17bb47674294a99b898e437dd4571b2`,
+built from the reviewed PostgreSQL 16.15 Alpine digest. The prior image is retained
+as `pcep-postgres-rollback:20261004T203125Z-pre-hardening`. The verified pre-change
+logical dump is `/home/micu/backups/pcep/pcep_db_20261004T203125Z.sql.gz`, mode
+0600, SHA-256
+`a261517fef6ea7bbf4baf53c06a54c8d03da6a5e7e44aa3989cf6e4e59162f7d`.
+It restored under the exact hardened runtime with 308 questions, 1,232 choices and
+29 migrations, then retained those counts across restart. The disposable runtime
+test independently verified initialization, writes, restart persistence, a read-only
+root, zero capabilities and `no-new-privileges`; Trivy reports zero fixable
+HIGH/CRITICAL findings after removal of the unused vulnerable `gosu` binary.
+
+Only `pcep_db` was recreated for the image/runtime change; it became healthy in
+seven seconds and retained the external PGDATA volume. The database credential was
+then rotated, the `.env` was replaced atomically and only `pcep_backend` was
+recreated to load it. The protected environment rollback copy is
+`/home/micu/backups/pcep/pcep.env.pre-password-rotation-20261004T203916Z`.
+An isolated TCP authentication probe confirms the previous credential is rejected.
+Both containers are healthy, the live database audit is clean, public smoke passes
+with backend `32d3b643f71e` and frontend `1f3bf87dc97a`, cloudflared is active and
+privileged `nginx -t` passes. No schema migration, volume replacement, Nginx reload
+or Cloudflare change was required.
 
 ## 15. Breaking changes
 
