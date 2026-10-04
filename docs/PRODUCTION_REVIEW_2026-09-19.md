@@ -1902,6 +1902,28 @@ cleanup removed the temporary container, and the check made no request to or cha
 in production. This test-only stage required no deployment, migration, environment,
 Nginx, Docker Compose, tunnel or Cloudflare change.
 
+The answer-key constraint release runs backend revision `32d3b643f71e`, image
+`sha256:9a25ef1eb9be5d4f979df5b7850796482729071b4a03d5fce1dcb5cab6b396d2`.
+Before replacement, the deploy retained rollback image
+`pcep-backend-rollback:20261004T200008Z-release-2915c622166b` and created the
+mode-0600 database backup
+`/home/micu/backups/pcep/pcep_db_20261004T200008Z.sql.gz`, SHA-256
+`23ab288e657159562520b990c3014f0f7c2a519b9af790db19f182a5fbc897e9`.
+The reviewed migration plan contained only `0011`; after rollout, PostgreSQL reports
+the unique partial index `one_correct_choice_per_question` on `question_id` with
+predicate `WHERE is_correct`; every migration is applied and no operation remains.
+Both the standard SQLite and isolated PostgreSQL 16 suites pass all 216 backend
+tests. Source and live audits
+pass all 308 questions, Django checks pass, and the immutable candidate has zero
+fixable HIGH/CRITICAL Trivy findings. Public smoke passes with
+`backend_release=32d3b643f71e`, `frontend_release=6b4ddc8aa65f`, answer-safe payloads
+and targeted ordering. The backend and database are healthy, cloudflared is active
+and privileged `nginx -t` passes. The deploy recreated only the backend and applied
+the compatible additive migration; it did not restart PostgreSQL, reload Nginx,
+publish a frontend, reseed questions or change environment/Cloudflare settings.
+Rolling the backend image back is compatible with the retained constraint; remove
+the constraint only through the reviewed reverse migration if that becomes necessary.
+
 ## 15. Breaking changes
 
 None.
