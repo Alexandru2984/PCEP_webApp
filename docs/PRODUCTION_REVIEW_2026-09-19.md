@@ -779,6 +779,13 @@ KB gzip on the entry bundle, which is warranted now that it closes an active fin
 vulnerabilities, and all 300 Vitest tests, lint, formatting, the production build
 and 31 Playwright flows pass against the new client.
 
+Production smoke now verifies the independently deployed frontend identity instead
+of reporting only the backend revision. Vite injects exactly one bounded static
+release marker into the shell and rejects an invalid build identifier; the existing
+footer continues to show the same value. The smoke contract validates and reports
+that marker separately from `X-PCEP-Release`. Missing, development, malformed and
+duplicate markers are regression-tested; all 216 backend tests pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -940,6 +947,7 @@ and 31 Playwright flows pass against the new client.
 - `5e8ebbc` — record the resilient Progress frontend release.
 - `85098b0` — update Axios to the fixed 1.20.0 release.
 - `6a2b681` — document the Axios security remediation.
+- `d4ddf83` — verify frontend and backend release identities independently.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

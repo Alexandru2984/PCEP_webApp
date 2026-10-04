@@ -63,12 +63,17 @@ make production-smoke PRODUCTION_URL=https://pcep.example.com
 The standard-library-only check makes bounded, retryable GET requests with normal
 TLS certificate verification. It verifies the shell, referenced fingerprinted
 JS/CSS entry assets, immutable asset caching, service-worker policy, liveness,
-database readiness, the release marker, request IDs, aggregate question counts,
+database readiness, separate frontend and backend release markers, request IDs,
+aggregate question counts,
 module/objective/difficulty matrices, security headers and API no-store behavior.
 It validates strict answer-safe shapes for random, daily, detail and search
 responses, then verifies that a three-question targeted drill preserves the
 requested order. It never calls an answer, grade or other write endpoint and does
 not send learner state, cookies or identifiers.
+
+Successful output reports `frontend_release` from the static shell metadata and
+`backend_release` from the API response headers. This makes an incomplete or stale
+frontend publication visible even when the backend is healthy.
 
 `.github/workflows/production-smoke.yml` runs this contract every six hours and
 on manual dispatch with read-only repository permissions. Its failure appears in
