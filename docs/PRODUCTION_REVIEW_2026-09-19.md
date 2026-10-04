@@ -887,6 +887,7 @@ tests, the question audit, Compose rendering and Django deploy check pass.
 - `5244b9d` — apply current Debian security patches in the runtime image.
 - `0ae831c` — record the runtime package remediation.
 - `fc10228` — scan each immutable backend candidate before replacement.
+- `2915c62` — document the pre-replacement image gate.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1570,6 +1571,19 @@ payloads and exact targeted order. A live public request that copied the interna
 health marker was logged exactly once using Nginx's generated request ID, while
 successful Compose probes produced zero access-log entries across two intervals.
 Compose remained healthy and privileged `nginx -t` passed. No migration,
+environment, Nginx or Cloudflare change was required; PostgreSQL was not restarted.
+
+The scan-gated backend release is deployed at revision `2915c622166b`, image
+`sha256:1fd6b76b4bd499b0c7578992b332e0a536f8b517180c530443eae3a81d4bf005`.
+Its immediate rollback tag is
+`pcep-backend-rollback:20261004T005001Z-release-0ae831c94921`. The private
+database backup is `pcep_db_20261004T005001Z.sql.gz`, with SHA-256
+`684e5861bc2cbc05b4425ed30e3ab3efe7298ece5de6cba33aa1b86c46f516b3`.
+The live deployment proved the new boundary end to end: Trivy scanned that exact
+immutable candidate ID with zero fixable HIGH/CRITICAL findings, and only after
+the scan succeeded did Compose recreate the backend. Post-start Django checks,
+the read-only 308-question audit, the complete public smoke, healthy Compose
+services and privileged `nginx -t` passed with no backend error. No migration,
 environment, Nginx or Cloudflare change was required; PostgreSQL was not restarted.
 
 ## 15. Breaking changes
