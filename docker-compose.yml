@@ -17,14 +17,13 @@ services:
     tmpfs:
       - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
       - /var/run/postgresql:size=16m,mode=3775,uid=70,gid=70,noexec,nosuid,nodev
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - path: .env.db
+        required: false
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${PCEP_APP_USER} -d $${PCEP_APP_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5

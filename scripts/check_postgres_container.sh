@@ -87,8 +87,11 @@ docker run -d \
   --tmpfs /var/run/postgresql:rw,noexec,nosuid,nodev,size=16m,mode=3775,uid=70,gid=70 \
   --mount type=volume,src="$volume",dst=/var/lib/postgresql/data \
   -e POSTGRES_DB=hardening_db \
-  -e POSTGRES_USER=hardening_user \
-  -e POSTGRES_PASSWORD=hardening-test-only \
+  -e POSTGRES_USER=hardening_admin \
+  -e POSTGRES_PASSWORD=hardening-admin-test-only \
+  -e PCEP_APP_DB=hardening_db \
+  -e PCEP_APP_USER=hardening_user \
+  -e PCEP_APP_PASSWORD=hardening-app-test-only \
   "$db_image" >/dev/null
 
 wait_for_database() {
@@ -107,12 +110,30 @@ wait_for_database() {
 }
 
 wait_for_database
+roles="$(
+  docker exec --user postgres "$candidate" \
+    psql -U hardening_admin -d hardening_db -AtF: -c \
+    "SELECT rolname,rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname IN ('hardening_admin','hardening_user') ORDER BY rolname;"
+)"
+test "$roles" = $'hardening_admin:t:t:t:t:t\nhardening_user:f:f:f:f:f'
+owners="$(
+  docker exec --user postgres "$candidate" \
+    psql -U hardening_admin -d hardening_db -AtF: -c \
+    "SELECT (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='hardening_db'), (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='pg_catalog'), (SELECT pg_get_userbyid(extowner) FROM pg_extension WHERE extname='plpgsql');"
+)"
+test "$owners" = 'hardening_user:hardening_admin:hardening_admin'
 rows="$(
   docker exec --user postgres "$candidate" \
     psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 -Atqc \
     'CREATE TABLE hardening_probe(id integer PRIMARY KEY); INSERT INTO hardening_probe VALUES (1); SELECT count(*) FROM hardening_probe;'
 )"
 test "$rows" = "1"
+if docker exec --user postgres "$candidate" \
+  psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 \
+  -c 'CREATE ROLE forbidden_role;' >/dev/null 2>&1; then
+  echo "PostgreSQL runtime check failed: the application role created another role" >&2
+  exit 1
+fi
 
 status="$(docker exec --user postgres "$candidate" cat /proc/1/status)"
 grep -Eq '^CapBnd:[[:space:]]+0+$' <<<"$status"

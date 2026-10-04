@@ -33,6 +33,7 @@ frontend/public/pyodide/
 
 # --- Env & secrets ---
 .env
+.env.db
 .env.local
 .env.*.local
 *.pem

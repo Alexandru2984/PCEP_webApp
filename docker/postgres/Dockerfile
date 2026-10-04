@@ -6,4 +6,6 @@ FROM ${POSTGRES_IMAGE}
 # runtime from the production image.
 RUN rm /usr/local/bin/gosu
 
+COPY init-app-role.sh /docker-entrypoint-initdb.d/10-pcep-app-role.sh
+
 USER postgres
