@@ -79,7 +79,9 @@ read-only backend execution; dropped Linux capabilities; `no-new-privileges`;
 PID, memory and temporary-filesystem limits; and verified dependency downloads.
 The production Python base is pinned by patch version and multi-architecture
 digest, development/test files are excluded from its context, and CI now scans
-the built OS and Python packages with a digest-pinned Trivy release.
+the built OS and Python packages with a digest-pinned Trivy release. The runtime
+stage also applies current Debian updates, closing the gap between a fixed Python
+image digest and later security fixes from the distribution repositories.
 
 The CSP keeps `wasm-unsafe-eval`, which Pyodide needs, and does not grant
 `unsafe-eval` or `unsafe-inline`. API responses use `default-src 'none'`.
@@ -321,8 +323,9 @@ its cost material.
   512 MB/128 PIDs with a noexec 64 MB tmpfs and graceful stop. It exposes only
   loopback port 8001. Successful internal readiness probes are omitted from the
   access log only when their marker and loopback peer both match; failures and
-  public probes remain logged. PostgreSQL exposes no host port and keeps its named
-  volume.
+  public probes remain logged. The pinned Python base receives current Debian
+  security updates during the runtime build. PostgreSQL exposes no host port and
+  keeps its named volume.
 - **systemd:** Nginx, Docker and cloudflared are active. The weekly SEO generator
   remains installed as an existing systemd timer.
 - **External monitoring:** a separate GitHub Actions workflow now performs a
@@ -719,6 +722,15 @@ readiness checks and public requests remain logged. All 214 backend tests, the s
 308-question audit, Django's production deploy check, Compose rendering, entrypoint
 syntax and Gunicorn configuration loading pass.
 
+A refreshed vulnerability database found seven fixable HIGH package occurrences in
+the first access-log candidate: one PCRE issue and two OpenSSL issues repeated across
+the installed OpenSSL packages. The pinned upstream Python image had not yet been
+rebuilt with Debian's `u3` packages. The runtime now applies current Debian updates;
+the replacement candidate contains `libpcre2` 10.46-1~deb13u3 and OpenSSL
+3.5.7-1~deb13u3. The blocking Trivy scan reports zero fixable HIGH/CRITICAL OS or
+Python findings, while the full report retains the same 44 unfixed HIGH occurrences
+across eight Debian CVEs and zero Python findings. All 214 backend tests pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -864,6 +876,7 @@ syntax and Gunicorn configuration loading pass.
 - `a4b133c` — cancel slow quiz loads without accepting late responses.
 - `661f605` — document cancellable quiz loading.
 - `22ec56a` — suppress only successful internal readiness probes in access logs.
+- `5244b9d` — apply current Debian security patches in the runtime image.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

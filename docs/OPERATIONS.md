@@ -43,9 +43,11 @@ The pinned image scan covers Debian and installed Python packages and fails on
 fixable HIGH/CRITICAL findings. Unfixed vendor findings remain visible in a full
 Trivy report and are reviewed separately rather than permanently breaking CI.
 The runtime base pins both Python 3.12.14 and the official multi-architecture
-image digest. Update the version and digest together only after rebuilding,
-scanning and running the backend suite. Test code, pytest configuration and
-development requirements are excluded from the production build context.
+image digest. The runtime stage applies current Debian updates so a versioned
+upstream image cannot leave newly fixed packages behind between image rebuilds.
+Update the Python version and digest together only after rebuilding, scanning and
+running the backend suite. Test code, pytest configuration and development
+requirements are excluded from the production build context.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime.
