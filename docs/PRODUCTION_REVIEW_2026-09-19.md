@@ -204,6 +204,12 @@ through the public-question whitelist, so their answer keys and explanations nev
 enter the snapshot. Resuming rotates ownership between tabs; stale tabs stop their
 in-flight answer request and cannot overwrite or delete the active copy.
 
+Completed Exam, Practice and Flashcard attempts now reuse their recovery ownership
+ID as the history ID. The report opens only after both the atomic progress write and
+matching recovery cleanup succeed. If cleanup fails after the write, retry recognizes
+the existing attempt and clears recovery without incrementing history, mistakes or
+study counters again.
+
 The question-bank snapshot is now normalized before it reaches the setup UI.
 Module, difficulty and objective totals must agree with both coverage matrices
 and the four module summaries, so a partial or malformed API response produces a
@@ -1016,6 +1022,7 @@ pass.
 - `c11c6d9` — verify generated Nginx API error contracts in isolated CI.
 - `4bbeaea` — prevent multiple correct choices at the database boundary.
 - `9ab7724` — report Pyodide output truncated at the manager boundary.
+- `57fb43c` — make completed-session cleanup retry-safe and idempotent.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

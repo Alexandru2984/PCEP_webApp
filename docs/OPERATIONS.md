@@ -409,6 +409,13 @@ performance, confidence calibration and pace because their result is self-rated.
 
 ## Active session recovery
 
+Completion uses the active recovery record's ownership ID as the durable attempt ID
+for Exam, Practice and Flashcards. The report opens only after the combined progress
+snapshot is written and the matching recovery record is removed. If cleanup is blocked,
+the last screen remains available for retry; finding that attempt ID in history makes the
+retry idempotent, so history, mistakes and spaced-repetition counters are not applied a
+second time. A recovery record owned by another tab is never removed.
+
 ### Exams
 
 An in-progress exam is stored separately under the versioned
