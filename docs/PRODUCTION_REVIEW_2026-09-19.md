@@ -764,6 +764,13 @@ application `h1`. It now uses the same top-level `h2` hierarchy as the populated
 dashboard. The backup Playwright flow runs axe on this exact empty state, and the
 component test pins the heading level.
 
+The two full-theme accessibility matrices each navigate every study mode, run axe
+repeatedly and check seven viewport widths. Under concurrent host load they reached
+the suite's generic 30-second timeout without a failed assertion; isolated runs
+passed. Their timeout is now scoped to 60 seconds while retries and all assertions
+remain unchanged. The final two-worker run completed them in 25.8 and 24.9 seconds,
+and all 31 Playwright flows passed.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -918,7 +925,10 @@ component test pins the heading level.
 - `443dcb8` — document strict quiz-set response validation.
 - `0f5cf62` — update the digest-pinned Trivy scanner to 0.75.0.
 - `3f30e8e` — keep stale backup reads from replacing a newer selection.
+- `775a165` — document resilient progress imports.
 - `d6cb023` — preserve heading order on an empty Progress dashboard.
+- `abb4876` — document the Progress heading correction.
+- `ed24b7b` — give the full accessibility matrices a measured timeout budget.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1638,6 +1648,27 @@ production build and all 31 Playwright flows passed. The complete public smoke,
 healthy Compose services and privileged `nginx -t` also passed. This frontend-only
 atomic publish recreated no service and required no migration, environment, Nginx
 or Cloudflare change; the backend remains on `2915c622166b`.
+
+The race-safe progress-import and heading-order frontend release is published at
+revision `abb4876cda89`. Its rollback root is
+`.frontend.previous-20261004T121417Z-7e80707e`, with external copy
+`frontend.20261004T121417Z-7e80707e`. The entry chunk `index-CjNaA0xh.js`
+has SHA-256
+`4cea429d7146b38c09ebdb9b044ac0cd91e04f2cc4a5df67c548e6b97f83a8ea`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`0ef25abf17d600fc830cb70de39a627b112c49c65dfd7a8627b3259d9fad3372`.
+The live root matches the validated build byte for byte. Fresh Chromium at 390 px
+delayed the first of two backup reads past the second: only the second preview
+remained, the busy status cleared, the section heading was level two, axe reported
+zero violations, the page fit the viewport and no page error occurred. The only
+console error was the tracked CSP rejection of Cloudflare's injected inline script.
+All 300 Vitest tests, lint, formatting, the production build and all 31 Playwright
+flows pass. The complete public smoke, healthy Compose services and privileged
+`nginx -t` also pass. This frontend-only atomic publish recreated no service and
+required no migration, environment, Nginx or Cloudflare change; the backend remains
+on `2915c622166b`.
 
 ## 15. Breaking changes
 
