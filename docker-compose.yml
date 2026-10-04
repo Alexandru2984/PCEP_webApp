@@ -49,7 +49,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "python - <<'PY'\nimport os\nfrom urllib.request import Request, urlopen\nhost = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')[0].strip()\nreq = Request('http://127.0.0.1:8000/api/health/', headers={'Host': host, 'X-Forwarded-Proto': 'https'})\nwith urlopen(req, timeout=3) as response:\n    raise SystemExit(0 if response.status == 200 else 1)\nPY",
+          "python - <<'PY'\nimport os\nfrom urllib.request import Request, urlopen\nhost = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')[0].strip()\nreq = Request('http://127.0.0.1:8000/api/health/', headers={'Host': host, 'X-Forwarded-Proto': 'https', 'X-PCEP-Internal-Healthcheck': '1'})\nwith urlopen(req, timeout=3) as response:\n    raise SystemExit(0 if response.status == 200 else 1)\nPY",
         ]
       interval: 10s
       timeout: 5s
