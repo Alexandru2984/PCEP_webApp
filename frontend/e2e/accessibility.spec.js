@@ -205,4 +205,8 @@ test('offline and failed storage warnings explain recovery', async ({
   await expect(page.getByText(/You are offline/)).toHaveCount(0)
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pcep-storage-warning')))
   await expect(page.getByRole('alert')).toContainText('Progress could not be saved')
+  await page.evaluate(() =>
+    window.dispatchEvent(new CustomEvent('pcep-storage-restored'))
+  )
+  await expect(page.getByText(/Progress could not be saved/)).toHaveCount(0)
 })

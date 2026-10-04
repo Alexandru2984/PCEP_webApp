@@ -50,6 +50,7 @@ function read(key, fallback) {
 function write(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
+    window.dispatchEvent(new CustomEvent('pcep-storage-restored'))
     return true
   } catch {
     window.dispatchEvent(new CustomEvent('pcep-storage-warning'))

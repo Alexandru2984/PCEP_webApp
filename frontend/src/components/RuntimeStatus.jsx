@@ -29,6 +29,7 @@ export default function RuntimeStatus() {
   useEffect(() => {
     const update = () => setOffline(navigator.onLine === false)
     const warn = () => setStorageWarning(true)
+    const storageRestored = () => setStorageWarning(false)
     const warnVersion = () => setVersionWarning(true)
     const warnSessionConflict = () => setSessionConflict(true)
     const detectVersion = () => {
@@ -76,6 +77,7 @@ export default function RuntimeStatus() {
     window.addEventListener('online', update)
     window.addEventListener('offline', update)
     window.addEventListener('pcep-storage-warning', warn)
+    window.addEventListener('pcep-storage-restored', storageRestored)
     window.addEventListener('pcep-storage-version-warning', warnVersion)
     window.addEventListener('pcep-active-exam-conflict', warnSessionConflict)
     window.addEventListener('pcep-active-practice-conflict', warnSessionConflict)
@@ -90,6 +92,7 @@ export default function RuntimeStatus() {
       window.removeEventListener('online', update)
       window.removeEventListener('offline', update)
       window.removeEventListener('pcep-storage-warning', warn)
+      window.removeEventListener('pcep-storage-restored', storageRestored)
       window.removeEventListener('pcep-storage-version-warning', warnVersion)
       window.removeEventListener('pcep-active-exam-conflict', warnSessionConflict)
       window.removeEventListener('pcep-active-practice-conflict', warnSessionConflict)
