@@ -939,6 +939,7 @@ and 31 Playwright flows pass against the new client.
 - `ed24b7b` — give the full accessibility matrices a measured timeout budget.
 - `5e8ebbc` — record the resilient Progress frontend release.
 - `85098b0` — update Axios to the fixed 1.20.0 release.
+- `6a2b681` — document the Axios security remediation.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1679,6 +1680,28 @@ flows pass. The complete public smoke, healthy Compose services and privileged
 `nginx -t` also pass. This frontend-only atomic publish recreated no service and
 required no migration, environment, Nginx or Cloudflare change; the backend remains
 on `2915c622166b`.
+
+The Axios-remediation frontend release is published at revision `6a2b681be5ec`.
+Its rollback root is `.frontend.previous-20261004T122546Z-aff485fe`, with external
+copy `frontend.20261004T122546Z-aff485fe`. The entry chunk
+`index-De_Qtudf.js` has SHA-256
+`2feeece66764f24ab4ec3cfc2f81f0bb9f30c65e0b9a3aff9ab05cb0d113cf2c`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`dc43de0e0ca2654e940384287a57cf8b7677bd5d9e3709157b1761867f6d4550`.
+The live root matches the validated build byte for byte. Fresh Chromium at 390 px
+used the real API through Axios 1.20.0 to fetch 30 questions and submit one Practice
+answer; both requests returned 200. The pre-submit response contained no correctness
+flag, answer ID or explanation, while feedback appeared after submission. Axe found
+zero violations, confirmed Quit cleared recovery, the page fit the viewport and no
+page error occurred. The only console error was the tracked CSP rejection of
+Cloudflare's injected inline script. `npm audit` reports zero vulnerabilities; all
+300 Vitest tests, lint, formatting, the production build and all 31 Playwright flows
+pass. The complete public smoke, healthy Compose services and privileged `nginx -t`
+also pass. This frontend-only atomic publish recreated no service and required no
+migration, environment, Nginx or Cloudflare change; the backend remains on
+`2915c622166b`.
 
 ## 15. Breaking changes
 
