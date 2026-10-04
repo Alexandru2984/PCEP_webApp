@@ -825,6 +825,16 @@ live `nginx -t` pass. A controlled 70 KB request returned the same 413 JSON cont
 with the new CSP after a graceful reload; public smoke and all runtime health checks
 remained green.
 
+The first warning-recovery implementation treated every successful localStorage write
+as recovery for every failed write. Exam and Flashcard rerenders can persist a smaller
+active-session record after the larger combined progress snapshot is rejected, which
+could prematurely hide the global warning. Storage events now identify their key and
+the runtime tracks the outstanding failed-key set. Successful removal also resolves
+only its own key. Component and browser regressions prove that an active-session write
+cannot clear a `pcep.progress` warning and that the later progress retry can. All 303
+Vitest tests, lint, formatting, the production build and the focused Playwright flow
+pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -996,6 +1006,7 @@ remained green.
 - `a8c7cb6` — clear a stale persistence warning after storage recovers.
 - `a4823b8` — document the storage-warning recovery contract.
 - `1992145` — align Nginx-generated API error CSP with normal API responses.
+- `5a6c92a` — keep storage warnings scoped to the key that failed.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

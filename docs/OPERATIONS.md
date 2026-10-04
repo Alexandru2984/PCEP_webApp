@@ -503,7 +503,9 @@ remain intact. Practice exposes **Retry saving results**, Exam exposes **Retry
 submission**, and the final Flashcard rating becomes selectable again. A successful
 retry records the attempt once and only then clears the active recovery record.
 The global persistence warning clears after a later storage write succeeds, so a
-recovered browser does not continue reporting a stale failure.
+recovered browser does not continue reporting a stale failure. Failure and recovery
+signals are tracked per storage key: saving a smaller active-session record cannot
+hide a failed `pcep.progress` snapshot.
 
 Progress, settings and active-session writes refuse to replace a storage schema
 with a higher version number. A stale tab also leaves newer recovery data untouched
