@@ -15,7 +15,7 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend audit-image build build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend audit-image audit-db-image build build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -24,6 +24,7 @@ help:
 		'  test             Run backend and frontend checks' \
 		'  audit            Run Python/npm dependency audits and question audit' \
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
+		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
 		'  build            Build the frontend production bundle' \
 		'  django-check     Run Django production deploy checks' \
 		'  production-smoke Check the read-only public production contract' \
@@ -68,6 +69,14 @@ audit-image:
 		-v "$(TRIVY_CACHE):/root/.cache/" \
 		"$(TRIVY_IMAGE)" image --scanners vuln --severity HIGH,CRITICAL \
 		--ignore-unfixed --exit-code 1 --no-progress "$(BACKEND_IMAGE)"
+
+audit-db-image:
+	mkdir -p "$(TRIVY_CACHE)"
+	docker run --rm \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "$(TRIVY_CACHE):/root/.cache/" \
+		"$(TRIVY_IMAGE)" image --scanners vuln --severity HIGH,CRITICAL \
+		--ignore-unfixed --exit-code 1 --no-progress pcep_webapp-postgres:16.15-alpine3.24
 
 build: build-frontend
 

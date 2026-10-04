@@ -20,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_DB: pcep_test
           POSTGRES_USER: pcep_user
@@ -205,6 +205,12 @@ jobs:
 
       - name: Validate Docker Compose config
         run: docker compose config >/dev/null
+
+      - name: Validate hardened PostgreSQL runtime
+        run: bash scripts/check_postgres_container.sh
+
+      - name: Scan hardened PostgreSQL image
+        run: make audit-db-image
 
       - name: Validate Nginx vhost in isolation
         run: bash scripts/check_nginx.sh
