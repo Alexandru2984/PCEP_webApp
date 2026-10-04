@@ -54,19 +54,32 @@ function fail(error) {
 function boundedResult(msg) {
   let remaining = MAX_OUTPUT
   const output = []
+  let truncated = msg.truncated === true
   if (Array.isArray(msg.output)) {
-    for (const chunk of msg.output.slice(0, 1000)) {
-      if (!remaining || typeof chunk?.text !== 'string') break
+    const chunks = msg.output.slice(0, 1000)
+    if (chunks.length < msg.output.length) truncated = true
+    for (const chunk of chunks) {
+      if (!remaining) {
+        truncated = true
+        break
+      }
+      if (typeof chunk?.text !== 'string') {
+        truncated = true
+        continue
+      }
       const text = chunk.text.slice(0, remaining)
       output.push({ stream: chunk.stream === 'stderr' ? 'stderr' : 'stdout', text })
       remaining -= text.length
+      if (text.length < chunk.text.length) truncated = true
     }
   }
+  const error = typeof msg.error === 'string' ? msg.error.slice(0, MAX_OUTPUT) : null
+  if (error && error.length < msg.error.length) truncated = true
   return {
     output,
-    error: typeof msg.error === 'string' ? msg.error.slice(0, MAX_OUTPUT) : null,
+    error,
     timedOut: false,
-    truncated: msg.truncated === true,
+    truncated,
   }
 }
 export function warmUp() {

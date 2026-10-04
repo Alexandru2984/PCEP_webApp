@@ -112,6 +112,8 @@ describe('Python worker lifecycle', () => {
     const run = runner.runPython('print(1)')
     await ready()
     result(workers[0], [{ stream: 'stdout', text: 'x'.repeat(20000) }])
-    expect((await run).output[0].text).toHaveLength(10000)
+    const bounded = await run
+    expect(bounded.output[0].text).toHaveLength(10000)
+    expect(bounded.truncated).toBe(true)
   })
 })
