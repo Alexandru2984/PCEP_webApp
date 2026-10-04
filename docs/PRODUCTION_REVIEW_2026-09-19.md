@@ -58,6 +58,10 @@ address, replaces forwarding headers, and Django trusts exactly one proxy hop.
   the public API accepted much larger bodies than its contract needs. Nginx now
   derives identity only from trusted Cloudflare peers, overwrites proxy headers,
   shares an IP rate zone across Gunicorn workers and caps API bodies at 64 KB.
+- Django connected as the PostgreSQL bootstrap superuser, which unnecessarily
+  extended an application compromise to cluster administration. New clusters now
+  separate the bootstrap administrator from a non-superuser application owner;
+  the same ownership split was restore-tested before production migration.
 - Admin and seed paths could admit malformed question sets. Full inline
   validation, preflight seed checks and read-only live database auditing now
   enforce the four-choice/one-correct/explanation invariants.
@@ -345,7 +349,9 @@ its cost material.
   bounded noexec runtime tmpfs mounts. It exposes no host port and keeps its external
   named PGDATA volume. Its digest-pinned PostgreSQL 16.15 Alpine image removes the
   unused root-only `gosu` helper; the resulting image has zero fixable HIGH/CRITICAL
-  findings.
+  findings. A dedicated database-only environment file separates the bootstrap
+  administrator credential from Django, while the application role owns only its
+  database and public objects.
 - **systemd:** Nginx, Docker and cloudflared are active. The weekly SEO generator
   remains installed as an existing systemd timer.
 - **External monitoring:** a separate GitHub Actions workflow now performs a
@@ -1031,6 +1037,7 @@ pass.
 - `9ab7724` — report Pyodide output truncated at the manager boundary.
 - `57fb43c` — make completed-session cleanup retry-safe and idempotent.
 - `c917fa6` — harden and continuously verify the PostgreSQL container runtime.
+- `26b72ae` — separate PostgreSQL administrator and Django application roles.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

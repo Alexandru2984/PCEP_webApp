@@ -159,7 +159,8 @@ npm run dev             # Vite dev server, proxies /api to Django (see vite.conf
 ### With Docker
 
 ```bash
-cp .env.example .env          # then fill in real secrets
+cp .env.example .env          # Django and its least-privilege database role
+cp .env.db.example .env.db    # separate PostgreSQL administrator/bootstrap role
 docker volume create pcep_webapp_postgres_data
 docker volume create pcep_webapp_static_volume
 docker volume create pcep_webapp_media_volume

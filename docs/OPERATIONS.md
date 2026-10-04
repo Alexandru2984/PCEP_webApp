@@ -25,6 +25,10 @@ docker volume create pcep_webapp_media_volume
 
 The defaults come from `.env.example`; create the matching names instead when
 `PCEP_POSTGRES_VOLUME`, `PCEP_STATIC_VOLUME` or `PCEP_MEDIA_VOLUME` is changed.
+Create `.env` from `.env.example` for Django and `.env.db` from `.env.db.example`
+for the database container. Both must be mode 0600. `PCEP_APP_DB`,
+`PCEP_APP_USER` and `PCEP_APP_PASSWORD` in `.env.db` must match the three
+`POSTGRES_*` application values in `.env`; the administrator password must differ.
 
 ## Local Verification
 
@@ -141,6 +145,11 @@ noexec tmpfs mounts for `/tmp` and its Unix socket. Only the external PGDATA vol
 is persistent and writable, and no database port is published to the host. Its local
 image extends a digest-pinned PostgreSQL 16.15 Alpine base only to remove the unused
 root-only `gosu` switcher and its independently compiled runtime.
+Fresh clusters bootstrap `pcep_admin` as the system-object owner and create a
+separate `pcep_user` login for Django. The application role owns only its database
+and public application objects; it cannot create roles or databases, replicate,
+bypass row security or act as a superuser. Only the database service receives
+`.env.db`, so the administrator credential never enters the backend container.
 Healthchecks use the first configured allowed hostname and forwarded HTTPS;
 local hostnames are not required in production ALLOWED_HOSTS. `/api/health/`
 remains readiness. Successful Compose probes carry an internal marker and are
@@ -250,6 +259,12 @@ preserving the named PGDATA volume, retag it as
 `pcep_webapp-postgres:16.15-alpine3.24`, recreate only `db` with `--no-build`, and
 repeat the readiness and public smoke checks. Restoring a logical dump remains a
 separate planned data operation and is not part of an image rollback.
+
+When rotating the Django database password, update `POSTGRES_PASSWORD` in `.env`
+and `PCEP_APP_PASSWORD` in `.env.db` atomically with the role password, then
+recreate only `backend`. Rotating the administrator password updates the
+`pcep_admin` role and `POSTGRES_PASSWORD` in `.env.db`; never add that value to
+`.env` or the backend service.
 
 ## Public study pages
 
