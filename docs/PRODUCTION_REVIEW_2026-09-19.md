@@ -108,7 +108,7 @@ Remaining security work:
   not a simple check constraint.
 - DRF's memory throttle remains per process. The shared Nginx limit closes the
   production gap, but deployments that bypass Nginx must supply a shared cache.
-- A full Trivy 0.74.0 scan reports 44 HIGH package occurrences across eight
+- A full Trivy 0.75.0 scan reports 44 HIGH package occurrences across eight
   unique Debian 13 CVEs. None has a vendor-fixed version, none affects an
   installed Python package and there are zero CRITICAL findings. The current
   non-root, read-only, capability-free runtime limits exposure. Debian 12
