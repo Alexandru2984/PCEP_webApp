@@ -951,6 +951,8 @@ duplicate markers are regression-tested; all 216 backend tests pass.
 - `6a2b681` — document the Axios security remediation.
 - `d4ddf83` — verify frontend and backend release identities independently.
 - `4c1342b` — document frontend release identity checks.
+- `6b49fee` — record the frontend identity release.
+- `0895af0` — route PCEP through verified Cloudflare Tunnel origin TLS.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1732,6 +1734,24 @@ zero violations, the page fit the viewport and no page error occurred. Compose
 remained healthy and privileged `nginx -t` passed. This frontend-only publication
 recreated no service and required no migration, environment, Nginx or Cloudflare
 change.
+
+The live Cloudflare Tunnel now matches `pcep.micutu.com` through an explicit rule
+before the shared catch-all. It sends the fixed PCEP Host/SNI to
+`https://127.0.0.1:443` and sets `noTLSVerify: false`; OpenSSL independently
+verified the local ECDSA certificate and TLS 1.3 connection. The old root-owned
+mode-0600 configuration is backed up at
+`/home/micu/backups/pcep/cloudflared.config.20261004T123936Z.yml`, SHA-256
+`7eb66fa5fc473b829add66d28e069bc85ff3b569ed3f7800dba1e043499e72ff`.
+Both the candidate and installed configs passed `cloudflared ingress validate`,
+PCEP selected the explicit rule, the separate `preturi` rule remained unchanged,
+and unknown hosts still selected the catch-all. Restarting only cloudflared changed
+its PID from 3947471 to 1588150; one probe returned 530 during the roughly one-second
+reconnection window, after which all four QUIC connections registered and the
+connector readiness endpoint reported healthy. The complete PCEP public smoke
+passed, representative PCEP, special-route and catch-all domains returned 200,
+Compose stayed healthy and privileged `nginx -t` passed. Nginx, Docker and
+PostgreSQL were not restarted; no migration, application deployment or Cloudflare
+dashboard change was required.
 
 ## 15. Breaking changes
 
