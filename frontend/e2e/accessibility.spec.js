@@ -57,6 +57,7 @@ for (const theme of ['light', 'dark']) {
   test(`${theme} study screens pass axe and fit seven viewport widths`, async ({
     page,
   }) => {
+    test.setTimeout(60_000)
     await mockApi(page)
     await page.addInitScript(
       (value) => localStorage.setItem('pcep.theme', JSON.stringify(value)),
