@@ -72,6 +72,12 @@ describe('ProgressTools', () => {
       text: vi.fn(() => Promise.resolve(backup())),
     }
     render(<ProgressTools onChange={vi.fn()} />)
+    expect(
+      screen.getByRole('heading', {
+        name: 'Progress backup & review lists',
+        level: 2,
+      })
+    ).toBeInTheDocument()
     const input = screen.getByLabelText('Progress backup file')
 
     fireEvent.change(input, { target: { files: [older] } })

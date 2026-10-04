@@ -1051,6 +1051,8 @@ test('progress backup exports and imports with a preview', async ({ page }) => {
   await mockApi(page)
   await page.goto('/')
   await page.getByRole('button', { name: /Progress/ }).click()
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations.map((violation) => violation.id)).toEqual([])
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export backup' }).click()
   const download = await downloadPromise

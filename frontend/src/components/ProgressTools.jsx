@@ -96,7 +96,7 @@ export default function ProgressTools({ onChange }) {
       aria-busy={reading}
       className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"
     >
-      <h3 className="font-semibold">Progress backup &amp; review lists</h3>
+      <h2 className="font-semibold">Progress backup &amp; review lists</h2>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
         Your progress stays in this browser. Export a backup to move it to another device.
       </p>
