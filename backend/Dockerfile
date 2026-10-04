@@ -12,6 +12,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PCEP_RELEASE=${PCEP_RELEASE}
 LABEL org.opencontainers.image.revision=${PCEP_RELEASE}
+# The versioned upstream image can lag Debian security updates between rebuilds.
+RUN apt-get update \
+    && apt-get upgrade --yes \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=dependencies /wheels /wheels
 COPY requirements.txt .
