@@ -313,6 +313,12 @@ validates the complete inline set with the same snippet, syllabus, explanation
 quality and exact-duplicate rules as the audit command. Its question list shows
 the correct option (or an invalid-count warning) from one prefetched choice set;
 the separate choice admin is view-only.
+Migration `0011_choice_one_correct_choice_per_question` adds a partial unique
+constraint that rejects a second correct choice for the same question even when
+a write bypasses Django validation. PostgreSQL cannot express the complementary
+cross-row requirement that a question has at least one correct choice with a
+simple check constraint, so Admin, seed preflight, deployment audit and the API's
+fail-closed 503 response continue to enforce and detect that half of the invariant.
 Seed validation runs before any writes, including an explicitly requested reset.
 Every question has one reviewed primary syllabus objective. The audit rejects
 unknown or cross-module objectives and warns if any of the 15 objectives is empty.

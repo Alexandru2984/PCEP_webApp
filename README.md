@@ -102,7 +102,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   monitoring without learner telemetry
 - 🔎 AST-backed question audits catch duplicates, malformed answer sets, short or
   editorial explanations, missing/cross-module objectives and out-of-syllabus syntax
-  before release
+  before release; PostgreSQL also rejects a second correct choice for one question
 
 ## Tech stack
 

@@ -104,10 +104,10 @@ Remaining security work:
   PCEP now bypasses it through an explicit hostname rule with a fixed Host/SNI and
   verified origin TLS. Completing the same migration for every other vhost belongs
   to those applications' deployment reviews.
-- Model/admin/seed validation protects normal writes, but a direct ORM or SQL
-  write can still bypass the one-correct-choice invariant. A deferred database
-  design could encode stronger constraints, though cross-row “exactly one” is
-  not a simple check constraint.
+- A partial database uniqueness constraint now prevents direct ORM or SQL writes
+  from adding a second correct choice. The complementary cross-row rule requiring
+  at least one correct choice is not a simple check constraint; Admin, seed/deploy
+  audits and fail-closed API behavior continue to protect that case.
 - DRF's memory throttle remains per process. The shared Nginx limit closes the
   production gap, but deployments that bypass Nginx must supply a shared cache.
 - A full Trivy 0.75.0 scan reports 44 HIGH package occurrences across eight
@@ -134,6 +134,8 @@ not printed or copied. No database or Docker volume was deleted.
   ordinary quiz sets remain randomized.
 - Added reusable question-bank validation, database-aware audit diagnostics,
   admin inline enforcement and safe seed preflight.
+- Added a partial database uniqueness constraint that rejects multiple correct
+  choices for one question even when a write bypasses Admin and model validation.
 - Changed `seed_questions --update` to update choices in their existing order
   rather than delete and recreate them. Choice IDs used by saved local sessions
   now remain stable; a structural choice-count mismatch aborts the entire atomic
@@ -1009,6 +1011,7 @@ pass.
 - `5a6c92a` — keep storage warnings scoped to the key that failed.
 - `6b4ddc8` — document key-scoped storage recovery behavior.
 - `c11c6d9` — verify generated Nginx API error contracts in isolated CI.
+- `4bbeaea` — prevent multiple correct choices at the database boundary.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
