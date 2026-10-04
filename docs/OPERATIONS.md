@@ -703,6 +703,12 @@ explicit `ALLOW_QUESTION_RESET=yes`.
 CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright
 to two workers, uploads HTML reports/traces, validates the vhost with disposable
 certificates in an isolated Nginx container, and builds the hardened backend.
+`scripts/check_nginx.sh` first performs `nginx -t`, then boots that temporary TLS
+vhost on a random loopback port. It verifies the complete Nginx-generated 413 and
+429 API contracts: status, exact JSON body, no-store policy, restrictive CSP,
+request ID and `Retry-After` on throttling. The script uses a digest-pinned Nginx
+image, removes its container and temporary files on exit, and never contacts the
+production hostname.
 Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.
 The push/pull-request CI never calls production. The scheduled dependency audit
 only reads manifests and advisory services; the separate scheduled smoke workflow

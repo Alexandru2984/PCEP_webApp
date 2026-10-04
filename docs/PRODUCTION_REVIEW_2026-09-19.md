@@ -1008,6 +1008,7 @@ pass.
 - `1992145` — align Nginx-generated API error CSP with normal API responses.
 - `5a6c92a` — keep storage warnings scoped to the key that failed.
 - `6b4ddc8` — document key-scoped storage recovery behavior.
+- `c11c6d9` — verify generated Nginx API error contracts in isolated CI.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1888,6 +1889,15 @@ storage flow pass. Public smoke reports this frontend revision and backend
 `2915c622166b`; Compose is healthy, cloudflared has four ready connections and
 privileged `nginx -t` passes. No service was recreated and no migration, environment,
 Nginx or Cloudflare change was required.
+
+The isolated Nginx CI check now covers the failure mode found during the live CSP
+review. Beyond syntax, it starts the digest-pinned Nginx image with disposable TLS
+material on a random loopback port and asserts the generated 413 and 429 status,
+exact JSON, no-store policy, restrictive CSP and request ID, plus `Retry-After` for
+throttling. `bash -n`, ShellCheck and the complete isolated runtime check pass. Its
+cleanup removed the temporary container, and the check made no request to or change
+in production. This test-only stage required no deployment, migration, environment,
+Nginx, Docker Compose, tunnel or Cloudflare change.
 
 ## 15. Breaking changes
 
