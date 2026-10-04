@@ -738,6 +738,13 @@ the already safe rollback snapshot and database backup, leaving the live contain
 untouched. The ordering and failure boundary are regression-tested; all 215 backend
 tests, the question audit, Compose rendering and Django deploy check pass.
 
+The quiz-set response-boundary follow-up rejects a count that disagrees with the
+payload, more questions than the learner requested, a foreign targeted ID or a
+targeted list whose order changed. Ordered subsets remain valid so deleted legacy
+bookmarks do not block the rest of a drill. Invalid responses create neither active
+recovery nor progress. All 299 Vitest tests across 32 files, lint, formatting and the
+production build pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -888,6 +895,7 @@ tests, the question audit, Compose rendering and Django deploy check pass.
 - `0ae831c` — record the runtime package remediation.
 - `fc10228` — scan each immutable backend candidate before replacement.
 - `2915c62` — document the pre-replacement image gate.
+- `d3c5585` — validate quiz-set counts and targeted response scope.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
