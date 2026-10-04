@@ -191,6 +191,15 @@ def test_database_rejects_an_objective_from_another_module(make_question):
 
 
 @pytest.mark.django_db
+def test_database_rejects_multiple_correct_choices(make_question):
+    q = make_question()
+    wrong_choice = q.choices.filter(is_correct=False).first()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Choice.objects.filter(id=wrong_choice.id).update(is_correct=True)
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize('correct_count', [0, 1, 2])
 def test_admin_inline_requires_one_correct_answer(make_question, correct_count):
     q = make_question()

@@ -220,13 +220,9 @@ def test_saved_drill_rejects_invalid_id_filter(api_client, ids):
     assert response.status_code == 400
     assert 'questions' not in response.json()
 
-@pytest.mark.parametrize('correct_count', [0, 2])
-def test_invalid_answer_key_fails_without_disclosing_feedback(api_client, make_question, correct_count):
+def test_missing_answer_key_fails_without_disclosing_feedback(api_client, make_question):
     q = make_question()
     q.choices.update(is_correct=False)
-    for c in q.choices.all()[:correct_count]:
-        c.is_correct = True
-        c.save()
     choice_id = q.choices.first().id
     for path, body in [(f'/api/questions/{q.id}/answer/', {'choice_id': choice_id}),
                        ('/api/grade/', {'answers': [{'question_id': q.id, 'choice_id': choice_id}]})]:

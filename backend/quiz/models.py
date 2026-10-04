@@ -90,6 +90,13 @@ class Choice(models.Model):
 
     class Meta:
         ordering = ['id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['question'],
+                condition=models.Q(is_correct=True),
+                name='one_correct_choice_per_question',
+            ),
+        ]
 
     def __str__(self):
         mark = '✓' if self.is_correct else '✗'

@@ -34,6 +34,7 @@ def test_invalid_startup_settings_fail_cleanly(monkeypatch, key, value):
 def test_host_is_passed_as_data(monkeypatch):
     host = "localhost'); raise RuntimeError('injected') #"
     monkeypatch.setenv('POSTGRES_HOST', host)
+    monkeypatch.setenv('POSTGRES_PORT', '5432')
     probe = MagicMock()
     monkeypatch.setattr(wait_for_db, 'wait_for_database', probe)
     wait_for_db.main()
