@@ -876,7 +876,9 @@ across eight Debian CVEs and zero Python findings. All 214 backend tests pass.
 - `a4b133c` — cancel slow quiz loads without accepting late responses.
 - `661f605` — document cancellable quiz loading.
 - `22ec56a` — suppress only successful internal readiness probes in access logs.
+- `a9b5c67` — document internal healthcheck log filtering.
 - `5244b9d` — apply current Debian security patches in the runtime image.
+- `0ae831c` — record the runtime package remediation.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1545,6 +1547,22 @@ inline script. The complete public smoke, healthy Compose services and privilege
 root and both complete rollback copies. This frontend-only atomic publish recreated
 no service and required no migration, environment, Nginx or Cloudflare change; the
 backend remains on `7207b1bc2fb9`.
+
+The access-log and runtime-security backend release is deployed at revision
+`0ae831c94921`, image
+`sha256:cbc7750c37d37378008f5cb8929517a639fdaa60a50cb2f6425baa6d4a6f1abe`.
+Its immediate rollback tag is
+`pcep-backend-rollback:20261004T004020Z-release-a9b5c67de6ba`. The private
+mode-0600 database backup is `pcep_db_20261004T004020Z.sql.gz`, with SHA-256
+`2b04d5ed4a562530fcd96fe1195da9a128b3e8205548f61d4128eb644da04b50`.
+The deployed image contains the patched PCRE and OpenSSL `u3` packages and passes
+the blocking Trivy scan with zero fixable HIGH/CRITICAL OS or Python findings.
+The public smoke verified the matching release, all 308 questions, answer-safe
+payloads and exact targeted order. A live public request that copied the internal
+health marker was logged exactly once using Nginx's generated request ID, while
+successful Compose probes produced zero access-log entries across two intervals.
+Compose remained healthy and privileged `nginx -t` passed. No migration,
+environment, Nginx or Cloudflare change was required; PostgreSQL was not restarted.
 
 ## 15. Breaking changes
 
