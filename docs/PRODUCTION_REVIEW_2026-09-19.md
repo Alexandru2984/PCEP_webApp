@@ -849,6 +849,7 @@ cannot move the app away from setup or create a Practice recovery record.
 - `dc371dc` — bound retained frontend asset generations.
 - `217ead0` — document bounded frontend assets.
 - `a4b133c` — cancel slow quiz loads without accepting late responses.
+- `661f605` — document cancellable quiz loading.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1495,6 +1496,28 @@ the already tracked CSP rejection of Cloudflare's injected inline script. The
 complete public smoke, healthy Compose services and privileged `nginx -t` passed.
 This atomic publish recreated no service and required no migration, environment,
 Nginx or Cloudflare change; the backend remains on `7207b1bc2fb9`.
+
+The cancellable-quiz-loading frontend release is published at revision
+`661f6052ffd7`. Its rollback root is
+`.frontend.previous-20261004T002626Z-8fa6f6d7`, with external copy
+`frontend.20261004T002626Z-8fa6f6d7`. The entry chunk `index-CyBUF6ZU.js`
+has SHA-256
+`54b762eb7a946364741bd77b93ed14ac05dae047df17b9b53932ada953b07ca3`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`9ee2460f26636c0cf6aa3e1c7947cb4cc5737234c935112ed678f8684871c121`.
+Fresh live Chromium at 390 px fetched a real answer-safe five-question response,
+held it for five seconds only in the browser and cancelled loading in about 192 ms.
+The delayed response was then delivered but could not leave setup or create Exam,
+Practice or Flashcard recovery. The exact requested preferences remained saved.
+The loading screen was axe-clean, fit the viewport and raised no page error; the
+only console error was the already tracked CSP rejection of Cloudflare's injected
+inline script. The complete public smoke, healthy Compose services and privileged
+`nginx -t` passed. Live asset retention remained bounded at 202 files in the new
+root and both complete rollback copies. This frontend-only atomic publish recreated
+no service and required no migration, environment, Nginx or Cloudflare change; the
+backend remains on `7207b1bc2fb9`.
 
 ## 15. Breaking changes
 
