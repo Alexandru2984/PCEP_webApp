@@ -66,6 +66,18 @@ function initialState() {
   )
 }
 
+function matchesTargetedOrder(questions, requestedIds) {
+  if (!Array.isArray(requestedIds) || requestedIds.length === 0) return true
+  const positions = new Map(requestedIds.map((id, index) => [id, index]))
+  let previous = -1
+  return questions.every((question) => {
+    const position = positions.get(question.id)
+    if (position === undefined || position <= previous) return false
+    previous = position
+    return true
+  })
+}
+
 export function sessionReducer(state, event) {
   switch (event.type) {
     case 'loading':
@@ -373,9 +385,13 @@ export default function useQuizSession() {
         throw new Error('No questions match these filters. Try loosening them.')
       const questions = data.questions.map(publicApiQuestion)
       if (
+        !Number.isSafeInteger(data.count) ||
+        data.count !== questions.length ||
+        questions.length > config.count ||
         questions.length > 100 ||
         questions.some((q) => !q) ||
         new Set(questions.map((q) => q.id)).size !== questions.length ||
+        !matchesTargetedOrder(questions, config.ids) ||
         questions.some(
           (question) =>
             (config.module && question.module !== config.module) ||

@@ -80,9 +80,14 @@ const deferred = () => {
   })
   return { promise, resolve }
 }
+const quizResponse = (questions, extra = {}) => ({
+  count: questions.length,
+  questions,
+  ...extra,
+})
 beforeEach(() => {
   vi.clearAllMocks()
-  fetchQuizSet.mockResolvedValue({ questions: [question] })
+  fetchQuizSet.mockResolvedValue(quizResponse([question]))
   fetchDailyChallenge.mockResolvedValue({
     date: '2026-09-24',
     count: 1,
@@ -142,12 +147,27 @@ describe('quiz session requests', () => {
     expect(result.current.error).toMatch(/invalid full mock/i)
   })
 
+  it.each([
+    ['an inconsistent count', { count: 2, questions: [question] }, config],
+    [
+      'more questions than requested',
+      quizResponse([question, secondQuestion]),
+      { ...config, count: 1 },
+    ],
+  ])('rejects a quiz response with %s', async (_label, response, requestConfig) => {
+    fetchQuizSet.mockResolvedValueOnce(response)
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startQuiz(requestConfig))
+
+    expect(result.current.phase).toBe('error')
+    expect(result.current.error).toMatch(/invalid questions/i)
+  })
+
   it('preserves a completed full mock in recovery and attempt history', async () => {
-    fetchQuizSet.mockResolvedValueOnce({
-      preset: PCEP_30_02_PRESET.value,
-      count: PCEP_30_02_PRESET.count,
-      questions: fullMockQuestions,
-    })
+    fetchQuizSet.mockResolvedValueOnce(
+      quizResponse(fullMockQuestions, { preset: PCEP_30_02_PRESET.value })
+    )
     gradeAnswers.mockResolvedValueOnce({
       results: fullMockQuestions.map((item) => ({
         question_id: item.id,
@@ -189,7 +209,7 @@ describe('quiz session requests', () => {
     })
     expect(fetchQuizSet).toHaveBeenCalledTimes(1)
     await act(async () => {
-      loading.resolve({ questions: [question] })
+      loading.resolve(quizResponse([question]))
       await start
     })
     const answer = deferred()
@@ -303,7 +323,7 @@ describe('quiz session requests', () => {
     act(() => result.current.resetToSetup())
     expect(signal.aborted).toBe(true)
     await act(async () => {
-      loading.resolve({ questions: [question] })
+      loading.resolve(quizResponse([question]))
       await start
     })
     expect(result.current.phase).toBe('setup')
@@ -326,7 +346,7 @@ describe('quiz session requests', () => {
   })
 
   it('recovers practice at the submitted feedback and completes it exactly once', async () => {
-    fetchQuizSet.mockResolvedValueOnce({ questions: [question, secondQuestion] })
+    fetchQuizSet.mockResolvedValueOnce(quizResponse([question, secondQuestion]))
     submitAnswer
       .mockResolvedValueOnce(feedback)
       .mockResolvedValueOnce({ ...feedback, correct_choice_id: 21 })
@@ -362,8 +382,8 @@ describe('quiz session requests', () => {
   })
 
   it('keeps future practice answer keys out of recovery and clears it on quit', async () => {
-    fetchQuizSet.mockResolvedValueOnce({
-      questions: [
+    fetchQuizSet.mockResolvedValueOnce(
+      quizResponse([
         question,
         {
           ...secondQuestion,
@@ -374,8 +394,8 @@ describe('quiz session requests', () => {
             explanation: 'UNSUBMITTED_SECRET',
           })),
         },
-      ],
-    })
+      ])
+    )
     const { result } = renderHook(useQuizSession)
     await act(async () => result.current.startQuiz(config))
 
@@ -410,7 +430,7 @@ describe('quiz session requests', () => {
   })
 
   it('recovers revealed flashcards and completes the deck exactly once', async () => {
-    fetchQuizSet.mockResolvedValueOnce({ questions: [question, secondQuestion] })
+    fetchQuizSet.mockResolvedValueOnce(quizResponse([question, secondQuestion]))
     const flashcardConfig = { ...config, mode: 'flashcards' }
     const firstItem = {
       question,
@@ -885,7 +905,7 @@ describe('quiz session requests', () => {
         ],
       }
     })
-    fetchQuizSet.mockResolvedValueOnce({ questions })
+    fetchQuizSet.mockResolvedValueOnce(quizResponse(questions))
     const requestedIds = [1, ...questions.map(({ id }) => id), 101]
     const { result } = renderHook(useQuizSession)
 
@@ -904,13 +924,50 @@ describe('quiz session requests', () => {
     expect(result.current.questions.at(-1).id).toBe(100)
   })
 
+  it.each([
+    ['reorders requested questions', [secondQuestion, question]],
+    [
+      'injects an unrequested question',
+      [
+        question,
+        {
+          ...secondQuestion,
+          id: 3,
+          choices: [
+            { id: 31, text: 'One' },
+            { id: 32, text: 'Two' },
+          ],
+        },
+      ],
+    ],
+  ])('rejects a targeted response that %s', async (_label, questions) => {
+    fetchQuizSet.mockResolvedValueOnce(quizResponse(questions))
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startSessionReview([1, 2]))
+
+    expect(result.current.phase).toBe('error')
+    expect(result.current.error).toMatch(/invalid questions/i)
+    expect(loadActivePractice()).toBeNull()
+  })
+
+  it('accepts an ordered subset when stale targeted ids no longer exist', async () => {
+    fetchQuizSet.mockResolvedValueOnce(quizResponse([question, secondQuestion]))
+    const { result } = renderHook(useQuizSession)
+
+    await act(async () => result.current.startSessionReview([1, 999, 2]))
+
+    expect(result.current.phase).toBe('answering')
+    expect(result.current.questions.map(({ id }) => id)).toEqual([1, 2])
+  })
+
   it('starts an objective drill and rejects a response outside that scope', async () => {
     const scopedQuestion = {
       ...question,
       module: 'module3',
       objective: '3.1',
     }
-    fetchQuizSet.mockResolvedValueOnce({ questions: [scopedQuestion] })
+    fetchQuizSet.mockResolvedValueOnce(quizResponse([scopedQuestion]))
     const { result } = renderHook(useQuizSession)
 
     await act(async () => result.current.startObjectiveDrill('3.1'))
@@ -926,7 +983,7 @@ describe('quiz session requests', () => {
     expect(result.current.phase).toBe('answering')
 
     act(() => result.current.resetToSetup())
-    fetchQuizSet.mockResolvedValueOnce({ questions: [question] })
+    fetchQuizSet.mockResolvedValueOnce(quizResponse([question]))
     await act(async () => result.current.startObjectiveDrill('3.1'))
     expect(result.current.phase).toBe('error')
     expect(result.current.error).toMatch(/invalid questions/i)
