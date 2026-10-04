@@ -9,12 +9,26 @@ describe('application recovery', () => {
     fireEvent(window, new CustomEvent('pcep-storage-warning'))
     expect(screen.getByRole('alert')).toHaveTextContent('Progress could not be saved')
   })
-  it('clears a persistence warning after storage accepts a later write', () => {
+  it('clears a persistence warning only after the same storage key recovers', () => {
     render(<RuntimeStatus />)
-    fireEvent(window, new CustomEvent('pcep-storage-warning'))
+    fireEvent(
+      window,
+      new CustomEvent('pcep-storage-warning', { detail: { key: 'pcep.progress' } })
+    )
     expect(screen.getByRole('alert')).toHaveTextContent('Progress could not be saved')
 
-    fireEvent(window, new CustomEvent('pcep-storage-restored'))
+    fireEvent(
+      window,
+      new CustomEvent('pcep-storage-restored', {
+        detail: { key: 'pcep.activeExam' },
+      })
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('Progress could not be saved')
+
+    fireEvent(
+      window,
+      new CustomEvent('pcep-storage-restored', { detail: { key: 'pcep.progress' } })
+    )
     expect(screen.queryByText(/Progress could not be saved/)).not.toBeInTheDocument()
   })
   it('warns when another app version owns newer saved data', () => {

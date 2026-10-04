@@ -26,10 +26,21 @@ export default function RuntimeStatus() {
       return true
     }
   })
+  const failedStorageKeys = useRef(new Set(storageWarning ? ['*'] : []))
   useEffect(() => {
     const update = () => setOffline(navigator.onLine === false)
-    const warn = () => setStorageWarning(true)
-    const storageRestored = () => setStorageWarning(false)
+    const warn = (event) => {
+      failedStorageKeys.current.add(event.detail?.key ?? '*')
+      setStorageWarning(true)
+    }
+    const storageRestored = (event) => {
+      const key = event.detail?.key
+      if (key) {
+        failedStorageKeys.current.delete(key)
+        failedStorageKeys.current.delete('*')
+      } else failedStorageKeys.current.clear()
+      setStorageWarning(failedStorageKeys.current.size > 0)
+    }
     const warnVersion = () => setVersionWarning(true)
     const warnSessionConflict = () => setSessionConflict(true)
     const detectVersion = () => {

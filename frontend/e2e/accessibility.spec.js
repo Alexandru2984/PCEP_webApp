@@ -203,10 +203,24 @@ test('offline and failed storage warnings explain recovery', async ({
   await expect(page.getByText(/You are offline/)).toBeVisible()
   await context.setOffline(false)
   await expect(page.getByText(/You are offline/)).toHaveCount(0)
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent('pcep-storage-warning')))
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new CustomEvent('pcep-storage-warning', { detail: { key: 'pcep.progress' } })
+    )
+  )
   await expect(page.getByRole('alert')).toContainText('Progress could not be saved')
   await page.evaluate(() =>
-    window.dispatchEvent(new CustomEvent('pcep-storage-restored'))
+    window.dispatchEvent(
+      new CustomEvent('pcep-storage-restored', {
+        detail: { key: 'pcep.activePractice' },
+      })
+    )
+  )
+  await expect(page.getByRole('alert')).toContainText('Progress could not be saved')
+  await page.evaluate(() =>
+    window.dispatchEvent(
+      new CustomEvent('pcep-storage-restored', { detail: { key: 'pcep.progress' } })
+    )
   )
   await expect(page.getByText(/Progress could not be saved/)).toHaveCount(0)
 })

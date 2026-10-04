@@ -39,6 +39,9 @@ const object = (v) => v && typeof v === 'object' && !Array.isArray(v)
 let cachedRaw
 let cachedProgress
 
+const signalStorage = (type, key) =>
+  window.dispatchEvent(new CustomEvent(type, { detail: { key } }))
+
 function read(key, fallback) {
   try {
     const raw = localStorage.getItem(key)
@@ -50,10 +53,10 @@ function read(key, fallback) {
 function write(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
-    window.dispatchEvent(new CustomEvent('pcep-storage-restored'))
+    signalStorage('pcep-storage-restored', key)
     return true
   } catch {
-    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    signalStorage('pcep-storage-warning', key)
     return false
   }
 }
@@ -467,9 +470,10 @@ export function clearActiveExam(expectedSessionId) {
   }
   try {
     localStorage.removeItem(ACTIVE_EXAM_KEY)
+    signalStorage('pcep-storage-restored', ACTIVE_EXAM_KEY)
     return true
   } catch {
-    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    signalStorage('pcep-storage-warning', ACTIVE_EXAM_KEY)
     return false
   }
 }
@@ -660,9 +664,10 @@ export function clearActivePractice(expectedSessionId) {
   }
   try {
     localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+    signalStorage('pcep-storage-restored', ACTIVE_PRACTICE_KEY)
     return true
   } catch {
-    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    signalStorage('pcep-storage-warning', ACTIVE_PRACTICE_KEY)
     return false
   }
 }
@@ -812,9 +817,10 @@ export function clearActiveFlashcards(expectedSessionId) {
   }
   try {
     localStorage.removeItem(ACTIVE_FLASHCARDS_KEY)
+    signalStorage('pcep-storage-restored', ACTIVE_FLASHCARDS_KEY)
     return true
   } catch {
-    window.dispatchEvent(new CustomEvent('pcep-storage-warning'))
+    signalStorage('pcep-storage-warning', ACTIVE_FLASHCARDS_KEY)
     return false
   }
 }
