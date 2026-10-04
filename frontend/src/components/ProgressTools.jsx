@@ -17,7 +17,9 @@ export default function ProgressTools({ onChange }) {
   const [preview, setPreview] = useState(null)
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
+  const [reading, setReading] = useState(false)
   const input = useRef(null)
+  const readRequest = useRef(0)
   const exportBackup = () => {
     setMessage(null)
     setError(null)
@@ -41,15 +43,25 @@ export default function ProgressTools({ onChange }) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    const request = ++readRequest.current
     setError(null)
     setMessage(null)
     setPreview(null)
+    setReading(true)
     try {
       if (file.size > 8 * 1024 * 1024)
         throw new Error('Backup must be smaller than 8 MB.')
-      setPreview(parseProgressBackup(await file.text()))
+      const nextPreview = parseProgressBackup(await file.text())
+      if (request === readRequest.current) setPreview(nextPreview)
     } catch (error) {
-      setError(error.message)
+      if (request === readRequest.current)
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Could not read this backup file. Please choose it again.'
+        )
+    } finally {
+      if (request === readRequest.current) setReading(false)
     }
   }
   const mergeBackup = () => {
@@ -80,7 +92,10 @@ export default function ProgressTools({ onChange }) {
     }
   }
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+    <section
+      aria-busy={reading}
+      className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"
+    >
       <h3 className="font-semibold">Progress backup &amp; review lists</h3>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
         Your progress stays in this browser. Export a backup to move it to another device.
@@ -140,6 +155,11 @@ export default function ProgressTools({ onChange }) {
           Clear notes
         </button>
       </div>
+      {reading && (
+        <p role="status" className="mt-3 text-sm text-sky-800 dark:text-sky-300">
+          Reading and validating backup…
+        </p>
+      )}
       {preview && (
         <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm dark:border-sky-800 dark:bg-sky-950/40">
           <p>
