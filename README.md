@@ -181,7 +181,7 @@ make django-check
 make compose-build && make audit-image
 make production-smoke
 
-# Backend — 214 tests (API/security, integrity, startup, release, SEO and smoke behavior)
+# Backend — 215 tests (API/security, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings

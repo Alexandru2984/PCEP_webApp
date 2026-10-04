@@ -731,6 +731,13 @@ the replacement candidate contains `libpcre2` 10.46-1~deb13u3 and OpenSSL
 Python findings, while the full report retains the same 44 unfixed HIGH occurrences
 across eight Debian CVEs and zero Python findings. All 214 backend tests pass.
 
+The backend deploy workflow now resolves the newly built candidate to its immutable
+Docker image ID and runs the blocking Trivy audit before `docker compose up`. A
+vulnerability finding, scanner outage or invalid candidate ID therefore stops after
+the already safe rollback snapshot and database backup, leaving the live container
+untouched. The ordering and failure boundary are regression-tested; all 215 backend
+tests, the question audit, Compose rendering and Django deploy check pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -879,6 +886,7 @@ across eight Debian CVEs and zero Python findings. All 214 backend tests pass.
 - `a9b5c67` — document internal healthcheck log filtering.
 - `5244b9d` — apply current Debian security patches in the runtime image.
 - `0ae831c` — record the runtime package remediation.
+- `fc10228` — scan each immutable backend candidate before replacement.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

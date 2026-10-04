@@ -86,11 +86,13 @@ The deployment command refuses tracked uncommitted changes. Before building, it
 verifies the live container, tags its exact image for rollback and streams a
 gzip-compressed PostgreSQL dump into a mode-`0600` file. It validates the dump
 header and checksum, then builds the candidate with the Git revision, runs
-Django deploy checks and refuses pending migrations. Only then does it recreate
-the backend service, wait for its Compose healthcheck, audit the live question
-bank read-only and verify readiness plus `X-PCEP-Release` through the public
-domain. A failure before replacement leaves the running container untouched;
-the rollback tag and dump are printed as soon as they are safe.
+Django deploy checks and refuses pending migrations. It resolves the candidate's
+immutable Docker image ID and runs the blocking Trivy audit against that exact
+image. A scan or scanner failure leaves the running container untouched. Only
+then does it recreate the backend service, wait for the Compose healthcheck,
+audit the live question bank read-only and verify readiness plus `X-PCEP-Release`
+through the public domain. The rollback tag and dump are printed as soon as they
+are safe.
 
 For a reviewed release that intentionally contains migrations, inspect them and
 run `make deploy-backend BACKEND_DEPLOY_FLAGS=--allow-migrations`. This records
