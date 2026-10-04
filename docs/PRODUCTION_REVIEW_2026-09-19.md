@@ -155,6 +155,9 @@ not printed or copied. No database or Docker volume was deleted.
   the existing one-query stats endpoint. All 15 objectives now have coverage.
 - Added bounded database startup, connection health checks, short connect
   timeout, ManifestStaticFilesStorage, structured Gunicorn logs and request IDs.
+- Marked successful internal Compose readiness probes and excluded only those
+  loopback requests from Gunicorn access logs. Readiness failures and public
+  requests using the same marker remain logged, preserving operational signal.
 
 The bank now contains 308 questions and 1,232 choices. Four earlier questions
 established coverage for previously empty objectives 1.1 and 1.2; three further
@@ -316,7 +319,10 @@ its cost material.
   available.
 - **Docker:** backend runs as `appuser`, read-only, capability-free, bounded to
   512 MB/128 PIDs with a noexec 64 MB tmpfs and graceful stop. It exposes only
-  loopback port 8001. PostgreSQL exposes no host port and keeps its named volume.
+  loopback port 8001. Successful internal readiness probes are omitted from the
+  access log only when their marker and loopback peer both match; failures and
+  public probes remain logged. PostgreSQL exposes no host port and keeps its named
+  volume.
 - **systemd:** Nginx, Docker and cloudflared are active. The weekly SEO generator
   remains installed as an existing systemd timer.
 - **External monitoring:** a separate GitHub Actions workflow now performs a
@@ -706,6 +712,13 @@ Playwright flows pass. The mobile regression keeps the mocked response pending f
 five seconds, cancels from an axe-clean loading screen and confirms the late response
 cannot move the app away from setup or create a Practice recovery record.
 
+The access-log signal follow-up removes the successful readiness probe emitted every
+ten seconds from routine Gunicorn access logs. Suppression requires the exact health
+path, GET, a successful response, the Compose-only marker and a loopback peer. Failed
+readiness checks and public requests remain logged. All 214 backend tests, the strict
+308-question audit, Django's production deploy check, Compose rendering, entrypoint
+syntax and Gunicorn configuration loading pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -850,6 +863,7 @@ cannot move the app away from setup or create a Practice recovery record.
 - `217ead0` — document bounded frontend assets.
 - `a4b133c` — cancel slow quiz loads without accepting late responses.
 - `661f605` — document cancellable quiz loading.
+- `22ec56a` — suppress only successful internal readiness probes in access logs.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

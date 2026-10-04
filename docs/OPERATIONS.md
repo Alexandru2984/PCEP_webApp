@@ -116,8 +116,11 @@ escalation is disabled, and the backend is capped at 512 MB and 128 processes.
 PostgreSQL volumes, privilege requirements and binding are unchanged.
 Healthchecks use the first configured allowed hostname and forwarded HTTPS;
 local hostnames are not required in production ALLOWED_HOSTS. `/api/health/`
-remains readiness. Gunicorn logs request ID, method, path, status and duration,
-without bodies, cookies, authorization or query strings.
+remains readiness. Successful Compose probes carry an internal marker and are
+omitted from Gunicorn's access log only when they arrive from container loopback.
+Failed probes and public requests remain visible, including requests that copy
+the marker. Gunicorn logs request ID, method, path, status and duration, without
+bodies, cookies, authorization or query strings.
 
 ## Frontend Deploy
 
