@@ -1928,6 +1928,30 @@ publish a frontend, reseed questions or change environment/Cloudflare settings.
 Rolling the backend image back is compatible with the retained constraint; remove
 the constraint only through the reviewed reverse migration if that becomes necessary.
 
+The Pyodide truncation-reporting frontend is published at revision
+`b16a9c49ef93`. Its rollback root is
+`.frontend.previous-20261004T200615Z-518df7be`, with external copy
+`frontend.20261004T200615Z-518df7be`. The entry chunk
+`index-DmmfjSFL.js` has SHA-256
+`bbd52a9934b5692b479f224039b8174447e83bc853b2542c93ae6227e557fb11`,
+the lazy runner chunk `CodeRunner-C7Zdp7L1.js` has SHA-256
+`4c497da67591b004462b6bda623e4d1b96d7366351915d96a36fed73a545a1a2`,
+the stylesheet remains
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`5b43c8e0b5a05d9136edaaf1bfeee02782d0f876e00f56d59a84a4df778d7e30`.
+The public files match the validated build byte for byte. All 303 Vitest tests,
+lint, formatting and the production build pass; the real-runtime Playwright flow
+also passes syntax/runtime errors, bounded output, timeout and worker recovery.
+Fresh live Chromium at 390 px loaded the published release and self-hosted Pyodide,
+ran 20,000 characters of output, observed the explicit 10,000-character warning,
+fit the viewport, found zero axe violations and raised no page error. The tracked
+Cloudflare inline-script CSP rejection remained the only console error. Public smoke
+passes with this frontend and backend `32d3b643f71e`; Compose is healthy,
+cloudflared is active and privileged `nginx -t` passes. This atomic frontend
+publication recreated no service and required no migration, environment, Nginx or
+Cloudflare change.
+
 ## 15. Breaking changes
 
 None.
