@@ -18,11 +18,13 @@ Browser
       └─ exact /u/ collection routes → loopback Umami service
 ```
 
-Cloudflared and Nginx are shared with other applications. The tunnel has a
-specific route for another hostname and a catch-all loopback TLS origin. Its
-local origin certificate is not verified. UFW exposes SSH and the unrelated
-TURN service, but not ports 80/443. Nginx listens on 80/443 for the local tunnel;
-the default TLS vhost redirects unknown hosts to `https://micutu.com/`.
+Cloudflared and Nginx are shared with other applications. The tunnel has explicit
+routes for PCEP and another hostname plus a catch-all loopback TLS origin. PCEP
+sets its reviewed Host/SNI and verifies the local Let's Encrypt certificate; the
+legacy catch-all still disables verification for other hostnames. UFW exposes SSH
+and the unrelated TURN service, but not ports 80/443. Nginx listens on 80/443 for
+the local tunnel; the default TLS vhost redirects unknown hosts to
+`https://micutu.com/`.
 PCEP's backend port is bound only to `127.0.0.1:8001`; PostgreSQL publishes no
 host port. The PCEP Docker bridge contains the backend and database.
 
@@ -98,10 +100,10 @@ Remaining security work:
 - Cloudflare currently injects a dynamic inline JavaScript-detection challenge.
   CSP blocks it, producing a console warning while leaving the application
   functional. Disable that edge feature rather than weaken CSP.
-- The shared tunnel catch-all and `noTLSVerify` increase the impact of a host
-  routing error. UFW, the origin guard and strict PCEP host handling contain the
-  current exposure, but an explicit PCEP ingress rule with verified origin TLS
-  would be clearer.
+- The shared tunnel catch-all still uses `noTLSVerify` for unrelated hostnames.
+  PCEP now bypasses it through an explicit hostname rule with a fixed Host/SNI and
+  verified origin TLS. Completing the same migration for every other vhost belongs
+  to those applications' deployment reviews.
 - Model/admin/seed validation protects normal writes, but a direct ORM or SQL
   write can still bypass the one-correct-choice invariant. A deferred database
   design could encode stronger constraints, though cross-row “exactly one” is
@@ -315,10 +317,10 @@ its cost material.
   frontend/static rollback and backup snapshots, enforces at least two retained
   copies and requires `--apply` before removal. Database/security backups cannot
   match its allowlist. No production snapshot was deleted during this work.
-- **Cloudflare/Tunnel:** service is enabled and healthy. Live cache behavior is
-  BYPASS/DYNAMIC for shell/API/workers and immutable for hashed assets. No
-  dashboard setting was changed because no Cloudflare account connector was
-  available.
+- **Cloudflare/Tunnel:** service is enabled and healthy. PCEP uses an explicit
+  hostname ingress with verified loopback origin TLS; live cache behavior is
+  BYPASS/DYNAMIC for shell/API/workers and immutable for hashed assets. No dashboard
+  setting was changed because no Cloudflare account connector was available.
 - **Docker:** backend runs as `appuser`, read-only, capability-free, bounded to
   512 MB/128 PIDs with a noexec 64 MB tmpfs and graceful stop. It exposes only
   loopback port 8001. Successful internal readiness probes are omitted from the

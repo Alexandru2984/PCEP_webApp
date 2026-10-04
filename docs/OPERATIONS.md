@@ -563,7 +563,41 @@ certificate, shared `block-dotfiles.conf`, and host Cloudflare real-IP and
 `$from_cloudflare_origin` definitions. The shared tunnel connects to HTTPS
 loopback; Nginx restores CF-Connecting-IP only for trusted peers and overwrites
 X-Forwarded-For with that verified address. Django still trusts one proxy hop.
-No shared tunnel/firewall configuration was changed.
+
+PCEP has an explicit ingress rule before the shared HTTPS catch-all. It fixes the
+origin Host and SNI to the reviewed hostname and verifies the local Let's Encrypt
+certificate, overriding the legacy global `noTLSVerify` only for PCEP:
+
+```yaml
+- hostname: pcep.micutu.com
+  service: https://127.0.0.1:443
+  originRequest:
+    originServerName: pcep.micutu.com
+    httpHostHeader: pcep.micutu.com
+    noTLSVerify: false
+    connectTimeout: 10s
+```
+
+Keep this rule after path/special-service rules and before the catch-all. Validate
+the file and selected route, verify the origin certificate independently, then
+restart because this systemd service has no reload action:
+
+```bash
+sudo cloudflared tunnel --config /etc/cloudflared/config.yml ingress validate
+sudo cloudflared tunnel --config /etc/cloudflared/config.yml ingress rule \
+  https://pcep.micutu.com/api/health/
+openssl s_client -connect 127.0.0.1:443 -servername pcep.micutu.com \
+  -verify_return_error -brief </dev/null
+sudo systemctl restart cloudflared
+make production-smoke
+```
+
+The pre-change mode-0600 backup is
+`/home/micu/backups/pcep/cloudflared.config.20261004T123936Z.yml`. To roll back,
+install it over `/etc/cloudflared/config.yml` as `root:root` mode 0600, validate,
+restart only cloudflared and rerun the smoke. The restart reconnects the tunnel and
+can briefly return an edge 530; it does not require an Nginx, Docker or database
+restart.
 
 Install `nginx/snippets/pcep-*.conf` into `/etc/nginx/snippets/` before installing
 the vhost. Back up outside sites-enabled, run `sudo nginx -t`, then use
