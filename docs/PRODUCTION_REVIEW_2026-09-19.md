@@ -479,9 +479,9 @@ The supported-dependency refresh keeps React 18, Vite 6 and Vitest 4 while
 updating compatible frontend packages and moving the development linter from the
 unsupported ESLint 9 line to ESLint 10. `npm ci`, 232 Vitest tests, lint,
 formatting, the production build and all 27 Playwright flows pass; `npm audit`
-reports zero vulnerabilities. Axios remains exactly at audited 1.18.0 because
-1.20.0 alone increased the entry bundle by about 5.9 KB / 1.9 KB gzip with no
-security finding to resolve. The validated entry remains 277.89 KB / 88.61 KB
+reported zero vulnerabilities at that checkpoint. Axios remained exactly at 1.18.0
+then because 1.20.0 alone increased the entry bundle by about 5.9 KB / 1.9 KB gzip
+with no security finding to resolve. The validated entry remained 277.89 KB / 88.61 KB
 gzip. Fresh live Chromium verified release `11d8c34b956e`, answer-safe quiz fetch,
 post-submit feedback, zero axe violations, no mobile overflow and an active worker.
 
@@ -771,6 +771,14 @@ passed. Their timeout is now scoped to 60 seconds while retries and all assertio
 remain unchanged. The final two-worker run completed them in 25.8 and 24.9 seconds,
 and all 31 Playwright flows passed.
 
+A later dependency audit reported new HIGH-severity Axios findings affecting the
+pinned 1.18.0 release. Axios is now pinned to the fixed 1.20.0 release with a fresh
+registry lock integrity value. The measured cost is about 5.9 KB uncompressed / 1.8
+KB gzip on the entry bundle, which is warranted now that it closes an active finding.
+`npm ci` reproduces the tree, `npm audit --audit-level=moderate` reports zero
+vulnerabilities, and all 300 Vitest tests, lint, formatting, the production build
+and 31 Playwright flows pass against the new client.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -929,6 +937,8 @@ and all 31 Playwright flows passed.
 - `d6cb023` — preserve heading order on an empty Progress dashboard.
 - `abb4876` — document the Progress heading correction.
 - `ed24b7b` — give the full accessibility matrices a measured timeout budget.
+- `5e8ebbc` — record the resilient Progress frontend release.
+- `85098b0` — update Axios to the fixed 1.20.0 release.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
