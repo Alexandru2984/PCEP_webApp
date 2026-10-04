@@ -11,6 +11,16 @@ spec = importlib.util.spec_from_file_location(
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
+CANDIDATE_IMAGE = f'sha256:{"a" * 64}'
+
+
+def candidate_capture(args):
+    if args[:2] == ['git', 'status']:
+        return ''
+    if args[:3] == ['docker', 'image', 'inspect']:
+        return CANDIDATE_IMAGE
+    return 'abc123def456'
+
 
 def config(tmp_path, **kwargs):
     values = {
@@ -34,9 +44,7 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
 
     def capture(args, **_kwargs):
         events.append(('capture', tuple(args)))
-        if args[:2] == ['git', 'status']:
-            return ''
-        return 'abc123def456'
+        return candidate_capture(args)
 
     monkeypatch.setattr(release, 'capture_command', capture)
     monkeypatch.setattr(
@@ -55,9 +63,11 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
     result = release.deploy(config(tmp_path))
 
     build = ('run', ('docker', 'compose', 'build', 'backend'))
+    scan = ('run', ('make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}'))
     up = ('run', ('docker', 'compose', 'up', '-d', '--no-deps', 'backend'))
     assert events.index(('snapshot',)) < events.index(('backup',)) < events.index(build)
-    assert events.index(build) < events.index(up) < events.index(('healthy',))
+    assert events.index(build) < events.index(scan) < events.index(up)
+    assert events.index(up) < events.index(('healthy',))
     assert events[-1] == ('public',)
     assert result.rollback_tag == 'rollback:test'
     assert any(
@@ -69,13 +79,39 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
     assert any(event[0] == 'run' and event[1][-2:] == ('migrate', '--check') for event in events)
 
 
+def test_deploy_does_not_replace_backend_when_image_scan_fails(tmp_path, monkeypatch):
+    commands = []
+
+    def run(args, **_kwargs):
+        commands.append(tuple(args))
+        if args == ['make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}']:
+            raise release.subprocess.CalledProcessError(1, args)
+
+    monkeypatch.setattr(release, 'run_command', run)
+    monkeypatch.setattr(
+        release,
+        'capture_command',
+        lambda args, **_kwargs: candidate_capture(args),
+    )
+    monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: 'rollback:test')
+    monkeypatch.setattr(
+        release, 'backup_database', lambda *_: (tmp_path / 'backup.sql.gz', 'digest')
+    )
+
+    with pytest.raises(release.subprocess.CalledProcessError):
+        release.deploy(config(tmp_path))
+
+    assert ('make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}') in commands
+    assert ('docker', 'compose', 'up', '-d', '--no-deps', 'backend') not in commands
+
+
 def test_reviewed_migrations_use_plan_instead_of_refusing_them(tmp_path, monkeypatch):
     commands = []
     monkeypatch.setattr(release, 'run_command', lambda args, **_: commands.append(tuple(args)))
     monkeypatch.setattr(
         release,
         'capture_command',
-        lambda args, **_kwargs: '' if args[:2] == ['git', 'status'] else 'abc123def456',
+        lambda args, **_kwargs: candidate_capture(args),
     )
     monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: 'rollback:test')
     monkeypatch.setattr(

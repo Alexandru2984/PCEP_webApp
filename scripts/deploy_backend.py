@@ -18,6 +18,8 @@ import uuid
 
 
 RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
+IMAGE_ID_PATTERN = re.compile(r'sha256:[0-9a-f]{64}')
+BACKEND_IMAGE = 'pcep_webapp-backend:latest'
 
 
 class ReleaseError(RuntimeError):
@@ -267,6 +269,13 @@ def deploy(config):
     print(f'Verified database backup: {backup_path} ({backup_sha256})', flush=True)
 
     run_command(['docker', 'compose', 'build', 'backend'], cwd=root, env=environment)
+    candidate_image = capture_command(
+        ['docker', 'image', 'inspect', BACKEND_IMAGE, '--format', '{{.Id}}'],
+        cwd=root,
+        env=environment,
+    )
+    if not IMAGE_ID_PATTERN.fullmatch(candidate_image):
+        raise ReleaseError('The candidate backend image has an invalid image ID.')
     candidate_release = capture_command(
         [
             'docker', 'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
@@ -299,6 +308,13 @@ def deploy(config):
             'docker', 'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
             'backend', 'manage.py', migration_command, *migration_args,
         ],
+        cwd=root,
+        env=environment,
+    )
+    # Scan the exact image Compose just built while the verified live container
+    # is still untouched. A scanner or vulnerability failure aborts safely here.
+    run_command(
+        ['make', 'audit-image', f'BACKEND_IMAGE={candidate_image}'],
         cwd=root,
         env=environment,
     )
