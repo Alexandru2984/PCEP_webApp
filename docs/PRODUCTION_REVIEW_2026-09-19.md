@@ -216,6 +216,9 @@ at 20,000 characters, output at 10,000 characters and active/queued jobs at
 four. Timeout or fatal failure replaces the worker. The pinned 0.29.4 npm
 tarball is verified by SHA-512 before staged extraction. These are browser
 resource controls, not a hostile-code sandbox.
+The manager also marks results as truncated when its independent character or
+chunk bounds discard worker data, so defensive client-side truncation cannot be
+mistaken for complete Python output.
 
 ## 6. UX/mobile changes
 
@@ -1012,6 +1015,7 @@ pass.
 - `6b4ddc8` — document key-scoped storage recovery behavior.
 - `c11c6d9` — verify generated Nginx API error contracts in isolated CI.
 - `4bbeaea` — prevent multiple correct choices at the database boundary.
+- `9ab7724` — report Pyodide output truncated at the manager boundary.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

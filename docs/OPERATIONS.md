@@ -529,10 +529,12 @@ a second deliberate Save may replace the newer stored note.
 The Python runner limits source to 20,000 characters, output/tracebacks to
 10,000 characters, queued/running jobs to four, startup to 30 seconds and each
 execution to eight seconds. Timeout terminates the worker; later Run recreates
-it. Failed startup/crash also permits retry. These are responsiveness/resource
-protections, not a hardened sandbox: arbitrary Python can use the JavaScript
-bridge and can still exhaust browser memory before a timeout. Do not run
-untrusted snippets in an authenticated admin browser.
+it. Failed startup/crash also permits retry. Both the worker and its manager enforce
+the output bound; if either layer discards excess text or chunks, the result is marked
+as truncated so the UI does not present incomplete output as complete. These are
+responsiveness/resource protections, not a hardened sandbox: arbitrary Python can
+use the JavaScript bridge and can still exhaust browser memory before a timeout.
+Do not run untrusted snippets in an authenticated admin browser.
 
 The question audit canonicalizes valid Python snippets through the standard AST
 before duplicate comparison. This catches semantically identical questions that
