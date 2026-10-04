@@ -496,6 +496,13 @@ size. Resume rotates the session ID. A stale tab detects that ownership transfer
 aborts any reveal in flight, returns to the recovery screen and cannot overwrite or
 delete the new owner's copy.
 
+Practice, Exam and Flashcards now enter the completed report only after the combined
+history, mistakes and study snapshot is stored successfully. If quota, permissions or
+a newer schema prevents that write, the current mode and its active recovery record
+remain intact. Practice exposes **Retry saving results**, Exam exposes **Retry
+submission**, and the final Flashcard rating becomes selectable again. A successful
+retry records the attempt once and only then clears the active recovery record.
+
 Progress, settings and active-session writes refuse to replace a storage schema
 with a higher version number. A stale tab also leaves newer recovery data untouched
 on read and clear, and shows a reload warning immediately or after a cross-tab

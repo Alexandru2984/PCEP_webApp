@@ -57,7 +57,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
   selections and flags, Practice resumes at the current question or already submitted
   feedback, and Flashcards restores the current card plus any answer already revealed.
   Every mode uses a validated local-only copy, requires confirmation before discard and
-  keeps answer keys out of every unanswered or unrevealed question.
+  keeps answer keys out of every unanswered or unrevealed question. A completed session
+  reaches its report only after the progress snapshot is stored; a failed write keeps
+  the last step and recovery copy available for an explicit retry.
 - 🧠 **Local review schedule** — an explainable 1, 3, 7, 14… day study cycle,
   due-review drills in Practice or Flashcards, per-question mastery and transparent
   adaptive study in Practice or Flashcards that also prioritizes low-confidence
@@ -187,7 +189,7 @@ cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 300 Vitest tests, then static checks, the production build and
+# Frontend — 302 Vitest tests, then static checks, the production build and
 # 31 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build

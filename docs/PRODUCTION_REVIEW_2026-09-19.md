@@ -799,6 +799,16 @@ install emits a deprecation notice for Workbox's transitive `glob@11.1.0`, but t
 package has no active audit finding; forcing a PWA dependency replacement solely
 for that warning would add unjustified release risk.
 
+Session completion previously entered the report even when the atomic progress write
+failed. Although its active recovery record remained, leaving the report could then
+clear that last copy, and the final Flashcard rating stayed guarded against a second
+click. Completion now fails closed in Practice, Exam and Flashcards: it keeps the
+current screen and active recovery record, explains the failure and makes the exact
+completion action retryable. The attempt is shown as complete and recovery is cleared
+only after the combined progress snapshot succeeds. All 302 Vitest tests, lint,
+formatting, the production build and all 31 Playwright flows pass, including the
+throttled-grading retry contract.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -965,6 +975,7 @@ for that warning would add unjustified release risk.
 - `6b49fee` — record the frontend identity release.
 - `0895af0` — route PCEP through verified Cloudflare Tunnel origin TLS.
 - `e72a4f4` — run dependency advisory audits daily and on manual dispatch.
+- `943a98b` — keep failed completed-session snapshots recoverable and retryable.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
