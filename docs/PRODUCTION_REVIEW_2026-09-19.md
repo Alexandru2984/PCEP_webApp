@@ -1996,8 +1996,8 @@ console error occurred. Public smoke passes with this frontend and backend
 passes. This atomic frontend publication recreated no service and required no
 migration, environment, Nginx or Cloudflare change.
 
-The PostgreSQL hardening is deployed from commit `c917fa6`. Production now runs
-image `sha256:286dc161b78dcd0ccc5e9d5e62bb07a3e17bb47674294a99b898e437dd4571b2`,
+The initial PostgreSQL hardening was deployed from commit `c917fa6` as image
+`sha256:286dc161b78dcd0ccc5e9d5e62bb07a3e17bb47674294a99b898e437dd4571b2`,
 built from the reviewed PostgreSQL 16.15 Alpine digest. The prior image is retained
 as `pcep-postgres-rollback:20261004T203125Z-pre-hardening`. The verified pre-change
 logical dump is `/home/micu/backups/pcep/pcep_db_20261004T203125Z.sql.gz`, mode
@@ -2019,6 +2019,29 @@ Both containers are healthy, the live database audit is clean, public smoke pass
 with backend `32d3b643f71e` and frontend `1f3bf87dc97a`, cloudflared is active and
 privileged `nginx -t` passes. No schema migration, volume replacement, Nginx reload
 or Cloudflare change was required.
+
+The least-privilege role follow-up is deployed from commit `26b72ae` as database
+image `sha256:665b0e8864d3399e8fb10828cc869c3065682262e289b56dacbfda8c8374b0e9`.
+The mode-0600 pre-change application dump is
+`/home/micu/backups/pcep/pcep_db_20261004T204938Z.sql.gz`, SHA-256
+`e19604b1fb14b560b96ee2e106c8bbc9cd32fbc5dd2d8788ff4d7c207a42a0a0`.
+The separate mode-0600 global-role dump is
+`/home/micu/backups/pcep/pcep_globals_20261004T204938Z.sql.gz`, SHA-256
+`e7b3810ef8c16319d2e24c2df9b5730f61dcae3ec1e51b39c13b5d55737dee4d`.
+The latter captures the rollback state that a normal per-database dump omits.
+
+The migration was first exercised on a restored copy, including application DDL,
+forbidden role creation and restart. Live, the bootstrap owner became `pcep_admin`;
+the recreated `pcep_user` has no superuser, create-role, create-database, replication
+or row-security-bypass privilege. It owns `pcep_db` plus its public tables and
+sequences, while the administrator retains system schemas and `plpgsql`. Django's
+migration check and question audit pass under the restricted role. `.env.db` is a
+separate ignored mode-0600 file; TCP authentication works for both roles, and an
+environment-key audit proves the administrator credential is absent from the backend
+container. Only `pcep_db` was recreated, becoming healthy in seven seconds without
+changing its external volume. Both containers and the tunnel are healthy, public
+smoke passes, and privileged `nginx -t` passes. No data/schema migration, frontend or
+backend publication, Nginx reload or Cloudflare change was required.
 
 ## 15. Breaking changes
 
