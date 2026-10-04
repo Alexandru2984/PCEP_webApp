@@ -128,7 +128,10 @@ export const DAILY_DATE = `${bucharestParts.year}-${bucharestParts.month}-${buch
 export const correctId = (questionId) => questionId * 10 + 1
 
 // Intercept every /api call so the suite needs no backend.
-export async function mockApi(page, { statsFailures = 0, quizFailures = 0 } = {}) {
+export async function mockApi(
+  page,
+  { statsFailures = 0, quizFailures = 0, quizDelayMs = 0 } = {}
+) {
   let statsAttempts = 0
   let quizAttempts = 0
   await page.route('**/api/**', async (route) => {
@@ -169,6 +172,8 @@ export async function mockApi(page, { statsFailures = 0, quizFailures = 0 } = {}
     }
     if (path.includes('/api/quiz-set')) {
       quizAttempts++
+      if (quizDelayMs > 0)
+        await new Promise((resolve) => setTimeout(resolve, quizDelayMs))
       if (quizAttempts <= quizFailures)
         return route.fulfill({
           status: 503,

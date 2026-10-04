@@ -112,6 +112,42 @@ test('quiz loading failure retries the exact saved setup', async ({ page }) => {
   ).toBe(true)
 })
 
+test('quiz loading can be cancelled without accepting a late response', async ({
+  page,
+}) => {
+  await mockApi(page, { quizDelayMs: 5_000 })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await page.getByLabel('Module').selectOption('module2')
+  await page.getByLabel('Difficulty').selectOption('hard')
+  await page.getByRole('button', { name: '5 questions' }).click()
+  await page.getByRole('button', { name: 'Start practice' }).click()
+
+  await expect(page.getByRole('status')).toHaveText('Loading quiz…')
+  await expect(page.getByRole('button', { name: 'Cancel loading' })).toBeVisible()
+  const analysis = await new AxeBuilder({ page }).analyze()
+  expect(analysis.violations.map((violation) => violation.id)).toEqual([])
+  await page.getByRole('button', { name: 'Cancel loading' }).click()
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+
+  await page.waitForTimeout(5_200)
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  const saved = await page.evaluate(() => ({
+    settings: JSON.parse(localStorage.getItem('pcep.settings')).data,
+    recovery: localStorage.getItem('pcep.activePractice'),
+  }))
+  expect(saved.settings).toMatchObject({
+    mode: 'practice',
+    module: 'module2',
+    difficulty: 'hard',
+    count: 5,
+  })
+  expect(saved.recovery).toBeNull()
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+  ).toBe(true)
+})
+
 test('syllabus objective filter requests and displays the precise scope', async ({
   page,
 }) => {
