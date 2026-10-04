@@ -788,6 +788,17 @@ footer continues to show the same value. The smoke contract validates and report
 that marker separately from `X-PCEP-Release`. Missing, development, malformed and
 duplicate markers are regression-tested; all 216 backend tests pass.
 
+The Axios advisory appeared after the previous dependency-clean release, exposing
+a monitoring gap: push/pull-request audits do not run while a repository is idle.
+A separate daily and manually dispatchable workflow now audits both Python
+requirement sets and the npm lockfile. It has read-only repository permissions,
+ten-minute job limits, SHA-pinned official actions and disables npm package scripts
+during tree reproduction. The current production/development Python audits and
+`npm audit --audit-level=moderate` all report zero known vulnerabilities. The npm
+install emits a deprecation notice for Workbox's transitive `glob@11.1.0`, but the
+package has no active audit finding; forcing a PWA dependency replacement solely
+for that warning would add unjustified release risk.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -953,6 +964,7 @@ duplicate markers are regression-tested; all 216 backend tests pass.
 - `4c1342b` — document frontend release identity checks.
 - `6b49fee` — record the frontend identity release.
 - `0895af0` — route PCEP through verified Cloudflare Tunnel origin TLS.
+- `e72a4f4` — run dependency advisory audits daily and on manual dispatch.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

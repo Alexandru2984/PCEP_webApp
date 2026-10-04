@@ -52,6 +52,14 @@ CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime.
 
+`.github/workflows/dependency-audit.yml` audits both committed Python requirement
+sets and the npm lockfile every day at 04:17 UTC, with manual dispatch available.
+It is independent of repository activity, uses read-only repository permissions,
+has ten-minute job limits and runs `npm ci --ignore-scripts` before the Node audit.
+This detects advisories published between code changes without granting a scanner
+write access or executing dependency lifecycle scripts. Reproduce either failure
+locally with `make audit` before changing a version pin.
+
 ## Public Production Smoke
 
 ```bash
@@ -683,5 +691,6 @@ CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright
 to two workers, uploads HTML reports/traces, validates the vhost with disposable
 certificates in an isolated Nginx container, and builds the hardened backend.
 Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.
-The push/pull-request CI never calls production. The separate scheduled smoke
-workflow performs only the bounded public checks documented above.
+The push/pull-request CI never calls production. The scheduled dependency audit
+only reads manifests and advisory services; the separate scheduled smoke workflow
+performs only the bounded public checks documented above.

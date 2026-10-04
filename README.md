@@ -199,6 +199,10 @@ production, plus `manage.py check --deploy` against a production-like config.
 Its pinned Trivy scan fails on HIGH/CRITICAL operating-system or Python findings
 that have a vendor fix, while still reporting separately tracked findings without
 a patch.
+The separate **Scheduled dependency audit** runs daily at 04:17 UTC and on manual
+dispatch, so newly published Python or Node advisories are detected even when no
+push or pull request occurs. It has read-only repository permissions and installs
+the Node tree with package scripts disabled before auditing the committed lockfile.
 The separate **Production smoke** workflow runs every six hours and on manual
 dispatch. It uses bounded read-only requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,
