@@ -817,6 +817,14 @@ flow and a component regression pin both transitions. All 303 Vitest tests, lint
 formatting and the production build pass; the focused Playwright recovery flow also
 passes.
 
+Public header comparison found that normal API responses carried the restrictive API
+CSP while Nginx-generated 413 and 429 JSON responses did not. The named error
+locations now add `default-src 'none'; frame-ancestors 'none'` alongside the existing
+no-store and common security headers. The isolated tracked-vhost check and privileged
+live `nginx -t` pass. A controlled 70 KB request returned the same 413 JSON contract
+with the new CSP after a graceful reload; public smoke and all runtime health checks
+remained green.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -987,6 +995,7 @@ passes.
 - `4064106` — document recoverable completion behavior and validation.
 - `a8c7cb6` — clear a stale persistence warning after storage recovers.
 - `a4823b8` — document the storage-warning recovery contract.
+- `1992145` — align Nginx-generated API error CSP with normal API responses.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1831,6 +1840,19 @@ browser recovery flow. Public smoke reports the new frontend revision, Compose i
 healthy, cloudflared has four ready connections and privileged `nginx -t` passes.
 No service was recreated and no migration, environment, Nginx or Cloudflare change
 was required; the backend remains on `2915c622166b`.
+
+The API error-header change is installed from commit `1992145`. The previous
+root-owned vhost is backed up as
+`/home/micu/backups/pcep/nginx.pcep.20261004T130929Z.conf`, mode 0600, with SHA-256
+`dea53d7b38ff450585c2db7dd5fe175ac70f7ae0e26259c4f10f2dde610f5b4b`.
+Both named 413/429 locations in the loaded `nginx -T` output contain the restrictive
+API CSP. A public 413 response confirmed that CSP, all common headers, no-store JSON
+and request ID end to end. The complete public smoke passed, Compose remained healthy,
+cloudflared retained four ready connections and the Nginx journal recorded a clean
+graceful reload. No container or tunnel was restarted; no migration, application
+artifact, environment or Cloudflare setting changed. Rollback consists of restoring
+the backup over `/etc/nginx/sites-available/pcep.micutu.com`, running `sudo nginx -t`
+and gracefully reloading Nginx.
 
 ## 15. Breaking changes
 

@@ -621,8 +621,10 @@ the vhost. Back up outside sites-enabled, run `sudo nginx -t`, then use
 `sudo systemctl reload nginx` (graceful). The 2026-09-18 vhost backup is in
 `/home/micu/backups/pcep/security-20260918/nginx.before`.
 The API has a shared 3 requests/second IP limit with a burst of 30, 64 KB body
-limit, short connection timeout and JSON 413/429 errors. Admin retains its
-20/minute limit and Django CSRF behavior. The analytics proxy exposes only
+limit, short connection timeout and JSON 413/429 errors. Those Nginx-generated
+errors carry `Cache-Control: no-store` and the same restrictive API CSP
+(`default-src 'none'; frame-ancestors 'none'`) as proxied API responses. Admin
+retains its 20/minute limit and Django CSRF behavior. The analytics proxy exposes only
 GET tracker script and POST event collection; its dashboard is not routed.
 Hashed assets get immutable caching and real 404s for missing files; shell,
 worker, Pyodide and study pages send no-cache/no-store/must-revalidate.
