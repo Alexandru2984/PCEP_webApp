@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react'
 
-export default function FeedbackBox({ feedback, onNext, isLast }) {
+export default function FeedbackBox({
+  feedback,
+  onNext,
+  isLast,
+  retryingFinish = false,
+}) {
   const nextButton = useRef(null)
   useEffect(() => {
     nextButton.current?.focus({ preventScroll: true })
@@ -59,7 +64,11 @@ export default function FeedbackBox({ feedback, onNext, isLast }) {
           onClick={onNext}
           className="rounded-lg bg-slate-900 px-5 py-2 font-medium text-white transition-colors hover:bg-slate-700 dark:bg-sky-700 dark:hover:bg-sky-800"
         >
-          {isLast ? 'See Results →' : 'Next Question →'}
+          {retryingFinish
+            ? 'Retry saving results'
+            : isLast
+              ? 'See Results →'
+              : 'Next Question →'}
         </button>
       </div>
     </div>

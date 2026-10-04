@@ -65,4 +65,19 @@ describe('FeedbackBox', () => {
     fireEvent.click(button)
     expect(onNext).toHaveBeenCalledOnce()
   })
+
+  it('labels a failed final snapshot as a save retry', () => {
+    render(
+      <FeedbackBox
+        feedback={{ is_correct: true, explanation: 'ok' }}
+        onNext={() => {}}
+        isLast
+        retryingFinish
+      />
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Retry saving results' })
+    ).toBeInTheDocument()
+  })
 })

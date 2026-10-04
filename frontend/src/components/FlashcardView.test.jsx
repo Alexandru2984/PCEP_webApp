@@ -88,6 +88,39 @@ describe('FlashcardView', () => {
     expect(screen.queryByRole('button', { name: /Got it/i })).not.toBeInTheDocument()
   })
 
+  it('keeps the final rating retryable when completed progress is not saved', async () => {
+    submitAnswer.mockResolvedValue({
+      is_correct: false,
+      correct_choice_id: 2,
+      explanation: 'first choice',
+      correct_explanation: 'first concept',
+    })
+    const onFinish = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const props = {
+      questions: [card(10, [1, 2])],
+      onFinish,
+      onQuit: () => {},
+    }
+    const { rerender } = render(<FlashcardView {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Reveal answer/i }))
+    expect(await screen.findByText(/first concept/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Got it/i }))
+    expect(onFinish).toHaveBeenCalledOnce()
+
+    rerender(
+      <FlashcardView
+        {...props}
+        completionError="The completed session could not be saved safely."
+      />
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Choose a rating again to retry saving your results'
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Got it/i }))
+    expect(onFinish).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps the answer hidden after a network failure and offers a safe retry', async () => {
     submitAnswer
       .mockRejectedValueOnce(new Error('Network failure'))

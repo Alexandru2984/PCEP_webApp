@@ -338,6 +338,7 @@ export default function QuizContainer() {
           onQuit={returnToSetup}
           initialProgress={flashcardProgress}
           onProgress={saveFlashcardProgress}
+          completionError={error}
         />
       </Suspense>
     )
@@ -374,7 +375,10 @@ export default function QuizContainer() {
           role="alert"
           className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
         >
-          {error} Select an answer to retry.
+          {error}{' '}
+          {phase === 'reviewing'
+            ? 'Choose “Retry saving results” to try again.'
+            : 'Select an answer to retry.'}
         </p>
       )}
       {phase === 'submitting-answer' && (
@@ -438,6 +442,7 @@ export default function QuizContainer() {
           feedback={feedback}
           onNext={handleNext}
           isLast={index + 1 >= questions.length}
+          retryingFinish={phase === 'reviewing' && !!error}
         />
       ) : (
         <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">

@@ -626,7 +626,7 @@ test('exam preserves answers through a throttled grading request and retries onc
     'aria-pressed',
     'true'
   )
-  await page.getByRole('button', { name: 'Retry grading' }).click()
+  await page.getByRole('button', { name: 'Retry submission' }).click()
   await expect(page.getByRole('heading', { name: 'Quiz complete' })).toBeVisible()
   await page.getByRole('button', { name: `All (${QUESTIONS.length})` }).click()
   await expect(page.getByText('✓ correct', { exact: true })).toHaveCount(QUESTIONS.length)

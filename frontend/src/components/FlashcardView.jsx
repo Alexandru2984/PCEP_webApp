@@ -16,6 +16,7 @@ export default function FlashcardView({
   onQuit,
   initialProgress,
   onProgress,
+  completionError,
 }) {
   const [index, setIndex] = useState(() => initialProgress?.index ?? 0)
   const [revealed, setRevealed] = useState(() => initialProgress?.revealed ?? null)
@@ -105,7 +106,7 @@ export default function FlashcardView({
       }
       const next = [...items, item]
       if (index + 1 >= questions.length) {
-        onFinish(next)
+        if (onFinish(next) === false) marking.current = false
         return
       }
       setItems(next)
@@ -143,12 +144,13 @@ export default function FlashcardView({
 
   return (
     <div>
-      {error && (
+      {(completionError || error) && (
         <p
           role="alert"
           className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
         >
-          {error}
+          {completionError || error}
+          {completionError && ' Choose a rating again to retry saving your results.'}
         </p>
       )}
       <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">

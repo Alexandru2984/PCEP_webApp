@@ -219,7 +219,7 @@ export default function ExamView({
           className="mb-3 text-sm font-medium text-amber-800 dark:text-amber-200"
         >
           Time is up. Your answers are locked.{' '}
-          {error ? 'Retry grading to finish.' : 'Submitting your exam…'}
+          {error ? 'Retry submission to finish.' : 'Submitting your exam…'}
         </p>
       )}
       {lowOnTime && timeLeft > 0 && (
@@ -400,7 +400,7 @@ export default function ExamView({
             disabled={submitting}
             className="rounded-lg bg-green-700 px-6 py-2.5 font-medium text-white transition-colors hover:bg-green-800 disabled:opacity-50"
           >
-            {submitting ? 'Grading…' : error ? 'Retry grading' : 'Submit exam'}
+            {submitting ? 'Grading…' : error ? 'Retry submission' : 'Submit exam'}
           </button>
         )}
       </div>

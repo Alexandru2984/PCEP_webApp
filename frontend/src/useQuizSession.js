@@ -30,6 +30,9 @@ import { MAX_RESPONSE_MS, validConfidence } from './confidence'
 import { validDateKey } from './daily'
 import { EXAM_SECONDS_PER_QUESTION, PCEP_30_02_PRESET, validPcep30_02Set } from './exam'
 
+const COMPLETION_SAVE_ERROR =
+  'The completed session could not be saved safely. Resolve the browser storage warning, then retry.'
+
 function emptyState(
   lastConfig = null,
   resumableExam = null,
@@ -203,6 +206,8 @@ export function sessionReducer(state, event) {
       return { ...state, submitting: true, error: null }
     case 'grade-error':
       return { ...state, submitting: false, error: event.error }
+    case 'save-error':
+      return { ...state, submitting: false, error: COMPLETION_SAVE_ERROR }
     case 'done':
       return {
         ...state,
@@ -554,7 +559,6 @@ export default function useQuizSession() {
         return false
       }
     }
-    finished.current = true
     const completedAt = Date.now()
     const elapsed = completedAt - state.startedAt
     const score = items.filter((i) => i.feedback?.is_correct).length
@@ -612,21 +616,26 @@ export default function useQuizSession() {
       items,
       completedAt
     )
-    if (saved && state.lastConfig?.mode === 'exam') {
+    if (!saved) {
+      dispatch({ type: 'save-error' })
+      return false
+    }
+    finished.current = true
+    if (state.lastConfig?.mode === 'exam') {
       const sessionId = state.examProgress?.sessionId
       if (!clearActiveExam(sessionId)) {
         const currentExam = loadActiveExam()
         if (currentExam && currentExam.sessionId !== sessionId) return false
       }
     }
-    if (saved && state.lastConfig?.mode === 'practice') {
+    if (state.lastConfig?.mode === 'practice') {
       const sessionId = state.practiceSessionId
       if (!clearActivePractice(sessionId)) {
         const currentPractice = loadActivePractice()
         if (currentPractice && currentPractice.sessionId !== sessionId) return false
       }
     }
-    if (saved && state.lastConfig?.mode === 'flashcards') {
+    if (state.lastConfig?.mode === 'flashcards') {
       const sessionId = state.flashcardProgress?.sessionId
       if (!clearActiveFlashcards(sessionId)) {
         const currentFlashcards = loadActiveFlashcards()
@@ -640,9 +649,9 @@ export default function useQuizSession() {
   const handleNext = () => {
     if (state.phase !== 'reviewing' || advancing.current) return
     advancing.current = true
-    if (state.index + 1 >= state.questions.length)
-      finish(state.history, state.questions.length)
-    else dispatch({ type: 'next' })
+    if (state.index + 1 >= state.questions.length) {
+      if (!finish(state.history, state.questions.length)) advancing.current = false
+    } else dispatch({ type: 'next' })
   }
 
   const handleExamSubmit = async (answers, metadata = {}) => {

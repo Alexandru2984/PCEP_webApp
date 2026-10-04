@@ -52,7 +52,7 @@ describe('exam recovery and timing', () => {
       />
     )
     fireEvent.click(screen.getByRole('button', { name: /One/ }))
-    const button = screen.getByRole('button', { name: /Retry grading/ })
+    const button = screen.getByRole('button', { name: /Retry submission/ })
     await act(async () => {
       fireEvent.click(button)
       fireEvent.click(button)

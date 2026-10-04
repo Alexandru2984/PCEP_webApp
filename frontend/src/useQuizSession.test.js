@@ -270,7 +270,7 @@ describe('quiz session requests', () => {
     expect(result.current.questions).toHaveLength(1)
   })
 
-  it('still shows completed results when browser storage rejects the snapshot', async () => {
+  it('keeps completed practice retryable until its snapshot is safely stored', async () => {
     submitAnswer.mockResolvedValue(feedback)
     const { result } = renderHook(useQuizSession)
     await act(async () => result.current.startQuiz(config))
@@ -282,13 +282,19 @@ describe('quiz session requests', () => {
     })
 
     act(() => result.current.handleNext())
-    expect(result.current.phase).toBe('done')
+    expect(result.current.phase).toBe('reviewing')
+    expect(result.current.error).toMatch(/could not be saved safely/i)
     expect(result.current.history).toHaveLength(1)
     expect(loadHistory()).toEqual([])
     expect(loadStudyProgress()).toEqual([])
+    expect(loadActivePractice()).not.toBeNull()
     expect(warning).toHaveBeenCalledOnce()
 
     setItem.mockRestore()
+    act(() => result.current.handleNext())
+    expect(result.current.phase).toBe('done')
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadActivePractice()).toBeNull()
     window.removeEventListener('pcep-storage-warning', warning)
   })
 
@@ -304,11 +310,16 @@ describe('quiz session requests', () => {
     })
 
     await act(async () => result.current.handleExamSubmit({ 1: 11 }))
-    expect(result.current.phase).toBe('done')
+    expect(result.current.phase).toBe('exam')
+    expect(result.current.error).toMatch(/could not be saved safely/i)
     expect(loadHistory()).toEqual([])
     expect(loadActiveExam()).not.toBeNull()
 
     setItem.mockRestore()
+    await act(async () => result.current.handleExamSubmit({ 1: 11 }))
+    expect(result.current.phase).toBe('done')
+    expect(loadHistory()).toHaveLength(1)
+    expect(loadActiveExam()).toBeNull()
   })
 
   it('cancels loading on reset and ignores stale responses', async () => {
