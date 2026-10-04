@@ -986,6 +986,7 @@ passes.
 - `943a98b` — keep failed completed-session snapshots recoverable and retryable.
 - `4064106` — document recoverable completion behavior and validation.
 - `a8c7cb6` — clear a stale persistence warning after storage recovers.
+- `a4823b8` — document the storage-warning recovery contract.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1809,6 +1810,27 @@ revisions, Compose remains healthy, cloudflared reports four ready connections a
 privileged `nginx -t` passes. This frontend-only atomic publication recreated no
 service and required no migration, environment, Nginx or Cloudflare change; the
 backend remains on `2915c622166b`.
+
+The storage-warning recovery patch is published at revision `a4823b8b2cf5`.
+Its rollback root is `.frontend.previous-20261004T130641Z-06ee2876`, with
+external copy `frontend.20261004T130641Z-06ee2876`. The entry chunk
+`index-DNkG6cO9.js` has SHA-256
+`2ba8937b503dd5d32b23c1b725b31ddac784ba106a726d69a3330994d9c471b2`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`774e5432e5405d90a18a86c2833e10395102f81578dfb23124e8c86bc5daba00`.
+The live root again matches the validated build byte for byte. A fresh 390 px
+Chromium session forced the final progress write to fail, observed the warning and
+intact Practice recovery, restored storage, retried completion and then observed one
+history record, cleared recovery and zero remaining persistence warnings. Axe found
+zero violations, the page fit the viewport and no page error occurred; the tracked
+Cloudflare inline-script CSP rejection remained the only console error. All 303
+Vitest tests, lint, formatting and the production build pass, along with the focused
+browser recovery flow. Public smoke reports the new frontend revision, Compose is
+healthy, cloudflared has four ready connections and privileged `nginx -t` passes.
+No service was recreated and no migration, environment, Nginx or Cloudflare change
+was required; the backend remains on `2915c622166b`.
 
 ## 15. Breaking changes
 
