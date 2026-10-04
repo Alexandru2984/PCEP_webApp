@@ -35,13 +35,18 @@ make audit
 make django-check
 make compose-build
 make audit-image
+bash scripts/check_postgres_container.sh
+make audit-db-image
 ```
 
 `make test` runs the local SQLite-backed backend test suite plus the frontend
 unit/lint/format/build checks. CI runs the backend suite against PostgreSQL.
-The pinned image scan covers Debian and installed Python packages and fails on
-fixable HIGH/CRITICAL findings. Unfixed vendor findings remain visible in a full
-Trivy report and are reviewed separately rather than permanently breaking CI.
+The pinned image scans cover the backend's Debian/Python packages and the database's
+Alpine packages, and fail on fixable HIGH/CRITICAL findings. Unfixed vendor findings
+remain visible in a full Trivy report and are reviewed separately rather than
+permanently breaking CI. The PostgreSQL runtime check builds the reviewed image,
+starts a disposable cluster with the production restrictions, writes data, verifies
+the kernel controls and read-only root, restarts it and verifies persistence.
 The runtime base pins both Python 3.12.14 and the official multi-architecture
 image digest. The runtime stage applies current Debian updates so a versioned
 upstream image cannot leave newly fixed packages behind between image rebuilds.
@@ -130,7 +135,12 @@ container shutdown grace period, and a bounded 60-second database startup probe
 The non-root backend filesystem is read-only except the existing static/media
 volumes and a 64 MB temporary filesystem. Capabilities are dropped, privilege
 escalation is disabled, and the backend is capped at 512 MB and 128 processes.
-PostgreSQL volumes, privilege requirements and binding are unchanged.
+PostgreSQL starts directly as its non-root user with a read-only root filesystem,
+all capabilities dropped, `no-new-privileges`, 512 MB/128-process limits and bounded
+noexec tmpfs mounts for `/tmp` and its Unix socket. Only the external PGDATA volume
+is persistent and writable, and no database port is published to the host. Its local
+image extends a digest-pinned PostgreSQL 16.15 Alpine base only to remove the unused
+root-only `gosu` switcher and its independently compiled runtime.
 Healthchecks use the first configured allowed hostname and forwarded HTTPS;
 local hostnames are not required in production ALLOWED_HOSTS. `/api/health/`
 remains readiness. Successful Compose probes carry an internal marker and are
@@ -221,6 +231,25 @@ preserve question/choice IDs and are reversible; they need no database restore
 for an application rollback. Database restoration is a separate planned
 maintenance operation into a suitable database, never an automatic pipe into the
 running production database.
+
+PostgreSQL runtime changes require a fresh verified logical backup, a successful
+`scripts/check_postgres_container.sh` run and a clean `make audit-db-image` result.
+Build and recreate only the database service, then wait for both database and backend
+readiness before public smoke testing:
+
+```bash
+docker compose build db
+make audit-db-image
+docker compose up -d --no-deps --no-build db
+docker compose ps
+make production-smoke
+```
+
+Tag the previous database image before replacement. To roll back the image while
+preserving the named PGDATA volume, retag it as
+`pcep_webapp-postgres:16.15-alpine3.24`, recreate only `db` with `--no-build`, and
+repeat the readiness and public smoke checks. Restoring a logical dump remains a
+separate planned data operation and is not part of an image rollback.
 
 ## Public study pages
 

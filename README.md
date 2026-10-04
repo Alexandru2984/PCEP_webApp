@@ -100,6 +100,8 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
   and database readiness probes, plus scheduled read-only production contract
   monitoring without learner telemetry
+- 🛡️ Non-root, read-only application and PostgreSQL containers with dropped
+  capabilities, bounded resources, digest-pinned bases and blocking image scans
 - 🔎 AST-backed question audits catch duplicates, malformed answer sets, short or
   editorial explanations, missing/cross-module objectives and out-of-syllabus syntax
   before release; PostgreSQL also rejects a second correct choice for one question
@@ -181,6 +183,7 @@ make test
 make audit
 make django-check
 make compose-build && make audit-image
+bash scripts/check_postgres_container.sh && make audit-db-image
 make production-smoke
 
 # Backend — 216 tests (API/security, integrity, startup, release, SEO and smoke behavior)

@@ -337,8 +337,12 @@ its cost material.
   loopback port 8001. Successful internal readiness probes are omitted from the
   access log only when their marker and loopback peer both match; failures and
   public probes remain logged. The pinned Python base receives current Debian
-  security updates during the runtime build. PostgreSQL exposes no host port and
-  keeps its named volume.
+  security updates during the runtime build. PostgreSQL also runs non-root with a
+  read-only root, no capabilities, `no-new-privileges`, 512 MB/128-PID bounds and
+  bounded noexec runtime tmpfs mounts. It exposes no host port and keeps its external
+  named PGDATA volume. Its digest-pinned PostgreSQL 16.15 Alpine image removes the
+  unused root-only `gosu` helper; the resulting image has zero fixable HIGH/CRITICAL
+  findings.
 - **systemd:** Nginx, Docker and cloudflared are active. The weekly SEO generator
   remains installed as an existing systemd timer.
 - **External monitoring:** a separate GitHub Actions workflow now performs a
@@ -1023,6 +1027,7 @@ pass.
 - `4bbeaea` — prevent multiple correct choices at the database boundary.
 - `9ab7724` — report Pyodide output truncated at the manager boundary.
 - `57fb43c` — make completed-session cleanup retry-safe and idempotent.
+- `c917fa6` — harden and continuously verify the PostgreSQL container runtime.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
