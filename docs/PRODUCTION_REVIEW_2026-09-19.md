@@ -976,6 +976,7 @@ throttled-grading retry contract.
 - `0895af0` — route PCEP through verified Cloudflare Tunnel origin TLS.
 - `e72a4f4` — run dependency advisory audits daily and on manual dispatch.
 - `943a98b` — keep failed completed-session snapshots recoverable and retryable.
+- `4064106` — document recoverable completion behavior and validation.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1775,6 +1776,30 @@ passed, representative PCEP, special-route and catch-all domains returned 200,
 Compose stayed healthy and privileged `nginx -t` passed. Nginx, Docker and
 PostgreSQL were not restarted; no migration, application deployment or Cloudflare
 dashboard change was required.
+
+The recoverable-completion frontend release is published at revision
+`406410646a21`. Its rollback root is
+`.frontend.previous-20261004T130206Z-3ecff7ea`, with external copy
+`frontend.20261004T130206Z-3ecff7ea`. The entry chunk
+`index-CWZ5Tsya.js` has SHA-256
+`ff476c84cd6286de0a2d8218809816347b084f592ccd4df37b9b27ea87f75fce`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`fdcbea864a5aea9cf09e7722d08043b627e45121f21b85b2b237d3d75ab9ede2`.
+The live root matches the validated build byte for byte. Fresh Chromium at 390 px
+completed five real Practice answers, then synthetically rejected only the final
+`pcep.progress` write. The last question and `pcep.activePractice` recovery remained
+available with the explicit retry action; after restoring writes, the retry created
+exactly one history record, cleared recovery and opened the report. Axe found zero
+violations, the page fit the viewport and no page error occurred. The only console
+error was the tracked CSP rejection of Cloudflare's injected inline script. All 302
+Vitest tests, lint, formatting, the production build and all 31 Playwright flows
+pass. The complete public smoke reports the new frontend and existing backend
+revisions, Compose remains healthy, cloudflared reports four ready connections and
+privileged `nginx -t` passes. This frontend-only atomic publication recreated no
+service and required no migration, environment, Nginx or Cloudflare change; the
+backend remains on `2915c622166b`.
 
 ## 15. Breaking changes
 
