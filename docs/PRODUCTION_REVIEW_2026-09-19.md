@@ -2043,6 +2043,19 @@ changing its external volume. Both containers and the tunnel are healthy, public
 smoke passes, and privileged `nginx -t` passes. No data/schema migration, frontend or
 backend publication, Nginx reload or Cloudflare change was required.
 
+Final validation after the completion, container and database-role stages is clean:
+
+- `python -m pytest -q` from `backend/`: 216 passed.
+- Source and live database question audits: 308 questions, no warnings.
+- `make django-check`: no production deployment warnings.
+- `npm run test`: 305 passed; lint, Prettier and the production build pass.
+- `npm run e2e`: all 31 Chromium flows pass, including both accessibility themes,
+  recovery, answer secrecy, PWA behavior and the real Pyodide runtime.
+- `make audit`: both Python requirement sets and npm report no known vulnerability.
+- Backend and PostgreSQL blocking Trivy scans: zero fixable HIGH/CRITICAL findings.
+- Hardened PostgreSQL runtime, isolated Nginx error contracts, Compose rendering,
+  privileged live `nginx -t` and the complete public production smoke all pass.
+
 ## 15. Breaking changes
 
 None.
