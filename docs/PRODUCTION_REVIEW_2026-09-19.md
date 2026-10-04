@@ -1959,6 +1959,28 @@ cloudflared is active and privileged `nginx -t` passes. This atomic frontend
 publication recreated no service and required no migration, environment, Nginx or
 Cloudflare change.
 
+The retry-safe session-completion frontend is published at revision
+`1f3bf87dc97a`. Its rollback root is
+`.frontend.previous-20261004T202246Z-c9285ba2`, with external copy
+`frontend.20261004T202246Z-c9285ba2`. The entry chunk
+`index-DbsD99DC.js` has SHA-256
+`99437ba7b34c91cf8b12bf309b3571ae681bb8efe2b73388a5d2e3755dbb65fb`,
+the stylesheet remains
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`462c1c2d42b1f43d1d698edb82842784fefc09516c52208f6564abe02e5de492`.
+All 20 files in the published release match the validated build byte for byte.
+All 305 Vitest tests, lint, formatting, the production build and the 22 quiz
+Playwright flows pass. Fresh live Chromium at 390 px forced only removal of the
+completed Practice recovery record to fail after the progress snapshot was written.
+The retry action preserved one history entry and one study attempt per question,
+then removed recovery and opened the report; the attempt and recovery IDs matched.
+The page fit the viewport, axe found zero violations, and no page or unexpected
+console error occurred. Public smoke passes with this frontend and backend
+`32d3b643f71e`; Compose is healthy, cloudflared is active and privileged `nginx -t`
+passes. This atomic frontend publication recreated no service and required no
+migration, environment, Nginx or Cloudflare change.
+
 ## 15. Breaking changes
 
 None.
