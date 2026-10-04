@@ -1007,6 +1007,7 @@ pass.
 - `a4823b8` — document the storage-warning recovery contract.
 - `1992145` — align Nginx-generated API error CSP with normal API responses.
 - `5a6c92a` — keep storage warnings scoped to the key that failed.
+- `6b4ddc8` — document key-scoped storage recovery behavior.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1864,6 +1865,29 @@ graceful reload. No container or tunnel was restarted; no migration, application
 artifact, environment or Cloudflare setting changed. Rollback consists of restoring
 the backup over `/etc/nginx/sites-available/pcep.micutu.com`, running `sudo nginx -t`
 and gracefully reloading Nginx.
+
+The key-scoped storage-recovery frontend release is published at revision
+`6b4ddc8aa65f`. Its rollback root is
+`.frontend.previous-20261004T133250Z-d64e2e3b`, with external copy
+`frontend.20261004T133250Z-d64e2e3b`. The entry chunk
+`index-CAxXwSPT.js` has SHA-256
+`e4e971fba12b369fbf587b197f99c456e92e7afbd17ab5e561f6005d1ee51401`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`c88bc571311e403c5575cffc999c24cc82f6fff59bf4ccdd741e995bb8927a5e`.
+The public files match the validated build byte for byte. Fresh Chromium at 390 px
+forced only the final `pcep.progress` write to fail, then successfully persisted a
+theme change. The progress warning remained visible after that unrelated write and
+cleared only when the progress retry succeeded; the active Practice recovery remained
+until then, exactly one history record was created, and the report opened normally.
+Axe found zero violations, the page fit the viewport and no page error occurred. The
+tracked Cloudflare inline-script CSP rejection remained the only console error. All
+303 Vitest tests, lint, formatting, the production build and the focused Playwright
+storage flow pass. Public smoke reports this frontend revision and backend
+`2915c622166b`; Compose is healthy, cloudflared has four ready connections and
+privileged `nginx -t` passes. No service was recreated and no migration, environment,
+Nginx or Cloudflare change was required.
 
 ## 15. Breaking changes
 
