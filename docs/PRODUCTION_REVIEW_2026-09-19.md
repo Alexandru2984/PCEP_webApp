@@ -745,6 +745,19 @@ bookmarks do not block the rest of a drill. Invalid responses create neither act
 recovery nor progress. All 299 Vitest tests across 32 files, lint, formatting and the
 production build pass.
 
+The digest-pinned container scanner is updated to Trivy 0.75.0. Its blocking scan
+of the immutable backend image currently in production reports zero fixable
+HIGH/CRITICAL findings. A full scan independently confirms the documented 44 HIGH
+package occurrences across eight unfixed Debian CVEs, zero Python findings and zero
+CRITICAL findings.
+
+Progress import now treats each file read as an ordered request. When two browser
+reads finish out of order, only the most recently selected backup can set the
+preview, loading state or error. The progress tools expose the active validation as
+an accessible status and busy state. A deferred-file regression test reproduces the
+race; all 300 Vitest tests across 32 files, lint, formatting and the production build
+pass.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -897,6 +910,8 @@ production build pass.
 - `2915c62` — document the pre-replacement image gate.
 - `d3c5585` — validate quiz-set counts and targeted response scope.
 - `443dcb8` — document strict quiz-set response validation.
+- `0f5cf62` — update the digest-pinned Trivy scanner to 0.75.0.
+- `3f30e8e` — keep stale backup reads from replacing a newer selection.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.

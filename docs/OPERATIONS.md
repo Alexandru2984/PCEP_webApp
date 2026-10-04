@@ -322,8 +322,10 @@ for history, mistakes, bookmarks and personal notes is bounded to 100 records;
 each note is limited to 2,000 characters. The per-question review schedule is
 bounded to 1,000 compact records. The progress screen exports backup format v4,
 previews and merges strictly validated imports up to 8 MB, and still accepts
-existing v1, v2 and v3 backups. History, mistakes, bookmarks, notes and the review
-schedule can be reset independently. Backups contain public question options,
+existing v1, v2 and v3 backups. If multiple files are selected while reads are in
+flight, only the most recent selection can update the preview or error state.
+History, mistakes, bookmarks, notes and the review schedule can be reset
+independently. Backups contain public question options,
 aggregate performance, optional confidence ratings, daily challenge dates,
 bounded response-time totals, the optional `pcep-30-02` full-mock marker, review
 dates and user-written notes, never answer keys or explanations. Keep backups
