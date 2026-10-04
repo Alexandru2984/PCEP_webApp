@@ -188,7 +188,7 @@ DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questio
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
 # Frontend — 294 Vitest tests, then static checks, the production build and
-# 30 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
+# 31 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
 cd frontend && npm run e2e

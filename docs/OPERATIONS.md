@@ -269,6 +269,8 @@ If the initial question request fails, the error screen offers a direct Retry wi
 exact saved mode, filters, preset or targeted IDs. Back to setup remains available.
 The normal loading guard prevents a second concurrent start while either request is in
 flight; no active recovery record is created until a valid public question set arrives.
+While that request is in flight, Cancel loading aborts it and returns to setup with the
+chosen preferences intact. A late response cannot start a session or create recovery.
 `GET /api/daily/` returns five public questions for the current
 `Europe/Bucharest` date. Selection is deterministic for the date and production
 secret, covers every populated syllabus module before filling the fifth slot, and

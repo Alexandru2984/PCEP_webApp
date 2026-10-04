@@ -697,6 +697,15 @@ window is configurable from 1 through 365 days. The production plan currently ke
 tests and the Django production check pass; regressions cover an old previous build,
 its lazy chunk, a recent chunk, one expired generation and invalid configuration.
 
+The cancellable-quiz-loading follow-up gives a slow initial question request a visible
+44 px Cancel loading action. Cancellation aborts the request, returns immediately to
+setup and preserves the selected preferences. The existing request-identity guard
+prevents a late response from starting a session or writing active recovery. All 294
+Vitest tests across 32 files, lint, formatting, the production build and all 31
+Playwright flows pass. The mobile regression keeps the mocked response pending for
+five seconds, cancels from an axe-clean loading screen and confirms the late response
+cannot move the app away from setup or create a Practice recovery record.
+
 ## 12. Commits
 
 - `e71a8d7` — production discovery, baseline and prioritized plan.
@@ -839,6 +848,7 @@ its lazy chunk, a recent chunk, one expired generation and invalid configuration
 - `1b4414f` — document accurate Exam review choices.
 - `dc371dc` — bound retained frontend asset generations.
 - `217ead0` — document bounded frontend assets.
+- `a4b133c` — cancel slow quiz loads without accepting late responses.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
