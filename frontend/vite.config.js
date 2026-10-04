@@ -7,9 +7,28 @@ import { pwaOptions } from './pwa.config'
 // Backend the dev server proxies to. Override with VITE_API_TARGET to point at
 // a backend on another port/host without editing this file.
 const API_TARGET = process.env.VITE_API_TARGET || 'http://127.0.0.1:8001'
+const RELEASE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+const release = process.env.VITE_PCEP_RELEASE || 'development'
+
+if (!RELEASE_PATTERN.test(release))
+  throw new Error('VITE_PCEP_RELEASE must be a bounded release identifier.')
+
+const releaseMeta = {
+  name: 'pcep-release-meta',
+  transformIndexHtml: {
+    order: 'pre',
+    handler: () => [
+      {
+        tag: 'meta',
+        attrs: { name: 'pcep-release', content: release },
+        injectTo: 'head',
+      },
+    ],
+  },
+}
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), VitePWA(pwaOptions)],
+  plugins: [releaseMeta, react(), tailwindcss(), VitePWA(pwaOptions)],
   server: {
     host: '0.0.0.0',
     port: 5173,

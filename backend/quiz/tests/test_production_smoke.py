@@ -155,13 +155,14 @@ def test_shell_csp_keeps_pyodide_without_general_eval_or_inline_scripts():
             "script-src 'self' 'wasm-unsafe-eval'"
         ),
     }
-    body = b'''<link rel="stylesheet" href="/assets/index-abc12345.css">
+    body = b'''<meta name="pcep-release" content="abc123def456">
+    <link rel="stylesheet" href="/assets/index-abc12345.css">
     <script type="module" src="/assets/index-abc12345.js"></script>
     <div id="root"></div>'''
-    assert smoke.check_shell(response(headers, body)) == [
-        '/assets/index-abc12345.js',
-        '/assets/index-abc12345.css',
-    ]
+    assert smoke.check_shell(response(headers, body)) == (
+        ['/assets/index-abc12345.js', '/assets/index-abc12345.css'],
+        'abc123def456',
+    )
 
     unsafe = response({
         **headers,
@@ -176,6 +177,21 @@ def test_shell_assets_require_safe_hashed_asset_paths():
     <link rel="stylesheet" href="/assets/index-a1234567.css">'''
     with pytest.raises(smoke.SmokeError, match='invalid entry asset path'):
         smoke.shell_assets(body)
+
+
+def test_shell_release_requires_one_production_marker():
+    assert (
+        smoke.shell_release(b'<meta name="pcep-release" content="abc123def456">')
+        == 'abc123def456'
+    )
+
+    for body in [
+        b'',
+        b'<meta name="pcep-release" content="development">',
+        b'<meta name="pcep-release" content="good"><meta name="pcep-release" content="other">',
+    ]:
+        with pytest.raises(smoke.SmokeError, match='release marker'):
+            smoke.shell_release(body)
 
 
 def test_entry_assets_require_security_headers_cache_policy_and_media_type():

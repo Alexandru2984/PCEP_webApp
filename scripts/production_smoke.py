@@ -48,6 +48,7 @@ class ShellAssetParser(HTMLParser):
         super().__init__()
         self.stylesheets = []
         self.modules = []
+        self.releases = []
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
@@ -59,6 +60,8 @@ class ShellAssetParser(HTMLParser):
             src = attributes.get('src') or ''
             if src.startswith('/assets/'):
                 self.modules.append(src)
+        elif tag == 'meta' and attributes.get('name') == 'pcep-release':
+            self.releases.append(attributes.get('content') or '')
 
 
 def require(condition, message):
@@ -169,13 +172,18 @@ def check_shared_security_headers(response, label):
     )
 
 
-def shell_assets(body):
+def parse_shell(body):
     try:
         html = body.decode('utf-8')
     except UnicodeDecodeError as error:
         raise SmokeError('The application shell is not valid UTF-8.') from error
     parser = ShellAssetParser()
     parser.feed(html)
+    return parser
+
+
+def shell_assets(body):
+    parser = parse_shell(body)
     require(parser.modules, 'The application shell has no module entry asset.')
     require(parser.stylesheets, 'The application shell has no stylesheet asset.')
     assets = parser.modules + parser.stylesheets
@@ -185,6 +193,18 @@ def shell_assets(body):
         'The application shell contains an invalid entry asset path.',
     )
     return assets
+
+
+def shell_release(body):
+    releases = parse_shell(body).releases
+    require(len(releases) == 1, 'The application shell must expose one release marker.')
+    release = releases[0]
+    require(
+        RELEASE_PATTERN.fullmatch(release) is not None
+        and release not in {'development', 'unknown'},
+        'The application shell has an invalid release marker.',
+    )
+    return release
 
 
 def check_asset(response, path):
@@ -217,7 +237,7 @@ def check_shell(response):
     require("'wasm-unsafe-eval'" in scripts, 'Shell CSP no longer permits the Pyodide runtime.')
     require("'unsafe-eval'" not in scripts, 'Shell CSP permits unsafe-eval.')
     require("'unsafe-inline'" not in scripts, 'Shell CSP permits inline scripts.')
-    return shell_assets(response.body)
+    return shell_assets(response.body), shell_release(response.body)
 
 
 def check_api_headers(response, releases, label):
@@ -460,7 +480,7 @@ def run(origin):
     releases = set()
 
     shell = public_get(origin, '/')
-    assets = check_shell(shell)
+    assets, frontend_release = check_shell(shell)
     for asset_path in assets:
         check_asset(public_get(origin, asset_path), asset_path)
 
@@ -542,7 +562,8 @@ def run(origin):
 
     require(len(releases) == 1, 'Public API endpoints report different releases.')
     return {
-        'release': next(iter(releases)),
+        'backend_release': next(iter(releases)),
+        'frontend_release': frontend_release,
         'questions': total,
         'targeted_order': targeted_ids,
         'assets': len(assets),
@@ -563,7 +584,9 @@ def main(argv=None):
         parser.exit(1, f'Production smoke failed: {error}\n')
     print(
         'Production smoke passed: '
-        f'release={result["release"]} questions={result["questions"]} '
+        f'backend_release={result["backend_release"]} '
+        f'frontend_release={result["frontend_release"]} '
+        f'questions={result["questions"]} '
         f'assets={result["assets"]} '
         f'targeted_order={",".join(map(str, result["targeted_order"]))}'
     )
