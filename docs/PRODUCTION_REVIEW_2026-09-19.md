@@ -948,6 +948,7 @@ duplicate markers are regression-tested; all 216 backend tests pass.
 - `85098b0` — update Axios to the fixed 1.20.0 release.
 - `6a2b681` — document the Axios security remediation.
 - `d4ddf83` — verify frontend and backend release identities independently.
+- `4c1342b` — document frontend release identity checks.
 
 No commit was pushed by the engineering assistant, and no authorship, co-author or
 generated-by attribution was added.
@@ -1710,6 +1711,25 @@ pass. The complete public smoke, healthy Compose services and privileged `nginx 
 also pass. This frontend-only atomic publish recreated no service and required no
 migration, environment, Nginx or Cloudflare change; the backend remains on
 `2915c622166b`.
+
+The frontend-identity release is published at revision `4c1342bcf849`. Its
+rollback root is `.frontend.previous-20261004T123652Z-77f6c005`, with external
+copy `frontend.20261004T123652Z-77f6c005`. The entry chunk
+`index-CIv-eH4e.js` has SHA-256
+`d49b460dd9336955dffac693401c9a041dfc49272c5e3414d1748f938be8f9ed`,
+the stylesheet `index-joTgEVXq.css` has SHA-256
+`a10b33a1b90f5b97a54cc51e4753d0fa8dec9fcf7c0ea304fcfc7d508d7f9f9c`,
+and `sw.js` has SHA-256
+`3a4c78272add0eb126d6ae0dd377fd976b3051323baac8cfba1bac77c825753b`.
+The live root matches the validated build byte for byte. Before publication, the
+new smoke correctly rejected the old shell for its missing marker. After the atomic
+swap it passed with `frontend_release=4c1342bcf849` and
+`backend_release=2915c622166b`, and the public HTML exposed exactly one marker.
+Fresh Chromium at 390 px confirmed that marker matches the React footer, axe found
+zero violations, the page fit the viewport and no page error occurred. Compose
+remained healthy and privileged `nginx -t` passed. This frontend-only publication
+recreated no service and required no migration, environment, Nginx or Cloudflare
+change.
 
 ## 15. Breaking changes
 
