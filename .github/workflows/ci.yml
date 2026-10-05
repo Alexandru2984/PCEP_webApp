@@ -220,6 +220,9 @@ jobs:
       - name: Validate Docker Compose config
         run: docker compose config >/dev/null
 
+      - name: Validate operational systemd units
+        run: make check-systemd
+
       - name: Validate hardened PostgreSQL runtime
         run: bash scripts/check_postgres_container.sh
 

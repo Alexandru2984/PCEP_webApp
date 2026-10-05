@@ -2273,6 +2273,20 @@ Unit tests cover path/config fail-closed behavior, stale backups, safe command
 selection, atomic success status, successful round-trip verification and simulated
 remote corruption. The complete backend suite passes all 262 tests.
 
+### Continuous systemd unit validation — 2026-10-05
+
+Push/pull-request CI now resolves and validates all five repository-owned systemd
+services/timers plus the offsite `OnSuccess` drop-in on Ubuntu 24.04. The validator
+rejects symlinks, unexpected tree entries, unsafe filenames and drop-ins without a
+repository-owned base unit before invoking `systemd-analyze verify` through an
+explicit unit search path. This turns host-version directive compatibility and
+drop-in composition into a blocking check rather than a manual deployment step.
+
+The exact local command reports five valid units and one valid drop-in. Bash syntax,
+workflow YAML, Compose rendering, the complete 262-test backend suite, tracked-secret
+scan and public production smoke are clean. This CI-only control made no production
+or systemd change; the encrypted offsite service and trigger remain uninstalled.
+
 ## 15. Breaking changes
 
 None.

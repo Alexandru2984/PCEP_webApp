@@ -195,8 +195,7 @@ credentials are available.
 
 The repository includes a fail-closed rclone upload and round-trip verification
 command, but its service and post-backup trigger are intentionally not installed.
-Follow
-[`OFFSITE_BACKUP_RUNBOOK.md`](OFFSITE_BACKUP_RUNBOOK.md) before activation. In
+Follow [`OFFSITE_BACKUP_RUNBOOK.md`](OFFSITE_BACKUP_RUNBOOK.md) before activation. In
 particular, do not use a raw storage remote, the retiring shared Google Drive OAuth
 client or a crypt key stored only on this host. The runbook requires a dedicated
 crypt remote, provider immutability/versioning, offline recovery material and a
@@ -206,6 +205,11 @@ tested independent alert.
 only for a manually reviewed first run after every activation gate passes. Neither
 command deletes or applies retention to remote data. Both require an explicit
 PCEP-only rclone config path; they never fall back to the operator's shared config.
+
+Run `make check-systemd` after changing any file under `ops/systemd`. It verifies all
+repository-owned services and timers with the host's `systemd-analyze`, loads
+adjacent drop-ins through the same unit search path and rejects an orphan or unsafe
+drop-in name. Push/pull-request CI runs this check on Ubuntu 24.04 as well.
 
 ## Backend Deploy
 

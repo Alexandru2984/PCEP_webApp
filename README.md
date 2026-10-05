@@ -218,6 +218,8 @@ auditing. Ignored `.env` files and other untracked operator state are never copi
 into the scanner.
 Its Nginx job starts a disposable TLS vhost and verifies the actual 413/429 JSON,
 cache, CSP, request-ID and retry contracts in addition to configuration syntax.
+It also resolves and validates every repository-owned systemd service, timer and
+drop-in so unsupported directives or orphan overrides cannot reach an operator.
 Its pinned Trivy scan fails on HIGH/CRITICAL operating-system or Python findings
 that have a vendor fix, while still reporting separately tracked findings without
 a patch.

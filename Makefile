@@ -24,7 +24,7 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -36,6 +36,7 @@ help:
 		'  audit-secrets    Scan tracked files and complete Git history for secrets' \
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
+		'  check-systemd    Validate every operational systemd unit and drop-in' \
 		'  build            Build the frontend production bundle' \
 		'  compose-build-frontend Build frontend through the pinned container' \
 		'  django-check     Run Django production deploy checks' \
@@ -101,6 +102,9 @@ audit-db-image:
 		-v "$(TRIVY_CACHE):/root/.cache/" \
 		"$(TRIVY_IMAGE)" image --scanners vuln --severity HIGH,CRITICAL \
 		--ignore-unfixed --exit-code 1 --no-progress pcep_webapp-postgres:16.15-alpine3.24
+
+check-systemd:
+	bash scripts/check_systemd_units.sh
 
 build: build-frontend
 
