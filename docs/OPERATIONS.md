@@ -149,6 +149,29 @@ default branch. Dependabot alerts and security updates remain repository setting
 confirm they are enabled under GitHub's security settings. If enabled, this file's
 cooldown and routine PR limit do not delay or count their security-update PRs.
 
+`.github/workflows/dependency-review.yml` compares the dependency snapshots for
+every pull request targeting `main` through GitHub's dependency review API. It
+fails its check when a change introduces a known vulnerability rated moderate or
+higher in runtime, development or unknown scope. The workflow is separate from CI,
+uses only `contents: read`, does not post PR comments and pins the official action
+to its full release commit.
+
+License enforcement is intentionally disabled: the repository has not adopted a
+reviewed allowlist, so a generic scanner default must not stand in for legal policy.
+OpenSSF scorecard output is also disabled because it is informational rather than a
+merge rule. Revisit both settings only through a documented policy change. This
+PR-time comparison complements rather than replaces the full-tree push audit and
+the daily advisory audit; it cannot be reproduced offline because the comparison
+comes from GitHub's dependency graph. Run `make check-workflows` locally after any
+configuration change.
+
+Before relying on the workflow, enable the dependency graph under the repository's
+GitHub **Settings > Advanced Security > Code Security** page, then confirm the
+hosted check on a pull request. A workflow failure prevents merging only when the
+check is required by branch protection or a ruleset; add that requirement after the
+first successful run has registered the check name. Keep the existing audits as the
+effective control until both external gates are complete.
+
 Python is deliberately excluded because its two SHA-256 lock files must be
 regenerated together with `make lock-backend`, reviewed and audited. Container base
 updates are also kept manual because each tag/digest pair must be rebuilt, runtime

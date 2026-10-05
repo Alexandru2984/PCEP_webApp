@@ -241,6 +241,13 @@ Tuesday. Normal version updates wait seven days after release and group compatib
 minor/patch changes; the cooldown does not apply to security-update PRs when that
 repository feature is enabled. Every proposal triggers the full CI suite and awaits
 human review—nothing is auto-merged by this configuration.
+The repository includes a PR-only GitHub dependency review workflow. Once the
+repository dependency graph is enabled, it fails on newly added or upgraded
+dependencies with moderate-or-higher known vulnerabilities in runtime, development
+or unknown scopes. The review has read-only repository access, neither comments on
+the PR nor grants write permission, and deliberately does not enforce a license
+allowlist until the project adopts a reviewed license policy. Make its check required
+through branch protection or a ruleset only after a successful hosted test run.
 The separate **Production smoke** workflow runs every six hours and on manual
 dispatch. It uses bounded read-only requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,
