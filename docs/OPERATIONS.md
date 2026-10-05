@@ -69,6 +69,13 @@ multi-architecture image digest. Run it through `make compose-build-frontend`;
 the target maps the invoking host UID/GID into the disposable container so a
 non-root builder can replace `frontend/dist` without leaving root-owned files or
 assuming UID 1000. Its home and npm cache remain inside the disposable container.
+The pinned runtime is Node 24.21.0 with npm 11.19.0. `.npmrc` enables npm's strict
+install-script policy, and the package manifest allows only the exact reviewed
+`esbuild@0.25.12` installer. The optional macOS-only `fsevents` installer is
+explicitly denied. A newly introduced or newly versioned lifecycle script therefore
+fails `npm ci` until its package and script are reviewed and the manifest is updated.
+After any dependency change, run `npm install-scripts ls` with npm 11.19.0 and
+confirm that no unreviewed scripts remain.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime.
@@ -79,8 +86,10 @@ dispatch available.
 It is independent of repository activity, uses read-only repository permissions,
 has ten-minute job limits and runs `npm ci --ignore-scripts` before the Node audit.
 This detects advisories published between code changes without granting a scanner
-write access or executing dependency lifecycle scripts. Reproduce either failure
-locally with `make audit` before changing a version pin.
+write access or executing dependency lifecycle scripts. Both the push/PR and daily
+audits run `npm audit signatures` to verify registry signatures and provenance
+attestations for the resolved packages. Reproduce either failure locally with
+`make audit` before changing a version pin.
 
 ## Public Production Smoke
 

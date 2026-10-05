@@ -60,7 +60,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
+          node-version: "24.21.0"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -68,4 +68,6 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Audit dependencies
-        run: npm audit --audit-level=moderate
+        run: |
+          npm audit --audit-level=moderate
+          npm audit signatures

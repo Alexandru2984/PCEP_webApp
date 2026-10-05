@@ -144,6 +144,10 @@ python manage.py runserver
 
 ### Frontend
 
+Use Node 24.21.0 with npm 11.19.0. The project rejects unreviewed dependency
+lifecycle scripts: only the exact reviewed `esbuild` installer is allowed, while
+the optional `fsevents` installer is explicitly disabled.
+
 ```bash
 cd frontend
 npm ci
@@ -214,6 +218,8 @@ The separate **Scheduled dependency audit** runs daily at 04:17 UTC and on manua
 dispatch, so newly published Python or Node advisories are detected even when no
 push or pull request occurs. It has read-only repository permissions and installs
 the Node tree with package scripts disabled before auditing the committed lockfile.
+Both push/PR CI and the scheduled job also verify npm registry signatures and
+provenance attestations for the resolved dependency tree.
 The separate **Production smoke** workflow runs every six hours and on manual
 dispatch. It uses bounded read-only requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,

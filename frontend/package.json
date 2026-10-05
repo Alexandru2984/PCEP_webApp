@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "fsevents": false
+  },
   "scripts": {
     "dev": "vite",
     "fetch-pyodide": "bash scripts/fetch-pyodide.sh",

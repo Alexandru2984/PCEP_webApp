@@ -69,6 +69,7 @@ audit-backend:
 
 audit-frontend:
 	cd frontend && $(NPM) audit --audit-level=moderate
+	cd frontend && $(NPM) audit signatures
 
 audit-image:
 	mkdir -p "$(TRIVY_CACHE)"

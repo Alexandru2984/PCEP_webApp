@@ -2109,6 +2109,24 @@ recreated. PostgreSQL, its volume, the frontend publication, Nginx and Cloudflar
 were not changed; no migration or seed operation ran. The public frontend remains
 `1f3bf87dc97a`.
 
+### npm install-script and registry-integrity controls — 2026-10-05
+
+Normal frontend installs now use npm's strict lifecycle-script policy under the
+exact Node 24.21.0/npm 11.19.0 toolchain used by CI and the digest-pinned builder.
+The manifest approves only the exact reviewed `esbuild@0.25.12` binary installer
+and explicitly disables the optional macOS-only `fsevents` installer. Any future
+dependency that introduces an unreviewed install script therefore stops `npm ci`.
+The scheduled audit retains `--ignore-scripts`, so it never executes dependency
+lifecycle code, while both CI audit paths now verify registry signatures and
+provenance attestations with `npm audit signatures`.
+
+A clean no-cache builder install reports no packages with unreviewed install
+scripts. The pinned builder verified registry signatures for all 522 dependency
+packages and verified 168 provenance attestations; the vulnerability audit reports
+zero findings. This is a build and CI control only: it does not alter the application
+bundle or the running production services, database, Nginx or Cloudflare
+configuration.
+
 ## 15. Breaking changes
 
 None.
