@@ -247,8 +247,13 @@ checksummed logical backup every day and retains 30 successful daily copies; use
 newest verified daily copy into a network-isolated, disposable database and checks
 its schema, ownership and question invariants; run the same drill with
 `make verify-database-restore`.
+Encrypted offsite replication has a fail-closed implementation and security runbook,
+but remains deliberately inactive until a dedicated crypt remote, independent alert,
+provider controls and offline recovery key satisfy the documented activation gates.
 
-Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md);
+offsite gates and incident response live in
+[docs/OFFSITE_BACKUP_RUNBOOK.md](docs/OFFSITE_BACKUP_RUNBOOK.md).
 
 ## API reference
 

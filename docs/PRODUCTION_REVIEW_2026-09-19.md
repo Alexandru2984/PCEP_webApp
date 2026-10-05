@@ -2244,6 +2244,35 @@ services stayed healthy and the complete public smoke passed without a restart.
 This validates recoverability but does not resolve the separate same-host/off-host
 durability limitation.
 
+### Fail-closed encrypted offsite preparation — 2026-10-05
+
+Off-host replication now has an implementation, tests, a hardened systemd service,
+an inactive post-backup trigger and a CISO/incident runbook. The command accepts only
+an rclone `crypt` remote at a dedicated non-root path with explicit standard
+filename encryption, directory-name encryption, a password and distinct second
+salt. It verifies every complete local backup pair, rejects stale scheduled input,
+uploads only the newest dump and checksum with immutable `copyto`, downloads both
+through the encrypted remote and verifies SHA-256 before reporting success. It has
+no remote delete, purge, sync or retention path. The service consumes a minimal
+PCEP-only rclone config through systemd encrypted credentials, keeps its runtime copy
+on tmpfs and writes an atomic success marker only after round-trip verification.
+
+The live blast-radius inventory currently reports zero Django users, zero database
+sessions, 308 questions and 1,232 choices. The runbook nevertheless treats future
+account identifiers, password hashes and sessions as in scope. Its CISO verdict is
+to block activation until the provider, region/DPA, versioning or object lock,
+dedicated least-privilege credential, separately stored crypt recovery material and
+an independently tested failure/missed-success alert are documented. Journal-only
+failure reporting does not satisfy that alert gate.
+
+Read-only preflight correctly rejects both existing choices: `gdrive-vps-crypt` is
+encrypted but inherits rclone's retiring shared Google OAuth client, while `r2` is a
+raw S3 backend without a PCEP crypt wrapper. No backup was uploaded, no remote object
+was changed, and the offsite systemd service/post-backup trigger were not installed.
+Unit tests cover path/config fail-closed behavior, stale backups, safe command
+selection, atomic success status, successful round-trip verification and simulated
+remote corruption. The complete backend suite passes all 262 tests.
+
 ## 15. Breaking changes
 
 None.

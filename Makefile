@@ -12,6 +12,9 @@ DATABASE_BACKUP_ROOT ?= $(BACKUP_ROOT)/daily
 DATABASE_BACKUP_KEEP ?= 30
 DATABASE_CONTAINER ?= pcep_db
 DATABASE_RESTORE_CONTAINER ?= pcep_db_restore_check
+PCEP_OFFSITE_REMOTE ?=
+OFFSITE_RCLONE_CONFIG ?=
+OFFSITE_BACKUP_MAX_AGE_HOURS ?= 48
 RELEASE_KEEP ?= 5
 ASSET_RETENTION_DAYS ?= 7
 RELEASE ?= $(shell git describe --always --dirty --abbrev=12 --match '__pcep_no_matching_tag__' 2>/dev/null || printf development)
@@ -21,7 +24,7 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -41,6 +44,8 @@ help:
 		'  deploy-backend   Backup, validate and deploy one backend release' \
 		'  backup-database  Create and retain a verified daily-style DB backup' \
 		'  verify-database-restore Restore the newest daily backup in isolation' \
+		'  offsite-backup-preflight Validate encrypted offsite config without upload' \
+		'  offsite-backup   Upload and round-trip verify the newest daily backup' \
 		'  compose-up       Start db + backend' \
 		'  seed-reset       Reset and seed production DB in backend container' \
 		'  deploy-frontend  Backup and publish frontend/dist to FRONTEND_ROOT' \
@@ -129,6 +134,16 @@ backup-database:
 
 verify-database-restore:
 	"$(PYTHON_BIN)" scripts/database_restore_check.py --backup-root "$(DATABASE_BACKUP_ROOT)" --source-container "$(DATABASE_CONTAINER)" --restore-container "$(DATABASE_RESTORE_CONTAINER)"
+
+offsite-backup-preflight:
+	@test -n "$(PCEP_OFFSITE_REMOTE)" || { printf '%s\n' 'PCEP_OFFSITE_REMOTE is required.'; exit 1; }
+	@test -n "$(OFFSITE_RCLONE_CONFIG)" || { printf '%s\n' 'OFFSITE_RCLONE_CONFIG is required.'; exit 1; }
+	"$(PYTHON_BIN)" scripts/database_offsite_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --remote "$(PCEP_OFFSITE_REMOTE)" --rclone-config "$(OFFSITE_RCLONE_CONFIG)" --max-age-hours "$(OFFSITE_BACKUP_MAX_AGE_HOURS)" --preflight-only
+
+offsite-backup:
+	@test -n "$(PCEP_OFFSITE_REMOTE)" || { printf '%s\n' 'PCEP_OFFSITE_REMOTE is required.'; exit 1; }
+	@test -n "$(OFFSITE_RCLONE_CONFIG)" || { printf '%s\n' 'OFFSITE_RCLONE_CONFIG is required.'; exit 1; }
+	"$(PYTHON_BIN)" scripts/database_offsite_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --remote "$(PCEP_OFFSITE_REMOTE)" --rclone-config "$(OFFSITE_RCLONE_CONFIG)" --max-age-hours "$(OFFSITE_BACKUP_MAX_AGE_HOURS)"
 
 compose-up:
 	$(COMPOSE) up -d

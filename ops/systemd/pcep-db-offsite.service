@@ -1,0 +1,61 @@
+[Unit]
+Description=PCEP encrypted offsite PostgreSQL backup
+Wants=network-online.target
+After=network-online.target pcep-db-backup.service
+ConditionPathIsDirectory=/home/micu/PCEP_webApp
+ConditionPathIsDirectory=/home/micu/backups/pcep/daily
+ConditionPathExists=/etc/pcep/offsite-backup.env
+
+[Service]
+Type=oneshot
+User=micu
+Group=micu
+UMask=0077
+WorkingDirectory=/home/micu/PCEP_webApp
+EnvironmentFile=/etc/pcep/offsite-backup.env
+LoadCredentialEncrypted=rclone.conf:/etc/credstore.encrypted/pcep-rclone-config
+RuntimeDirectory=pcep-db-offsite
+RuntimeDirectoryMode=0700
+Environment=HOME=%t/pcep-db-offsite
+ExecStartPre=/usr/bin/install -m 0600 %d/rclone.conf %t/pcep-db-offsite/rclone.conf
+StateDirectory=pcep-db-offsite
+StateDirectoryMode=0755
+ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_offsite_backup.py --backup-root /home/micu/backups/pcep/daily --rclone-config %t/pcep-db-offsite/rclone.conf --max-age-hours 6 --status-file /var/lib/pcep-db-offsite/last-success
+
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/home/micu/backups/pcep/daily
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+RemoveIPC=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=-/run/docker.sock -/run/containerd/containerd.sock -/run/podman/podman.sock
+IPAddressDeny=0.0.0.0/8 10.0.0.0/8 100.64.0.0/10
+IPAddressDeny=169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 192.168.0.0/16
+IPAddressDeny=192.0.2.0/24 198.18.0.0/15 198.51.100.0/24 203.0.113.0/24
+IPAddressDeny=224.0.0.0/4 240.0.0.0/4
+IPAddressDeny=::/128 100::/64 2001:2::/48 2001:db8::/32
+IPAddressDeny=fc00::/7 fe80::/10 ff00::/8
+SystemCallArchitectures=native
+KeyringMode=private
+MemoryHigh=256M
+MemoryMax=384M
+TasksMax=64
+LimitNOFILE=1024
+TimeoutStartSec=30m

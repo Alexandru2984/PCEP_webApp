@@ -191,6 +191,22 @@ physical host; they do not protect against host or disk loss. Replication to
 independently controlled storage remains required when an off-host destination and
 credentials are available.
 
+## Encrypted Offsite Database Backup
+
+The repository includes a fail-closed rclone upload and round-trip verification
+command, but its service and post-backup trigger are intentionally not installed.
+Follow
+[`OFFSITE_BACKUP_RUNBOOK.md`](OFFSITE_BACKUP_RUNBOOK.md) before activation. In
+particular, do not use a raw storage remote, the retiring shared Google Drive OAuth
+client or a crypt key stored only on this host. The runbook requires a dedicated
+crypt remote, provider immutability/versioning, offline recovery material and a
+tested independent alert.
+
+`make offsite-backup-preflight` performs no upload. `make offsite-backup` is allowed
+only for a manually reviewed first run after every activation gate passes. Neither
+command deletes or applies retention to remote data. Both require an explicit
+PCEP-only rclone config path; they never fall back to the operator's shared config.
+
 ## Backend Deploy
 
 ```bash
