@@ -78,7 +78,11 @@ After any dependency change, run `npm install-scripts ls` with npm 11.19.0 and
 confirm that no unreviewed scripts remain.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
-those pins; current action majors use the supported Node 24 runtime.
+those pins; current action majors use the supported Node 24 runtime. Every workflow
+uses the explicit Ubuntu 24.04 runner label instead of the moving `ubuntu-latest`
+alias. Python jobs pin 3.12.14, matching the backend image and local review
+environment. Upgrade either runner or interpreter only as a reviewed change after
+the complete CI suite passes on the candidate combination.
 
 `.github/workflows/dependency-audit.yml` installs and audits the committed hashed
 Python locks and audits the npm lockfile every day at 04:17 UTC, with manual

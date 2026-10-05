@@ -209,6 +209,9 @@ cd frontend && npm run e2e
 
 Push/PR CI runs the backend, frontend, audit and build checks without calling
 production, plus `manage.py check --deploy` against a production-like config.
+Its jobs use the explicit Ubuntu 24.04 runner image; Python jobs use the same
+3.12.14 patch release as the backend runtime, avoiding unreviewed toolchain changes
+when GitHub advances its `ubuntu-latest` alias.
 Its Nginx job starts a disposable TLS vhost and verifies the actual 413/429 JSON,
 cache, CSP, request-ID and retry contracts in addition to configuration syntax.
 Its pinned Trivy scan fails on HIGH/CRITICAL operating-system or Python findings

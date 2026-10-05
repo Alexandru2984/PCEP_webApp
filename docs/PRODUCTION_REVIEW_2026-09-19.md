@@ -2127,6 +2127,27 @@ zero findings. This is a build and CI control only: it does not alter the applic
 bundle or the running production services, database, Nginx or Cloudflare
 configuration.
 
+### GitHub Actions runner and interpreter pinning — 2026-10-05
+
+All push, pull-request, scheduled-audit and production-smoke jobs now select the
+explicit Ubuntu 24.04 runner rather than the moving `ubuntu-latest` alias. This
+prevents GitHub's announced October/November 2026 Ubuntu 26.04 migration from
+changing the CI operating system without review. Python jobs also select exact
+3.12.14, matching the digest-pinned backend image and the local validation
+environment; the GitHub Actions Python manifest provides 3.12.14 builds for both
+Ubuntu 22.04 and 24.04 on x64 and arm64.
+
+The current `ubuntu-latest` label still resolves to Ubuntu 24.04, so this is an
+environment freeze rather than an effective runner downgrade or application
+change. It requires no production deployment or service restart. A later Ubuntu
+26.04 move should be explicit and follow a complete CI run on that runner.
+
+Local validation parsed all workflow YAML, rendered the Compose configuration and
+ran all 218 backend tests under Python 3.12.14. The 308-question audit, both hashed
+Python dependency audits, Django's production deploy check and the public production
+smoke also pass. The hosted workflow will exercise the explicit runner on the next
+push; no push was performed as part of this review.
+
 ## 15. Breaking changes
 
 None.

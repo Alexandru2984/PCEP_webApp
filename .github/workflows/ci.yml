@@ -16,7 +16,7 @@ permissions:
 jobs:
   backend:
     name: Backend (Django + pytest + audit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     services:
@@ -54,7 +54,7 @@ jobs:
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.12.14"
           cache: pip
           cache-dependency-path: |
             backend/requirements.txt
@@ -91,7 +91,7 @@ jobs:
 
   frontend:
     name: Frontend (audit + unit tests + lint + build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     defaults:
@@ -142,7 +142,7 @@ jobs:
 
   e2e:
     name: E2E (Playwright, mocked API)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     defaults:
@@ -195,7 +195,7 @@ jobs:
 
   ops:
     name: Ops (compose + Nginx + backend build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     env:
