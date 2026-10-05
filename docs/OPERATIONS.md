@@ -121,6 +121,26 @@ audits run `npm audit signatures` to verify registry signatures and provenance
 attestations for the resolved packages. Reproduce either failure locally with
 `make audit` before changing a version pin.
 
+`.github/dependabot.yml` proposes reviewed version updates for GitHub Actions each
+Monday and frontend npm dependencies each Tuesday at 05:23 Europe/Bucharest. A
+seven-day cooldown applies only to routine version updates; GitHub security updates
+are not delayed by that setting. Compatible minor/patch updates are grouped by
+ecosystem and npm dependency type, while major upgrades stay isolated. At most
+three routine PRs per ecosystem remain open; security PRs are outside that limit.
+There is no auto-merge configuration.
+
+The configuration file enables version-update proposals after it reaches the
+default branch. Dependabot alerts and security updates remain repository settings;
+confirm they are enabled under GitHub's security settings. If enabled, this file's
+cooldown and routine PR limit do not delay or count their security-update PRs.
+
+Python is deliberately excluded because its two SHA-256 lock files must be
+regenerated together with `make lock-backend`, reviewed and audited. Container base
+updates are also kept manual because each tag/digest pair must be rebuilt, runtime
+tested and scanned together. The daily advisory workflow still detects vulnerable
+Python and npm resolutions between upgrades. `make check-workflows` validates both
+the workflows and Dependabot configuration with strict offline zizmor collection.
+
 ## Public Production Smoke
 
 ```bash

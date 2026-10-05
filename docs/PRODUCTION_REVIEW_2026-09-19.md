@@ -2314,6 +2314,26 @@ and expression use. The local Bash/ShellCheck and semantic actionlint validation
 also remain clean. This control changes only repository CI and documentation: no
 push, deployment, service restart or production mutation was performed.
 
+### Reviewed dependency update proposals — 2026-10-05
+
+Dependabot configuration now covers the two ecosystems whose updates the existing
+CI can reproduce directly: hash-pinned GitHub Actions and the frontend npm manifest
+plus lockfile. Checks run weekly on separate mornings in Europe/Bucharest. Routine
+versions wait seven days after release, minor/patch changes are grouped and major
+changes remain isolated. The three-PR limit controls routine noise but does not
+delay security update PRs when that repository feature is enabled; no update is
+auto-merged. Dependabot alerts/security updates remain an explicit GitHub repository
+setting and must be confirmed there after the configuration reaches the default
+branch.
+
+Python and container updates remain manual by design. Python changes require both
+hashed lock files to be regenerated and audited together, while base-image changes
+require coordinated tag/digest review, rebuild, runtime checks and image scans.
+The daily dependency advisory workflow continues to cover idle periods. Strict
+offline zizmor validation now includes `.github/dependabot.yml` as an explicit
+input, so invalid or unsafe automation configuration blocks push/pull-request CI.
+This repository-only change performs no external update, push or production action.
+
 ## 15. Breaking changes
 
 None.

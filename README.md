@@ -232,6 +232,11 @@ push or pull request occurs. It has read-only repository permissions and install
 the Node tree with package scripts disabled before auditing the committed lockfile.
 Both push/PR CI and the scheduled job also verify npm registry signatures and
 provenance attestations for the resolved dependency tree.
+Dependabot checks GitHub Actions every Monday and frontend npm dependencies every
+Tuesday. Normal version updates wait seven days after release and group compatible
+minor/patch changes; the cooldown does not apply to security-update PRs when that
+repository feature is enabled. Every proposal triggers the full CI suite and awaits
+human review—nothing is auto-merged by this configuration.
 The separate **Production smoke** workflow runs every six hours and on manual
 dispatch. It uses bounded read-only requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,

@@ -14,6 +14,7 @@ readonly ZIZMOR_URL="https://github.com/zizmorcore/zizmor/releases/download/v${Z
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 workflow_root="$root/.github/workflows"
+dependabot_config="$root/.github/dependabot.yml"
 
 die() { echo "workflow-check: $*" >&2; exit 1; }
 
@@ -40,6 +41,8 @@ while IFS= read -r -d '' workflow; do
     workflows+=("$workflow")
 done < <(find "$workflow_root" -mindepth 1 -maxdepth 1 -print0 | sort -z)
 (( ${#workflows[@]} > 0 )) || die 'no workflow files found.'
+[[ -f "$dependabot_config" && ! -L "$dependabot_config" ]] \
+    || die '.github/dependabot.yml must be a regular file.'
 
 stage="$(mktemp -d /tmp/pcep-workflow-check.XXXXXX)"
 cleanup() {
@@ -89,9 +92,9 @@ printf '%s  %s\n' "$ZIZMOR_SHA256" "$zizmor_archive" \
 tar --extract --gzip --file="$zizmor_archive" --directory="$stage" zizmor
 chmod 0500 "$stage/zizmor"
 
-# Keep the security audit deterministic and credential-free. Explicit workflow
+# Keep the security audit deterministic and credential-free. Explicit automation
 # paths prevent collection gaps, while repository config and inline ignores are
-# disabled so a workflow change cannot suppress its own finding.
+# disabled so a repository change cannot suppress its own finding.
 env -u GH_TOKEN -u GITHUB_TOKEN -u ZIZMOR_GITHUB_TOKEN -u ZIZMOR_CONFIG \
     "$stage/zizmor" \
     --offline \
@@ -103,7 +106,8 @@ env -u GH_TOKEN -u GITHUB_TOKEN -u ZIZMOR_GITHUB_TOKEN -u ZIZMOR_CONFIG \
     --color=never \
     --render-links=never \
     --show-audit-urls=always \
-    "${workflows[@]}"
+    "${workflows[@]}" \
+    "$dependabot_config"
 
-printf 'Security-audited %d workflow(s) with zizmor %s in offline mode.\n' \
+printf 'Security-audited %d workflow(s) and Dependabot config with zizmor %s in offline mode.\n' \
     "${#workflows[@]}" "$ZIZMOR_VERSION"
