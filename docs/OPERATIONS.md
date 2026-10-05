@@ -98,12 +98,17 @@ environment. Upgrade either runner or interpreter only as a reviewed change afte
 the complete CI suite passes on the candidate combination.
 
 Run `make check-workflows` after changing `.github/workflows/`. It downloads the
-Linux/amd64 `actionlint` 1.7.12 archive over HTTPS, verifies the release's pinned
-SHA-256 before extraction and validates every workflow plus its embedded shell.
-The command supplies its own empty configuration, so repository ignore rules cannot
-suppress findings, and rejects symlinks, nested entries and unsafe filenames in the
-workflow directory. Update the version, archive checksum and documentation together
-after reviewing the upstream release; do not replace the version with `latest`.
+Linux/amd64 `actionlint` 1.7.12 and `zizmor` 1.30.1 archives over HTTPS, verifies
+each release's pinned SHA-256 before extraction, and validates every workflow.
+Actionlint checks schema, expressions and embedded shell; zizmor's pedantic offline
+persona checks hash pinning, permissions, triggers, secret handling and other static
+CI security properties. No GitHub token is exposed to the scanner.
+
+The command supplies trusted tool configuration, disables repository ignore rules,
+passes every workflow explicitly, and rejects symlinks, nested entries and unsafe
+filenames in the workflow directory. Update each version, archive checksum and this
+documentation together after reviewing the upstream release; never replace a fixed
+version with `latest`.
 
 `.github/workflows/dependency-audit.yml` installs and audits the committed hashed
 Python locks and audits the npm lockfile every day at 04:17 UTC, with manual

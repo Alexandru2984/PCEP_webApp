@@ -36,7 +36,7 @@ help:
 		'  audit-secrets    Scan tracked files and complete Git history for secrets' \
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
-		'  check-workflows  Semantically validate every GitHub Actions workflow' \
+		'  check-workflows  Validate GitHub Actions syntax, shell and security' \
 		'  check-systemd    Validate every operational systemd unit and drop-in' \
 		'  build            Build the frontend production bundle' \
 		'  compose-build-frontend Build frontend through the pinned container' \

@@ -2300,6 +2300,20 @@ also rejects symlinks, nested content and unsafe names in `.github/workflows` ra
 than silently omitting them. The current three workflows pass with no findings.
 This is a CI-only control; it made no production, systemd or offsite-backup change.
 
+### GitHub Actions security audit — 2026-10-05
+
+The workflow check now adds `zizmor` 1.30.1's pedantic security analysis after
+actionlint. Its Linux/amd64 archive is fixed by version and exact release SHA-256;
+the binary runs explicitly offline, receives no GitHub token, loads no repository
+configuration and honors no inline ignores. All workflow paths are supplied
+explicitly and strict collection turns any parse/schema omission into a failure.
+
+All three workflows pass with zero findings, including full action hash pinning and
+matching version comments, minimal permissions, safe triggers, credential handling
+and expression use. The local Bash/ShellCheck and semantic actionlint validations
+also remain clean. This control changes only repository CI and documentation: no
+push, deployment, service restart or production mutation was performed.
+
 ## 15. Breaking changes
 
 None.
