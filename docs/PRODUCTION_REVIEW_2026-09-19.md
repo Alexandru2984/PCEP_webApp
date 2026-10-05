@@ -2195,6 +2195,26 @@ allocated space across both locations. Nothing was removed: the filesystem still
 has 140 GiB free, so cleanup remains an explicit operator-reviewed action rather
 than part of the database-backup rollout.
 
+### Tracked-file and Git-history secret scanning — 2026-10-05
+
+The CI ops job now scans the current contents of every Git-tracked path and a text
+rendering of all reachable commit history with the existing digest-pinned Trivy
+0.75.0 secret detector. It fetches full history and fails rather than silently
+accepting a shallow clone. The staging tree excludes every ignored or untracked
+file, so production `.env` files, the operator's rclone credentials, local backups
+and `.claude/` never enter the scanner container. The container has no network,
+capabilities or writable root. Its working directory is fixed to `/`, outside the
+read-only target at `/workspace`, so repository-controlled Trivy, ignore or secret
+configuration is scanned as data but cannot configure the scanner.
+
+The complete tracked tree and history scan reports no secret finding. A separate
+temporary canary containing a synthetic GitHub token produced a redacted CRITICAL
+finding and exit status 1, proving that the blocking path is active; that canary was
+committed only in a disposable test repository, never entered this repository, and
+was removed with the temporary scan tree. This control does not inspect intentionally
+ignored runtime secrets and does not replace credential rotation if a real value
+ever reaches Git history.
+
 ## 15. Breaking changes
 
 None.

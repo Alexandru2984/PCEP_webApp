@@ -64,6 +64,19 @@ again during its network-free runtime install. After intentionally changing an
 input requirement, install the development lock and run `make lock-backend`, then
 review both lock diffs and repeat the audit and image build.
 
+`make audit-secrets` creates a mode-0700 temporary tree containing only paths known
+to Git plus a text rendering of all reachable commit history. It deliberately
+excludes ignored/untracked operator files such as `.env`, rclone configuration,
+backup data and `.claude/`. The digest-pinned Trivy secret scanner runs against that
+tree without network access, capabilities or a writable root filesystem. Repository
+`trivy.yaml`, ignore files and secret-rule configuration cannot suppress their own
+finding: the scanner starts in `/`, outside the read-only target mounted at
+`/workspace`, so target files are data rather than scanner configuration. The
+command refuses shallow clones; the CI ops checkout therefore fetches full history.
+Scanner output redacts matched values. Treat a finding as exposed even if a later
+commit removes it, rotate the credential first, then purge history only through a
+separately reviewed procedure.
+
 The frontend builder uses a versioned Node 24/Alpine tag plus the official
 multi-architecture image digest. Run it through `make compose-build-frontend`;
 the target maps the invoking host UID/GID into the disposable container so a

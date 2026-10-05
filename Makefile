@@ -19,7 +19,7 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -27,7 +27,8 @@ help:
 		'  install          Install backend dev deps and frontend deps' \
 		'  lock-backend     Regenerate hashed Python dependency locks' \
 		'  test             Run backend and frontend checks' \
-		'  audit            Run Python/npm dependency audits and question audit' \
+		'  audit            Run dependency, question and tracked-secret audits' \
+		'  audit-secrets    Scan tracked files and complete Git history for secrets' \
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
 		'  build            Build the frontend production bundle' \
@@ -63,7 +64,7 @@ test-backend:
 test-frontend: fetch-pyodide
 	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" $(NPM) run build
 
-audit: audit-backend audit-frontend
+audit: audit-backend audit-frontend audit-secrets
 
 audit-backend:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.test_settings "$(PYTHON_BIN)" manage.py audit_questions --fail-on-warnings
@@ -73,6 +74,9 @@ audit-backend:
 audit-frontend:
 	cd frontend && $(NPM) audit --audit-level=moderate
 	cd frontend && $(NPM) audit signatures
+
+audit-secrets:
+	TRIVY_IMAGE="$(TRIVY_IMAGE)" bash scripts/check_tracked_secrets.sh
 
 audit-image:
 	mkdir -p "$(TRIVY_CACHE)"
