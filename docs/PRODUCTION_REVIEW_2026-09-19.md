@@ -2287,6 +2287,19 @@ workflow YAML, Compose rendering, the complete 262-test backend suite, tracked-s
 scan and public production smoke are clean. This CI-only control made no production
 or systemd change; the encrypted offsite service and trigger remain uninstalled.
 
+### Semantic GitHub Actions validation — 2026-10-05
+
+Push/pull-request CI now runs the same `make check-workflows` entry point available
+to operators. It downloads only the fixed Linux/amd64 actionlint 1.7.12 artifact,
+verifies its exact SHA-256 before extracting the binary and validates all three
+workflow files. ShellCheck integration remains mandatory for embedded shell blocks.
+
+The validator passes workflow paths explicitly and supplies a trusted empty config,
+so a repository-owned actionlint ignore rule cannot suppress its own finding. It
+also rejects symlinks, nested content and unsafe names in `.github/workflows` rather
+than silently omitting them. The current three workflows pass with no findings.
+This is a CI-only control; it made no production, systemd or offsite-backup change.
+
 ## 15. Breaking changes
 
 None.

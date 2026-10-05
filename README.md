@@ -212,6 +212,8 @@ production, plus `manage.py check --deploy` against a production-like config.
 Its jobs use the explicit Ubuntu 24.04 runner image; Python jobs use the same
 3.12.14 patch release as the backend runtime, avoiding unreviewed toolchain changes
 when GitHub advances its `ubuntu-latest` alias.
+The ops job semantically validates every workflow with a checksum-pinned
+`actionlint` release and runs ShellCheck against embedded shell blocks.
 The ops job also scans every tracked file and the complete reachable Git history
 for known secret formats using the same digest-pinned Trivy image as container
 auditing. Ignored `.env` files and other untracked operator state are never copied

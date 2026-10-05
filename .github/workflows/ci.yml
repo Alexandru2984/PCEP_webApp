@@ -214,6 +214,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Validate GitHub Actions workflows
+        run: make check-workflows
+
       - name: Scan tracked files and Git history for secrets
         run: make audit-secrets
 

@@ -97,6 +97,14 @@ alias. Python jobs pin 3.12.14, matching the backend image and local review
 environment. Upgrade either runner or interpreter only as a reviewed change after
 the complete CI suite passes on the candidate combination.
 
+Run `make check-workflows` after changing `.github/workflows/`. It downloads the
+Linux/amd64 `actionlint` 1.7.12 archive over HTTPS, verifies the release's pinned
+SHA-256 before extraction and validates every workflow plus its embedded shell.
+The command supplies its own empty configuration, so repository ignore rules cannot
+suppress findings, and rejects symlinks, nested entries and unsafe filenames in the
+workflow directory. Update the version, archive checksum and documentation together
+after reviewing the upstream release; do not replace the version with `latest`.
+
 `.github/workflows/dependency-audit.yml` installs and audits the committed hashed
 Python locks and audits the npm lockfile every day at 04:17 UTC, with manual
 dispatch available.
