@@ -2056,6 +2056,59 @@ Final validation after the completion, container and database-role stages is cle
 - Hardened PostgreSQL runtime, isolated Nginx error contracts, Compose rendering,
   privileged live `nginx -t` and the complete public production smoke all pass.
 
+### Dependency reproducibility and rollback recovery — 2026-10-05
+
+Python production and development dependency graphs are now committed as complete
+SHA-256 lock files. Local/CI installs require hashes and binary distributions; the
+backend image verifies the production lock while collecting wheels and again during
+its network-free runtime install. `pip-tools` 7.6.1 and `make lock-backend` provide
+the reviewed regeneration path. Scheduled dependency auditing installs the hashed
+development environment instead of resolving the scanner's transitive dependencies
+dynamically.
+
+The frontend builder now pins Node 24.21.0 on Alpine 3.24 by official
+multi-architecture digest
+`sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1`.
+Its Compose wrapper maps the invoking host UID/GID while retaining a disposable
+home/cache, so the non-root builder can safely replace `frontend/dist` on hosts
+whose operator is not UID 1000. CI now builds and runs this exact builder, and all
+four primary CI jobs have explicit time bounds.
+
+A pre-deploy test build exposed the existing safety rule that the exact live image
+must be snapshotted before its local tag is displaced. The first deployment attempt
+therefore stopped before backup, build or service replacement. Recovery deliberately
+did not use `docker commit`, which could preserve runtime secrets in image metadata.
+The deployment tool now accepts an explicit fallback only when exact live image
+metadata is unavailable. It requires non-root `appuser`, matching release metadata,
+no embedded application/database secret keys, a clean `pip check` in a networkless,
+read-only, capability-free container, and a clean blocking image scan before tagging
+the fallback. Normal deployments still require the exact running image.
+
+The retained `2915c622166b` rollback was independently scanned and exercised
+read-only against the live schema (`migrate --check` and the 308-question database
+audit) before use. Release `ab91beebe4f2` is now live as backend image
+`sha256:503dd4c69ed5aab723fe00bc275dc0f55905209dfe77e3b71fb352ddb6958903`.
+Its fallback rollback tag is
+`pcep-backend-rollback:20261005T081403Z-release-2915c622166b`. The verified mode-0600
+database backup is `/home/micu/backups/pcep/pcep_db_20261005T081403Z.sql.gz`,
+SHA-256 `148df20780dd0b67adf9d91678f3bf8dfe58b32abd9171a93b5132610089d894`.
+
+Validation for this follow-up is clean:
+
+- fresh hash-only development install plus `pip check`;
+- 218 backend tests and 305 frontend tests;
+- lint, Prettier and both host/container production frontend builds;
+- all 31 Playwright flows;
+- Python/npm advisories: zero;
+- candidate and fallback fixable HIGH/CRITICAL findings: zero;
+- Django deploy check, migration check and 308-question live audit: clean;
+- Compose healthy, privileged `nginx -t` and complete public smoke: clean.
+
+Commits `a60c21f` and `ab91bee` contain the implementation. Only the backend was
+recreated. PostgreSQL, its volume, the frontend publication, Nginx and Cloudflare
+were not changed; no migration or seed operation ran. The public frontend remains
+`1f3bf87dc97a`.
+
 ## 15. Breaking changes
 
 None.
