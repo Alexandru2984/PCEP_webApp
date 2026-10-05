@@ -64,7 +64,7 @@ lock-backend:
 	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --output-file backend/requirements-dev.lock backend/requirements-dev.txt
 
 install-frontend:
-	cd frontend && $(NPM) ci
+	NPM="$(NPM)" bash frontend/scripts/install-dependencies.sh
 
 test: test-backend test-frontend
 

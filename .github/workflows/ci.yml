@@ -110,7 +110,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/install-dependencies.sh
 
       - name: Audit dependencies
         run: |
@@ -161,7 +161,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/install-dependencies.sh
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium

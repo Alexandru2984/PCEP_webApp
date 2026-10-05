@@ -82,13 +82,18 @@ multi-architecture image digest. Run it through `make compose-build-frontend`;
 the target maps the invoking host UID/GID into the disposable container so a
 non-root builder can replace `frontend/dist` without leaving root-owned files or
 assuming UID 1000. Its home and npm cache remain inside the disposable container.
-The pinned runtime is Node 24.21.0 with npm 11.19.0. `.npmrc` enables npm's strict
-install-script policy, and the package manifest allows only the exact reviewed
-`esbuild@0.25.12` installer. The optional macOS-only `fsevents` installer is
-explicitly denied. A newly introduced or newly versioned lifecycle script therefore
-fails `npm ci` until its package and script are reviewed and the manifest is updated.
-After any dependency change, run `npm install-scripts ls` with npm 11.19.0 and
-confirm that no unreviewed scripts remain.
+The pinned runtime is Node 24.21.0 with npm 11.19.0. `.npmrc` blocks all dependency
+lifecycle scripts, including on older npm releases that predate `allowScripts`.
+`frontend/scripts/install-dependencies.sh` performs `npm ci --ignore-scripts`, then
+checks the lockfile and installed package metadata against an exact reviewed
+inventory. Every dependency must resolve from `registry.npmjs.org` with SHA-512
+integrity. It runs `npm rebuild` only for `esbuild@0.25.12` and exercises its binary;
+the package manifest records the same explicit esbuild approval and denies the
+optional macOS-only `fsevents@2.3.3` installer for npm versions that understand that
+policy. A new version, lifecycle command or package with an install script fails
+before any such code runs.
+After a dependency change, review both inventory failures before updating the
+checker; never replace the targeted rebuild with a blanket script enablement.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime. Every workflow

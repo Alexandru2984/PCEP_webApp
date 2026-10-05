@@ -2111,18 +2111,25 @@ were not changed; no migration or seed operation ran. The public frontend remain
 
 ### npm install-script and registry-integrity controls — 2026-10-05
 
-Normal frontend installs now use npm's strict lifecycle-script policy under the
-exact Node 24.21.0/npm 11.19.0 toolchain used by CI and the digest-pinned builder.
-The manifest approves only the exact reviewed `esbuild@0.25.12` binary installer
-and explicitly disables the optional macOS-only `fsevents` installer. Any future
-dependency that introduces an unreviewed install script therefore stops `npm ci`.
-The scheduled audit retains `--ignore-scripts`, so it never executes dependency
-lifecycle code, while both CI audit paths now verify registry signatures and
-provenance attestations with `npm audit signatures`.
+Normal frontend installs use the exact Node 24.21.0/npm 11.19.0 toolchain in CI and
+the digest-pinned builder. A follow-up removed reliance on npm 11.18+'s
+`strict-allow-scripts`, which older npm versions merely warn about and ignore.
+Every supported install now starts with `npm ci --ignore-scripts`, validates the
+exact lifecycle-script inventory in both the lockfile and installed package
+metadata, and requires every artifact to have an official-registry URL plus SHA-512
+integrity. It then rebuilds and exercises only `esbuild@0.25.12`. The optional
+`fsevents@2.3.3` installer remains blocked. The manifest retains the matching
+allow/deny declarations as defense in depth for npm versions that support them,
+without making enforcement depend on that support. Any new version, lifecycle
+command or package with an install script fails before its code can execute.
+
+The scheduled audit also validates the same inventory after its script-free install.
+Both CI audit paths continue to verify registry signatures and provenance
+attestations with `npm audit signatures`.
 
 A clean no-cache builder install reports no packages with unreviewed install
-scripts. The pinned builder verified registry signatures for all 522 dependency
-packages and verified 168 provenance attestations; the vulnerability audit reports
+scripts. The pinned tree verified registry signatures for all 523 dependency
+packages and verified 169 provenance attestations; the vulnerability audit reports
 zero findings. This is a build and CI control only: it does not alter the application
 bundle or the running production services, database, Nginx or Cloudflare
 configuration.

@@ -144,13 +144,14 @@ python manage.py runserver
 
 ### Frontend
 
-Use Node 24.21.0 with npm 11.19.0. The project rejects unreviewed dependency
-lifecycle scripts: only the exact reviewed `esbuild` installer is allowed, while
-the optional `fsevents` installer is explicitly disabled.
+Use Node 24.21.0 with npm 11.19.0. The installer blocks every dependency lifecycle
+script, verifies the exact lockfile and installed-package inventory, then executes
+only the reviewed `esbuild@0.25.12` installer. The manifest records the same
+allow/deny policy for newer npm releases; optional `fsevents` remains blocked.
 
 ```bash
 cd frontend
-npm ci
+bash scripts/install-dependencies.sh
 npm run fetch-pyodide   # one-time: downloads the self-hosted Python runtime (~12 MB,
                         # git-ignored) used by the in-browser code runner
 npm run dev             # Vite dev server, proxies /api to Django (see vite.config.js)
