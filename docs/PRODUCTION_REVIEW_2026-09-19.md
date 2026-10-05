@@ -2359,7 +2359,7 @@ offline zizmor validation now includes `.github/dependabot.yml` as an explicit
 input, so invalid or unsafe automation configuration blocks push/pull-request CI.
 This repository-only change performs no external update, push or production action.
 
-### Pull-request dependency-diff enforcement preparation — 2026-10-05
+### Pull-request dependency-diff preparation and graph activation — 2026-10-05
 
 A separate workflow is prepared to review the dependency delta for pull requests
 targeting `main`. Its check fails for newly introduced or upgraded dependencies
@@ -2377,12 +2377,18 @@ has a reviewed legal allowlist rather than an implicit scanner policy.
 
 Local actionlint and strict offline zizmor validation cover the workflow syntax,
 immutable action pin, permissions and untrusted-PR trigger. The dependency comparison
-itself requires GitHub's hosted dependency graph. Read-only inspection on 2026-10-05
-confirmed that the graph is disabled, `main` has no branch protection and the
-repository has no ruleset. Therefore the workflow is not yet an effective merge
-control: the graph must be enabled, the change pushed, a hosted pull-request run
-confirmed and its check then marked required. No repository push, settings change,
-production deployment or service restart was performed during this work.
+itself requires GitHub's hosted dependency graph. The graph and Dependabot alerts
+were enabled through GitHub's documented repository endpoint. A subsequent HTTP 204
+status, the public dependency page and an authenticated dependency comparison all
+confirm availability. GitHub generated an SBOM with 609 packages and 1,150
+relationships; the initial open-alert list is empty. Dependabot security updates
+remain disabled, so this activation cannot open automated remediation PRs.
+
+`main` still has no branch protection and the repository has no ruleset. Therefore
+the local workflow is not yet an effective merge control: the change must be pushed,
+a hosted pull-request run confirmed and its check then marked required. No repository
+push, production deployment or service restart was performed; the only external
+mutation was enabling the dependency graph and Dependabot alerts.
 
 ## 15. Breaking changes
 

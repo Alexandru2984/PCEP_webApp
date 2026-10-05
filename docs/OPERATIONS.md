@@ -165,12 +165,19 @@ the daily advisory audit; it cannot be reproduced offline because the comparison
 comes from GitHub's dependency graph. Run `make check-workflows` locally after any
 configuration change.
 
-Before relying on the workflow, enable the dependency graph under the repository's
-GitHub **Settings > Advanced Security > Code Security** page, then confirm the
-hosted check on a pull request. A workflow failure prevents merging only when the
-check is required by branch protection or a ruleset; add that requirement after the
-first successful run has registered the check name. Keep the existing audits as the
-effective control until both external gates are complete.
+The repository dependency graph and Dependabot alerts were enabled on 2026-10-05.
+GitHub's initial SBOM contains 609 packages and 1,150 relationships, with no open
+Dependabot alert at activation time. Check the current setting without changing it
+with `gh api -i repos/Alexandru2984/PCEP_webApp/vulnerability-alerts`: HTTP 204 means
+enabled. Do not disable it; GitHub's disable endpoint removes both alerts and the
+dependency graph that this workflow requires. Dependabot security updates remain a
+separate, disabled setting and no security-update PR is created automatically.
+
+After the workflow reaches the default branch, confirm its hosted check on a pull
+request. A workflow failure prevents merging only when the check is required by
+branch protection or a ruleset; add that requirement after the first successful run
+has registered the check name. Keep the existing audits as the effective merge
+control until that external gate is complete.
 
 Python is deliberately excluded because its two SHA-256 lock files must be
 regenerated together with `make lock-backend`, reviewed and audited. Container base
