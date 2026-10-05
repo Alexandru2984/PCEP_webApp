@@ -1,7 +1,9 @@
 PYTHON ?= backend/.venv/bin/python
 PIP ?= backend/.venv/bin/pip
+LOCK_COMPILER ?= backend/.venv/bin/pip-compile
 PYTHON_BIN := $(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON))
 PIP_BIN := $(if $(findstring /,$(PIP)),$(abspath $(PIP)),$(PIP))
+LOCK_COMPILER_BIN := $(if $(findstring /,$(LOCK_COMPILER)),$(abspath $(LOCK_COMPILER)),$(LOCK_COMPILER))
 NPM ?= npm
 COMPOSE ?= docker compose
 FRONTEND_ROOT ?= /var/www/pcep/frontend
@@ -15,17 +17,19 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend test test-backend test-frontend audit audit-backend audit-frontend audit-image audit-db-image build build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
 		'Targets:' \
 		'  install          Install backend dev deps and frontend deps' \
+		'  lock-backend     Regenerate hashed Python dependency locks' \
 		'  test             Run backend and frontend checks' \
 		'  audit            Run Python/npm dependency audits and question audit' \
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
 		'  build            Build the frontend production bundle' \
+		'  compose-build-frontend Build frontend through the pinned container' \
 		'  django-check     Run Django production deploy checks' \
 		'  production-smoke Check the read-only public production contract' \
 		'  compose-build    Rebuild the backend image with its release revision' \
@@ -39,7 +43,11 @@ help:
 install: install-backend install-frontend
 
 install-backend:
-	cd backend && "$(PIP_BIN)" install -r requirements-dev.txt
+	"$(PIP_BIN)" install --require-hashes --only-binary=:all: -r backend/requirements-dev.lock
+
+lock-backend:
+	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --output-file backend/requirements.lock backend/requirements.txt
+	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --output-file backend/requirements-dev.lock backend/requirements-dev.txt
 
 install-frontend:
 	cd frontend && $(NPM) ci
@@ -56,8 +64,8 @@ audit: audit-backend audit-frontend
 
 audit-backend:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.test_settings "$(PYTHON_BIN)" manage.py audit_questions --fail-on-warnings
-	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements.txt
-	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements-dev.txt
+	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements.lock
+	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements-dev.lock
 
 audit-frontend:
 	cd frontend && $(NPM) audit --audit-level=moderate
@@ -82,6 +90,11 @@ build: build-frontend
 
 build-frontend: fetch-pyodide
 	cd frontend && VITE_PCEP_RELEASE="$(RELEASE)" $(NPM) run build
+
+# Match the bind-mounted source/output ownership instead of assuming host UID 1000.
+# HOME/cache stay on the disposable container filesystem for arbitrary host UIDs.
+compose-build-frontend:
+	$(COMPOSE) --profile build run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --env NPM_CONFIG_CACHE=/tmp/npm-cache frontend-builder
 
 # Self-hosted Python runtime for the in-browser code runner (git-ignored, ~12 MB).
 # Fetched only when missing so repeat builds stay fast.

@@ -73,7 +73,7 @@ services:
         condition: service_healthy
 
   # One-shot builder for the React app. Not started by `docker compose up`.
-  # Run with: docker compose --profile build run --rm frontend-builder
+  # Run with: make compose-build-frontend (maps the host UID/GID for safe output).
   frontend-builder:
     build:
       context: ./frontend

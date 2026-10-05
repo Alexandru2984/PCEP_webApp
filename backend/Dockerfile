@@ -2,8 +2,9 @@ ARG PYTHON_IMAGE=python:3.12.14-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be0
 FROM ${PYTHON_IMAGE} AS dependencies
 ENV PIP_NO_CACHE_DIR=1
 WORKDIR /build
-COPY requirements.txt .
-RUN pip wheel --only-binary=:all: --wheel-dir /wheels -r requirements.txt
+COPY requirements.lock .
+RUN pip wheel --require-hashes --only-binary=:all: \
+    --wheel-dir /wheels -r requirements.lock
 
 FROM ${PYTHON_IMAGE}
 ARG PCEP_RELEASE=development
@@ -18,8 +19,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=dependencies /wheels /wheels
-COPY requirements.txt .
-RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+COPY requirements.lock .
+RUN pip install --require-hashes --no-index --find-links=/wheels \
+    -r requirements.lock \
     && rm -rf /wheels \
     && adduser --disabled-password --gecos "" appuser \
     && mkdir -p /app/staticfiles /app/media \

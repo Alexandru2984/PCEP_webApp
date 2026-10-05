@@ -132,7 +132,7 @@ Internet → Cloudflare → cloudflared → HTTPS loopback Nginx
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
+pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
 
 # Point Django at a local Postgres and seed the bank
 export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=True
@@ -165,7 +165,7 @@ docker volume create pcep_webapp_postgres_data
 docker volume create pcep_webapp_static_volume
 docker volume create pcep_webapp_media_volume
 docker compose up --build     # db + backend on 127.0.0.1:8001
-docker compose --profile build run --rm frontend-builder   # build the React app
+make compose-build-frontend       # build React through the pinned Node image
 ```
 
 The three named volumes are external by design: Compose uses them but cannot
@@ -186,6 +186,9 @@ make django-check
 make compose-build && make audit-image
 bash scripts/check_postgres_container.sh && make audit-db-image
 make production-smoke
+
+# After intentionally changing a Python requirement:
+make lock-backend
 
 # Backend — 216 tests (API/security, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.

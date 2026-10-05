@@ -17,6 +17,7 @@ jobs:
   backend:
     name: Backend (Django + pytest + audit)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -58,14 +59,18 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
+            backend/requirements.lock
+            backend/requirements-dev.lock
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: >-
+          pip install --require-hashes --only-binary=:all:
+          -r requirements-dev.lock
 
       - name: Audit Python dependencies
         run: |
-          python -m pip_audit -r requirements.txt
-          python -m pip_audit -r requirements-dev.txt
+          python -m pip_audit -r requirements.lock
+          python -m pip_audit -r requirements-dev.lock
 
       - name: Audit question bank
         env:
@@ -87,6 +92,7 @@ jobs:
   frontend:
     name: Frontend (audit + unit tests + lint + build)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     defaults:
       run:
@@ -135,6 +141,7 @@ jobs:
   e2e:
     name: E2E (Playwright, mocked API)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -187,6 +194,7 @@ jobs:
   ops:
     name: Ops (compose + Nginx + backend build)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       POSTGRES_DB: pcep_db
@@ -217,6 +225,12 @@ jobs:
 
       - name: Build hardened backend image
         run: docker compose build backend
+
+      - name: Build pinned frontend builder image
+        run: docker compose --profile build build frontend-builder
+
+      - name: Run pinned frontend builder
+        run: make compose-build-frontend
 
       - name: Scan backend image for fixable high-severity vulnerabilities
         run: make audit-image

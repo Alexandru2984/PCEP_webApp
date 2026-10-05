@@ -39,6 +39,7 @@ make audit
 make django-check
 make compose-build
 make audit-image
+make compose-build-frontend
 bash scripts/check_postgres_container.sh
 make audit-db-image
 ```
@@ -56,13 +57,25 @@ image digest. The runtime stage applies current Debian updates so a versioned
 upstream image cannot leave newly fixed packages behind between image rebuilds.
 Update the Python version and digest together only after rebuilding, scanning and
 running the backend suite. Test code, pytest configuration and development
-requirements are excluded from the production build context.
+requirements are excluded from the production build context. Production and
+development Python installs use committed transitive locks with SHA-256 hashes;
+the Docker build verifies the production lock once while collecting wheels and
+again during its network-free runtime install. After intentionally changing an
+input requirement, install the development lock and run `make lock-backend`, then
+review both lock diffs and repeat the audit and image build.
+
+The frontend builder uses a versioned Node 24/Alpine tag plus the official
+multi-architecture image digest. Run it through `make compose-build-frontend`;
+the target maps the invoking host UID/GID into the disposable container so a
+non-root builder can replace `frontend/dist` without leaving root-owned files or
+assuming UID 1000. Its home and npm cache remain inside the disposable container.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime.
 
-`.github/workflows/dependency-audit.yml` audits both committed Python requirement
-sets and the npm lockfile every day at 04:17 UTC, with manual dispatch available.
+`.github/workflows/dependency-audit.yml` installs and audits the committed hashed
+Python locks and audits the npm lockfile every day at 04:17 UTC, with manual
+dispatch available.
 It is independent of repository activity, uses read-only repository permissions,
 has ten-minute job limits and runs `npm ci --ignore-scripts` before the Node audit.
 This detects advisories published between code changes without granting a scanner

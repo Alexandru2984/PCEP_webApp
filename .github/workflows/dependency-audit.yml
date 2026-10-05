@@ -30,15 +30,19 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
+            backend/requirements.lock
+            backend/requirements-dev.lock
 
-      - name: Install pinned advisory scanner
-        run: python -m pip install pip-audit==2.10.1
+      - name: Install hashed audit environment
+        run: >-
+          python -m pip install --require-hashes --only-binary=:all:
+          -r backend/requirements-dev.lock
 
       - name: Audit production dependencies
-        run: python -m pip_audit -r backend/requirements.txt
+        run: python -m pip_audit -r backend/requirements.lock
 
       - name: Audit development dependencies
-        run: python -m pip_audit -r backend/requirements-dev.txt
+        run: python -m pip_audit -r backend/requirements-dev.lock
 
   node:
     name: Node advisories
