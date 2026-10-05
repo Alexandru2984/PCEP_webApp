@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
 CANDIDATE_IMAGE = f'sha256:{"a" * 64}'
+FALLBACK_IMAGE = f'sha256:{"b" * 64}'
 
 
 def candidate_capture(args):
@@ -161,6 +163,84 @@ def test_snapshot_tag_is_verified_against_running_image(tmp_path, monkeypatch):
     assert commands == [
         ('docker', 'tag', 'sha256:running', tag),
     ]
+
+
+def test_snapshot_uses_explicit_verified_fallback_when_live_metadata_is_missing(
+    tmp_path, monkeypatch
+):
+    commands = []
+    fallback_reference = 'pcep-backend-rollback:reviewed'
+
+    def capture(args, **_kwargs):
+        if args[:3] == ['docker', 'inspect', 'pcep_backend'] and '.State.Running' in args[-1]:
+            return 'true healthy sha256:missing'
+        if args[:3] == ['docker', 'inspect', 'pcep_backend']:
+            return 'live-release'
+        if args[:4] == ['docker', 'image', 'inspect', 'sha256:missing']:
+            raise release.ReleaseError('missing image metadata')
+        if args[:4] == ['docker', 'image', 'inspect', fallback_reference]:
+            if args[-1] == '{{.Id}}':
+                return FALLBACK_IMAGE
+            return json.dumps(
+                {
+                    'User': 'appuser',
+                    'Env': ['PATH=/usr/local/bin', 'PCEP_RELEASE=reviewed-release'],
+                    'Labels': {
+                        'org.opencontainers.image.revision': 'reviewed-release'
+                    },
+                }
+            )
+        if args[:3] == ['docker', 'image', 'inspect']:
+            return FALLBACK_IMAGE
+        raise AssertionError(args)
+
+    monkeypatch.setattr(release, 'capture_command', capture)
+    monkeypatch.setattr(
+        release, 'run_command', lambda args, **_kwargs: commands.append(tuple(args))
+    )
+
+    tag = release.snapshot_running_backend(
+        config(tmp_path, fallback_rollback_image=fallback_reference),
+        '20261005T010203Z',
+    )
+
+    assert tag == 'pcep-backend-rollback:20261005T010203Z-release-reviewed-release'
+    assert ('make', 'audit-image', f'BACKEND_IMAGE={FALLBACK_IMAGE}') in commands
+    assert (
+        'docker', 'run', '--rm', '--network', 'none', '--read-only',
+        '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+        '--pids-limit', '64', '--memory', '256m',
+        '--tmpfs', '/tmp:size=16m,noexec,nosuid,nodev',
+        '--entrypoint', 'python', FALLBACK_IMAGE,
+        '-m', 'pip', 'check',
+    ) in commands
+    assert commands[-1] == ('docker', 'tag', FALLBACK_IMAGE, tag)
+
+
+def test_fallback_rollback_rejects_embedded_runtime_secrets(tmp_path, monkeypatch):
+    def capture(args, **_kwargs):
+        if args[-1] == '{{.Id}}':
+            return FALLBACK_IMAGE
+        return json.dumps(
+            {
+                'User': 'appuser',
+                'Env': [
+                    'PCEP_RELEASE=reviewed-release',
+                    'DJANGO_SECRET_KEY=must-not-be-baked-in',
+                ],
+                'Labels': {'org.opencontainers.image.revision': 'reviewed-release'},
+            }
+        )
+
+    monkeypatch.setattr(release, 'capture_command', capture)
+    monkeypatch.setattr(
+        release,
+        'run_command',
+        lambda *_args, **_kwargs: pytest.fail('Unsafe fallback must not be run.'),
+    )
+
+    with pytest.raises(release.ReleaseError, match='DJANGO_SECRET_KEY'):
+        release.verify_fallback_rollback_image(config(tmp_path), 'fallback:unsafe')
 
 
 def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):

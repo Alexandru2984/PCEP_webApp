@@ -144,6 +144,22 @@ partial deploys and stale PWA tabs immediately distinguishable. Responses
 generated directly by Nginx (for example, an over-limit request) do not carry
 the Django release header.
 
+If an earlier local build already displaced the exact live image metadata,
+routine deployment stops before backup or service replacement. Do not recover
+with `docker commit`: the committed container configuration can embed runtime
+secrets. Select an already retained, reviewed rollback image that is compatible
+with the current schema, inspect it, and invoke the explicit recovery path:
+
+```bash
+make deploy-backend BACKEND_DEPLOY_FLAGS='--fallback-rollback-image <reviewed-tag>'
+```
+
+This path is used only when the exact live image cannot be inspected. It requires
+the fallback to run as `appuser`, requires matching release environment/label
+metadata, rejects baked-in application/database secret keys, runs `pip check`
+and the blocking image scan, and only then creates the timestamped rollback tag.
+The normal exact-image path remains unchanged.
+
 Never reset/reseed the live bank during routine deployment: question IDs are
 referenced by local progress. Startup runs pending migrations and collectstatic.
 The API has three workers, 30-second request/graceful timeouts, a 45-second

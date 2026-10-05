@@ -19,7 +19,16 @@ import uuid
 
 RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 IMAGE_ID_PATTERN = re.compile(r'sha256:[0-9a-f]{64}')
+IMAGE_REFERENCE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}')
 BACKEND_IMAGE = 'pcep_webapp-backend:latest'
+SENSITIVE_IMAGE_ENV_PREFIXES = (
+    'CORS_',
+    'DATABASE_',
+    'DJANGO_',
+    'PCEP_APP_',
+    'POSTGRES_',
+)
+SENSITIVE_IMAGE_ENV_NAMES = {'ACCESS_TOKEN', 'PASSWORD', 'SECRET_KEY'}
 
 
 class ReleaseError(RuntimeError):
@@ -36,6 +45,7 @@ class ReleaseConfig:
     backend_container: str = 'pcep_backend'
     database_container: str = 'pcep_db'
     allow_migrations: bool = False
+    fallback_rollback_image: str | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +81,12 @@ def validate_release(value):
     return value
 
 
+def validate_image_reference(value):
+    if not IMAGE_REFERENCE_PATTERN.fullmatch(value):
+        raise ReleaseError('Fallback rollback image must be a bounded local image reference.')
+    return value
+
+
 def git_release(project_root):
     release = capture_command(
         [
@@ -99,6 +115,78 @@ def ensure_tracked_tree_is_clean(project_root):
         raise ReleaseError('Refusing to deploy with tracked uncommitted changes.')
 
 
+def verify_fallback_rollback_image(config, image_reference):
+    root = config.project_root
+    image_id = capture_command(
+        ['docker', 'image', 'inspect', image_reference, '--format', '{{.Id}}'],
+        cwd=root,
+    )
+    if not IMAGE_ID_PATTERN.fullmatch(image_id):
+        raise ReleaseError('The fallback rollback image has an invalid image ID.')
+
+    raw_config = capture_command(
+        ['docker', 'image', 'inspect', image_reference, '--format', '{{json .Config}}'],
+        cwd=root,
+    )
+    try:
+        image_config = json.loads(raw_config)
+    except json.JSONDecodeError as error:
+        raise ReleaseError('The fallback rollback image has invalid metadata.') from error
+    if not isinstance(image_config, dict) or image_config.get('User') != 'appuser':
+        raise ReleaseError('The fallback rollback image must run as appuser.')
+
+    environment = image_config.get('Env')
+    labels = image_config.get('Labels')
+    if not isinstance(environment, list) or not isinstance(labels, dict):
+        raise ReleaseError('The fallback rollback image is missing required metadata.')
+    environment_values = {}
+    for entry in environment:
+        if not isinstance(entry, str) or '=' not in entry:
+            raise ReleaseError('The fallback rollback image has invalid environment metadata.')
+        name, value = entry.split('=', 1)
+        environment_values[name] = value
+
+    sensitive_names = sorted(
+        name
+        for name in environment_values
+        if name in SENSITIVE_IMAGE_ENV_NAMES
+        or name.startswith(SENSITIVE_IMAGE_ENV_PREFIXES)
+    )
+    if sensitive_names:
+        raise ReleaseError(
+            'The fallback rollback image embeds runtime secret keys: '
+            + ', '.join(sensitive_names)
+        )
+
+    fallback_release = environment_values.get('PCEP_RELEASE', '')
+    label_release = labels.get('org.opencontainers.image.revision', '')
+    if (
+        not RELEASE_PATTERN.fullmatch(fallback_release)
+        or label_release != fallback_release
+    ):
+        raise ReleaseError(
+            'The fallback rollback image must have matching safe release metadata.'
+        )
+
+    run_command(
+        ['make', 'audit-image', f'BACKEND_IMAGE={image_id}'],
+        cwd=root,
+        env=release_environment(config),
+    )
+    run_command(
+        [
+            'docker', 'run', '--rm', '--network', 'none', '--read-only',
+            '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+            '--pids-limit', '64', '--memory', '256m',
+            '--tmpfs', '/tmp:size=16m,noexec,nosuid,nodev',
+            '--entrypoint', 'python', image_id,
+            '-m', 'pip', 'check',
+        ],
+        cwd=root,
+    )
+    return image_id, fallback_release
+
+
 def snapshot_running_backend(config, stamp):
     root = config.project_root
     state = capture_command(
@@ -116,14 +204,6 @@ def snapshot_running_backend(config, stamp):
         raise ReleaseError('The current backend must be running and healthy before deployment.')
 
     running_image = state[2]
-    # This deliberately fails if a build already displaced the old local image.
-    # The rollback snapshot must be the first mutating release operation.
-    available_image = capture_command(
-        ['docker', 'image', 'inspect', running_image, '--format', '{{.Id}}'],
-        cwd=root,
-    )
-    if available_image != running_image:
-        raise ReleaseError('The local image does not match the running backend image.')
     current_release = capture_command(
         [
             'docker', 'inspect', config.backend_container,
@@ -137,14 +217,40 @@ def snapshot_running_backend(config, stamp):
     if not RELEASE_PATTERN.fullmatch(current_release):
         current_release = 'unknown'
 
-    rollback_tag = f'pcep-backend-rollback:{stamp}-release-{current_release}'
-    run_command(['docker', 'tag', running_image, rollback_tag], cwd=root)
+    rollback_source = running_image
+    rollback_release = current_release
+    try:
+        available_image = capture_command(
+            ['docker', 'image', 'inspect', running_image, '--format', '{{.Id}}'],
+            cwd=root,
+        )
+    except ReleaseError as error:
+        if not config.fallback_rollback_image:
+            raise ReleaseError(
+                'The exact live image metadata is unavailable. Supply only a reviewed '
+                '--fallback-rollback-image or restore the exact image before deployment.'
+            ) from error
+        rollback_source, rollback_release = verify_fallback_rollback_image(
+            config,
+            validate_image_reference(config.fallback_rollback_image),
+        )
+        print(
+            'Exact live image metadata is unavailable; using verified fallback '
+            f'{config.fallback_rollback_image} ({rollback_release}).',
+            flush=True,
+        )
+    else:
+        if available_image != running_image:
+            raise ReleaseError('The local image does not match the running backend image.')
+
+    rollback_tag = f'pcep-backend-rollback:{stamp}-release-{rollback_release}'
+    run_command(['docker', 'tag', rollback_source, rollback_tag], cwd=root)
     tagged_image = capture_command(
         ['docker', 'image', 'inspect', rollback_tag, '--format', '{{.Id}}'],
         cwd=root,
     )
-    if tagged_image != running_image:
-        raise ReleaseError('The rollback tag does not match the running backend image.')
+    if tagged_image != rollback_source:
+        raise ReleaseError('The rollback tag does not match its verified source image.')
     return rollback_tag
 
 
@@ -366,6 +472,13 @@ def main():
         '--allow-migrations', action='store_true',
         help='Show and allow reviewed pending migrations; otherwise refuse them.',
     )
+    parser.add_argument(
+        '--fallback-rollback-image',
+        help=(
+            'Reviewed local image to retain only when exact live image metadata '
+            'is unavailable; metadata, secrets, packages and vulnerabilities are checked.'
+        ),
+    )
     args = parser.parse_args()
 
     project_root = args.project_root.resolve()
@@ -379,6 +492,7 @@ def main():
         public_health_url=args.public_health_url,
         health_timeout=args.health_timeout,
         allow_migrations=args.allow_migrations,
+        fallback_rollback_image=args.fallback_rollback_image,
     )
     try:
         result = deploy(config)
