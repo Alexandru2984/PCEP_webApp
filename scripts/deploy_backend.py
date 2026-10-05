@@ -254,14 +254,16 @@ def snapshot_running_backend(config, stamp):
     return rollback_tag
 
 
-def backup_database(config, stamp):
+def backup_database(config, stamp, filename_prefix='pcep_db'):
+    if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,31}', filename_prefix):
+        raise ReleaseError('Database backup prefix must be a bounded safe label.')
     backup_root = config.backup_root.absolute()
     if backup_root.is_symlink():
         raise ReleaseError('Backup root must not be a symlink.')
     backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     backup_root.chmod(0o700)
 
-    final_path = backup_root / f'pcep_db_{stamp}.sql.gz'
+    final_path = backup_root / f'{filename_prefix}_{stamp}.sql.gz'
     if final_path.exists():
         raise ReleaseError(f'Backup already exists: {final_path}')
     partial_path = backup_root / f'.{final_path.name}.partial-{uuid.uuid4().hex}'

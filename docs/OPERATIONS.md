@@ -124,6 +124,46 @@ GitHub Actions and the README badge. The push/pull-request CI remains independen
 of production availability, so a transient Internet or production outage cannot
 block code review.
 
+## Daily Database Backup
+
+`make deploy-backend` always creates a verified pre-deploy dump, but deploy cadence
+is not a recovery-point policy. `make backup-database` uses the same atomic dump
+implementation to create
+`/home/micu/backups/pcep/daily/pcep_db_daily_<UTC>.sql.gz`, plus a private SHA-256
+sidecar. It validates the gzip stream and PostgreSQL dump header before publication,
+fsyncs the completed files, verifies every retained checksum on each run and only
+then removes complete daily pairs beyond the newest 30. Failed dumps never trigger
+retention. Unpaired files, pre-deploy dumps, role dumps, configuration backups and
+frontend snapshots are outside its exact filename pattern and are never removed.
+
+Install the reviewed timer after creating its only writable directory:
+
+```bash
+sudo install -d -m 0700 -o micu -g micu /home/micu/backups/pcep/daily
+sudo install -m 0644 ops/systemd/pcep-db-backup.service /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-db-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pcep-db-backup.timer
+sudo systemctl start pcep-db-backup.service
+systemctl status pcep-db-backup.timer pcep-db-backup.service
+```
+
+The timer runs daily at 01:17 local time with up to 15 minutes of randomized delay
+and catches up after downtime. The oneshot runs as `micu`, receives no database
+credential file, reaches PostgreSQL only through the existing Docker Unix socket,
+and has a read-only host view except for the daily backup directory. Inspect recent
+runs with `journalctl -u pcep-db-backup.service` and verify a sidecar from inside the
+daily directory with `sha256sum --check <backup>.sha256`.
+
+Perform a restore drill after backup-code, PostgreSQL or schema changes. Restore the
+plain SQL with `psql -X --set ON_ERROR_STOP=on --single-transaction` into a fresh,
+isolated PostgreSQL 16 database after creating the `pcep_user` owner role, then
+verify migration and question/choice counts. Never test a restore over the live
+database. These local logical dumps improve recovery point coverage but remain on
+the same physical host; they do not protect against host or disk loss. Replication
+to independently controlled storage remains required when an off-host destination
+and credentials are available.
+
 ## Backend Deploy
 
 ```bash

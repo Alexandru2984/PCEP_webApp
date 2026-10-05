@@ -268,6 +268,21 @@ def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):
     assert not list((tmp_path / 'backups').glob('.*.partial-*'))
 
 
+def test_database_backup_rejects_unsafe_filename_prefix(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        release.subprocess,
+        'Popen',
+        lambda *_args, **_kwargs: pytest.fail('pg_dump must not run.'),
+    )
+
+    with pytest.raises(release.ReleaseError, match='backup prefix'):
+        release.backup_database(
+            config(tmp_path),
+            '20261005T010203Z',
+            filename_prefix='../daily',
+        )
+
+
 @pytest.mark.parametrize('value', ['', 'dirty release', '../escape', 'x' * 65])
 def test_release_label_is_bounded(value):
     with pytest.raises(release.ReleaseError):

@@ -194,7 +194,7 @@ make production-smoke
 # After intentionally changing a Python requirement:
 make lock-backend
 
-# Backend — 218 tests (API/security, integrity, startup, release, SEO and smoke behavior)
+# Backend — 227 tests (API/security, backup, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
@@ -237,7 +237,9 @@ Make deploy/build targets inject the current Git revision automatically.
 
 `make deploy-backend` snapshots the running image and creates a verified private
 database dump before it can replace the local image tag, then checks and deploys
-only the backend service.
+only the backend service. A separate hardened systemd timer creates a private,
+checksummed logical backup every day and retains 30 successful daily copies; use
+`make backup-database` for the same operation manually.
 
 Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
@@ -262,6 +264,7 @@ backend/     Django project + DRF quiz app, management commands, tests
 frontend/    React + Vite + Tailwind app
 nginx/       Production vhost and security/proxy header snippets
 scripts/     Atomic publishers, Nginx validation and public study-page generator
+ops/         Reviewed systemd units for host-side operational jobs
 .github/     CI and scheduled production-smoke workflows
 docker-compose.yml
 ```

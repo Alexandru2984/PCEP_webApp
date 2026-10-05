@@ -2148,6 +2148,53 @@ Python dependency audits, Django's production deploy check and the public produc
 smoke also pass. The hosted workflow will exercise the explicit runner on the next
 push; no push was performed as part of this review.
 
+### Daily database backup and restore validation — 2026-10-05
+
+Pre-deploy dumps no longer provide the only database recovery points. A dedicated
+host-side job now creates an atomic, mode-0600 `pg_dump` every day, writes and fsyncs
+a SHA-256 sidecar, re-verifies every complete retained pair and keeps 30 daily
+backups. It uses a non-blocking lock to reject concurrent runs. Retention happens
+only after a new dump and checksum succeed, and its exact daily filename pattern
+cannot select deployment dumps, role/configuration backups or release snapshots.
+Corrupt, non-private or symlinked matching files fail closed; unpaired files remain
+for operator review instead of being deleted.
+
+The systemd oneshot runs as `micu` with no capabilities or production credential
+file. Its host filesystem is read-only except for
+`/home/micu/backups/pcep/daily`, and it reaches the database only through the Docker
+Unix socket. The persistent timer runs at 01:17 local time with a randomized delay.
+Unit validation covers successful retention, dump failure before retention,
+unpaired-file preservation, matching-symlink refusal, checksum corruption and
+bounded keep values.
+
+The complete backend suite now passes all 227 tests under Python 3.12.14. Both
+hashed dependency audits report no known vulnerability, the 308-question audit and
+Django production check are clean, the systemd units verify, and Compose renders.
+
+A real dump of the live database was created in a temporary mode-0700 directory,
+then restored with `psql -X`, `ON_ERROR_STOP` and one transaction into a disposable,
+network-isolated PostgreSQL 16.15 container running with the production security
+controls. The restore produced 308 questions, 1,232 choices and all 29 migrations;
+the partial unique index was present and `pcep_user` owned the question table. The
+temporary dump and container were removed afterward. The remaining disaster-
+recovery limitation is off-host durability: scheduled copies still reside on the
+same physical server until an independently controlled destination is configured.
+
+The hardened timer is enabled and waiting for its next run in the daily
+01:17-01:32 local-time window. Two manual service executions completed successfully;
+the latest mode-0600 backup is
+`/home/micu/backups/pcep/daily/pcep_db_daily_20261005T133023Z.sql.gz`, SHA-256
+`2b80f9e589adc8e930e3c9912a552a294ef5d944b03d9030dedb314505fc8d45`.
+Both retained sidecars pass `sha256sum --check`. The final systemd security
+analysis reports exposure 2.2/10 after network, device, namespace, process and
+write-path isolation. No application or database service was restarted.
+
+The separate frontend-retention dry run identified 55 old rollback roots and 55
+matching backup copies beyond the newest five, representing 2.2 GiB of unique
+allocated space across both locations. Nothing was removed: the filesystem still
+has 140 GiB free, so cleanup remains an explicit operator-reviewed action rather
+than part of the database-backup rollout.
+
 ## 15. Breaking changes
 
 None.
