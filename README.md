@@ -233,6 +233,9 @@ push or pull request occurs. It has read-only repository permissions and install
 the Node tree with package scripts disabled before auditing the committed lockfile.
 Both push/PR CI and the scheduled job also verify npm registry signatures and
 provenance attestations for the resolved dependency tree.
+The frontend pins Workbox's deprecated `glob@11` transitive dependency to
+`glob@13.0.6`; Workbox uses only the retained `globSync` library API. Keep this
+override exact and remove it when Workbox supports the current major directly.
 Dependabot checks GitHub Actions every Monday and frontend npm dependencies every
 Tuesday. Normal version updates wait seven days after release and group compatible
 minor/patch changes; the cooldown does not apply to security-update PRs when that

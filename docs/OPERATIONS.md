@@ -86,14 +86,24 @@ The pinned runtime is Node 24.21.0 with npm 11.19.0. `.npmrc` blocks all depende
 lifecycle scripts, including on older npm releases that predate `allowScripts`.
 `frontend/scripts/install-dependencies.sh` performs `npm ci --ignore-scripts`, then
 checks the lockfile and installed package metadata against an exact reviewed
-inventory. Every dependency must resolve from `registry.npmjs.org` with SHA-512
-integrity. It runs `npm rebuild` only for `esbuild@0.25.12` and exercises its binary;
-the package manifest records the same explicit esbuild approval and denies the
-optional macOS-only `fsevents@2.3.3` installer for npm versions that understand that
-policy. A new version, lifecycle command or package with an install script fails
-before any such code runs.
+inventory. Every downloaded dependency artifact must resolve from
+`registry.npmjs.org` with SHA-512 integrity; `inBundle` entries must trace to such a
+parent artifact. It runs `npm rebuild` only for `esbuild@0.25.12` and exercises its
+binary. The package manifest records the same explicit esbuild approval and denies
+the optional macOS-only `fsevents@2.3.3` installer for npm versions that understand
+that policy. A new version, lifecycle command or package with an install script
+fails before any such code runs.
 After a dependency change, review both inventory failures before updating the
 checker; never replace the targeted rebuild with a blanket script enablement.
+
+`workbox-build@7.4.1` still requests `glob@^11.0.1`. Its resolved 11.1.0 release is
+patched for the known CLI injection advisory but is deprecated upstream. Neither
+the current Workbox release nor `vite-plugin-pwa@2` changes that dependency. The
+frontend therefore applies an exact, scoped override to `glob@13.0.6`. Workbox uses
+only the retained `globSync` library API; glob 13 removes the CLI and its associated
+dependency subtree. Do not widen the override. On every change, reproduce the PWA
+build and offline Playwright test, and remove the override once Workbox declares
+support for a current glob major.
 CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime. Every workflow

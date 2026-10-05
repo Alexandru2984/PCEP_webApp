@@ -7,6 +7,11 @@
     "esbuild@0.25.12": true,
     "fsevents": false
   },
+  "overrides": {
+    "workbox-build": {
+      "glob": "13.0.6"
+    }
+  },
   "scripts": {
     "dev": "vite",
     "fetch-pyodide": "bash scripts/fetch-pyodide.sh",

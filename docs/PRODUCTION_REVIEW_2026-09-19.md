@@ -2128,11 +2128,29 @@ Both CI audit paths continue to verify registry signatures and provenance
 attestations with `npm audit signatures`.
 
 A clean no-cache builder install reports no packages with unreviewed install
-scripts. The pinned tree verified registry signatures for all 523 dependency
+scripts. The pinned tree verified registry signatures for all 518 dependency
 packages and verified 169 provenance attestations; the vulnerability audit reports
 zero findings. This is a build and CI control only: it does not alter the application
 bundle or the running production services, database, Nginx or Cloudflare
 configuration.
+
+### Deprecated Workbox glob removal — 2026-10-05
+
+The remaining npm install warning came from `workbox-build@7.4.1` constraining
+`glob@^11.0.1`. The resolved `glob@11.1.0` already contains the published CLI
+injection fix, so the warning did not represent an open `npm audit` vulnerability.
+However, the entire 11.x line is deprecated. `vite-plugin-pwa@2.0.0` retains the
+same Workbox dependency and therefore would not remove the warning.
+
+The frontend now gives Workbox an exact scoped `glob@13.0.6` override. Workbox calls
+only `globSync`, which remains available through glob 13's CommonJS export; the new
+major removes the CLI and five no-longer-needed transitive packages. The override is
+intentionally not ranged and must be removed once Workbox supports the current major
+itself. A clean install has no glob deprecation warning, all 518 packages have
+verified registry signatures, 169 have verified provenance attestations and the
+vulnerability audit is clean. All 305 Vitest tests, lint, formatting, the production
+PWA build with its 13-entry precache and all 31 Playwright flows pass, including the
+offline-shell contract. No production or external repository state was changed.
 
 ### GitHub Actions runner and interpreter pinning — 2026-10-05
 

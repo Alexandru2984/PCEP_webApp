@@ -22,24 +22,37 @@ function readJson(path) {
 }
 
 const lock = readJson(join(root, 'package-lock.json'))
-for (const [path, pkg] of Object.entries(lock.packages ?? {})) {
-  if (path === '') continue
-  if (
-    typeof pkg.resolved !== 'string' ||
-    !pkg.resolved.startsWith('https://registry.npmjs.org/')
-  ) {
-    fail(`dependency is not from the approved npm registry: ${path}`)
+const lockPackages = lock.packages ?? {}
+
+function hasApprovedArtifact(pkg) {
+  return (
+    typeof pkg?.resolved === 'string' &&
+    pkg.resolved.startsWith('https://registry.npmjs.org/') &&
+    typeof pkg.integrity === 'string' &&
+    /^sha512-[A-Za-z0-9+/]+={0,2}$/.test(pkg.integrity)
+  )
+}
+
+function bundledParentHasApprovedArtifact(path) {
+  let parentPath = path
+  while (parentPath.includes('/node_modules/')) {
+    parentPath = parentPath.slice(0, parentPath.lastIndexOf('/node_modules/'))
+    const parent = lockPackages[parentPath]
+    if (parent && !parent.inBundle) return hasApprovedArtifact(parent)
   }
-  if (
-    typeof pkg.integrity !== 'string' ||
-    !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(pkg.integrity)
-  ) {
-    fail(`dependency is not locked with SHA-512 integrity: ${path}`)
+  return false
+}
+
+for (const [path, pkg] of Object.entries(lockPackages)) {
+  if (path === '') continue
+  if (pkg.inBundle && bundledParentHasApprovedArtifact(path)) continue
+  if (!hasApprovedArtifact(pkg)) {
+    fail(`dependency lacks an approved registry artifact: ${path}`)
   }
 }
 
 const actualLockEntries = new Map(
-  Object.entries(lock.packages ?? {}).filter(([, pkg]) => pkg.hasInstallScript)
+  Object.entries(lockPackages).filter(([, pkg]) => pkg.hasInstallScript)
 )
 
 for (const [path, expected] of expectedLockEntries) {
