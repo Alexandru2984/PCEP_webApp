@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify a PCEP database backup by restoring it weekly
+
+[Timer]
+OnCalendar=Sun *-*-* 03:17:00
+Persistent=true
+RandomizedDelaySec=30m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

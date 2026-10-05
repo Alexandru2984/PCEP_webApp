@@ -155,10 +155,15 @@ Install the reviewed timer after creating its only writable directory:
 sudo install -d -m 0700 -o micu -g micu /home/micu/backups/pcep/daily
 sudo install -m 0644 ops/systemd/pcep-db-backup.service /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-backup.timer /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-db-restore-check.service /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-db-restore-check.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pcep-db-backup.timer
+sudo systemctl enable --now pcep-db-restore-check.timer
 sudo systemctl start pcep-db-backup.service
-systemctl status pcep-db-backup.timer pcep-db-backup.service
+sudo systemctl start pcep-db-restore-check.service
+systemctl status pcep-db-backup.timer pcep-db-backup.service \
+  pcep-db-restore-check.timer pcep-db-restore-check.service
 ```
 
 The timer runs daily at 01:17 local time with up to 15 minutes of randomized delay
@@ -168,14 +173,23 @@ and has a read-only host view except for the daily backup directory. Inspect rec
 runs with `journalctl -u pcep-db-backup.service` and verify a sidecar from inside the
 daily directory with `sha256sum --check <backup>.sha256`.
 
-Perform a restore drill after backup-code, PostgreSQL or schema changes. Restore the
-plain SQL with `psql -X --set ON_ERROR_STOP=on --single-transaction` into a fresh,
-isolated PostgreSQL 16 database after creating the `pcep_user` owner role, then
-verify migration and question/choice counts. Never test a restore over the live
-database. These local logical dumps improve recovery point coverage but remain on
-the same physical host; they do not protect against host or disk loss. Replication
-to independently controlled storage remains required when an off-host destination
-and credentials are available.
+The restore timer runs each Sunday at 03:17 local time with up to 30 minutes of
+randomized delay and catches up after downtime. `make verify-database-restore`
+performs the same drill on demand. It verifies the newest private dump and checksum,
+uses the exact immutable image ID of the live PostgreSQL container, then restores
+into a disposable container with no network, capabilities, writable root or
+persistent data volume. The drill uses no production database credential and never
+connects to the live database. It verifies the application table owner, migrations,
+the one-correct-choice index and every question's four-choice/one-answer invariants,
+then verifies the source checksum again and removes the container. Inspect runs with
+`journalctl -u pcep-db-restore-check.service`. Repeat the drill directly after
+backup-code, PostgreSQL or schema changes; never test a restore over the live
+database.
+
+These local logical dumps improve recovery point coverage but remain on the same
+physical host; they do not protect against host or disk loss. Replication to
+independently controlled storage remains required when an off-host destination and
+credentials are available.
 
 ## Backend Deploy
 

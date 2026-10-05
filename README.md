@@ -243,7 +243,10 @@ Make deploy/build targets inject the current Git revision automatically.
 database dump before it can replace the local image tag, then checks and deploys
 only the backend service. A separate hardened systemd timer creates a private,
 checksummed logical backup every day and retains 30 successful daily copies; use
-`make backup-database` for the same operation manually.
+`make backup-database` for the same operation manually. A weekly timer restores the
+newest verified daily copy into a network-isolated, disposable database and checks
+its schema, ownership and question invariants; run the same drill with
+`make verify-database-restore`.
 
 Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 

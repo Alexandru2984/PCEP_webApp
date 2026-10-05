@@ -10,6 +10,8 @@ FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
 DATABASE_BACKUP_ROOT ?= $(BACKUP_ROOT)/daily
 DATABASE_BACKUP_KEEP ?= 30
+DATABASE_CONTAINER ?= pcep_db
+DATABASE_RESTORE_CONTAINER ?= pcep_db_restore_check
 RELEASE_KEEP ?= 5
 ASSET_RETENTION_DAYS ?= 7
 RELEASE ?= $(shell git describe --always --dirty --abbrev=12 --match '__pcep_no_matching_tag__' 2>/dev/null || printf development)
@@ -19,7 +21,7 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 PRODUCTION_URL ?= https://pcep.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -38,6 +40,7 @@ help:
 		'  compose-build    Rebuild the backend image with its release revision' \
 		'  deploy-backend   Backup, validate and deploy one backend release' \
 		'  backup-database  Create and retain a verified daily-style DB backup' \
+		'  verify-database-restore Restore the newest daily backup in isolation' \
 		'  compose-up       Start db + backend' \
 		'  seed-reset       Reset and seed production DB in backend container' \
 		'  deploy-frontend  Backup and publish frontend/dist to FRONTEND_ROOT' \
@@ -123,6 +126,9 @@ deploy-backend:
 
 backup-database:
 	"$(PYTHON_BIN)" scripts/database_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --keep "$(DATABASE_BACKUP_KEEP)"
+
+verify-database-restore:
+	"$(PYTHON_BIN)" scripts/database_restore_check.py --backup-root "$(DATABASE_BACKUP_ROOT)" --source-container "$(DATABASE_CONTAINER)" --restore-container "$(DATABASE_RESTORE_CONTAINER)"
 
 compose-up:
 	$(COMPOSE) up -d

@@ -2215,6 +2215,35 @@ was removed with the temporary scan tree. This control does not inspect intentio
 ignored runtime secrets and does not replace credential rotation if a real value
 ever reaches Git history.
 
+### Automated isolated restore drill — 2026-10-05
+
+The newest complete daily database backup is now restored automatically every
+Sunday at 03:17 local time, with up to 30 minutes of randomized delay. The drill
+re-verifies all retained complete backup pairs, selects the newest, and obtains the
+exact immutable image ID from the live PostgreSQL container without reading its
+environment or connecting to its database. It starts a disposable PostgreSQL
+container with no network, capabilities, writable root or persistent data volume;
+all database storage is a bounded tmpfs. The source dump and checksum are mounted
+nowhere and remain read-only to the host-side process.
+
+The restore uses `psql` with `ON_ERROR_STOP` and one transaction, then verifies
+positive question, choice and migration counts, `pcep_user` ownership, the valid
+one-correct-choice partial index, exactly four choices and exactly one correct
+choice for every question. It verifies the source checksum again after the drill
+and removes the disposable container on success or any handled failure. A fixed
+disposable container name also makes concurrent executions fail closed.
+
+Unit coverage brings the backend suite to 237 passing tests. Both the direct drill
+and the installed hardened systemd service restored 308 questions, 1,232 choices
+and all 29 migrations from
+`pcep_db_daily_20261005T133023Z.sql.gz` using PostgreSQL image ID
+`sha256:665b0e8864d3399e8fb10828cc869c3065682262e289b56dacbfda8c8374b0e9`.
+The timer is enabled for its next randomized run on 2026-10-11, the service reports
+systemd exposure 2.2/10, and no disposable container remains. Production Compose
+services stayed healthy and the complete public smoke passed without a restart.
+This validates recoverability but does not resolve the separate same-host/off-host
+durability limitation.
+
 ## 15. Breaking changes
 
 None.

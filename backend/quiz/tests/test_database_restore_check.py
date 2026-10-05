@@ -1,0 +1,130 @@
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+
+spec = importlib.util.spec_from_file_location(
+    'database_restore_check',
+    Path(__file__).resolve().parents[3] / 'scripts/database_restore_check.py',
+)
+restore = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(restore)
+
+
+def complete_backup(root, stamp):
+    path = root / f'pcep_db_daily_{stamp}.sql.gz'
+    path.write_bytes(stamp.encode())
+    path.chmod(0o600)
+    checksum = path.with_name(f'{path.name}.sha256')
+    checksum.write_text(f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n')
+    checksum.chmod(0o600)
+    return path, checksum
+
+
+def valid_metrics(**overrides):
+    metrics = {
+        'questions': 308,
+        'choices': 1232,
+        'migrations': 29,
+        'question_owner': 'pcep_user',
+        'unique_index_valid': True,
+        'invalid_choice_counts': 0,
+        'invalid_correct_counts': 0,
+    }
+    metrics.update(overrides)
+    return metrics
+
+
+def test_selects_newest_complete_private_verified_backup(tmp_path):
+    root = tmp_path / 'daily'
+    root.mkdir(mode=0o700)
+    older = complete_backup(root, '20261001T010000Z')
+    newer = complete_backup(root, '20261002T010000Z')
+
+    assert restore.select_latest_backup(root) == newer
+    assert older[0].exists()
+
+
+def test_backup_selection_rejects_public_root_and_corruption(tmp_path):
+    root = tmp_path / 'daily'
+    root.mkdir(mode=0o755)
+    path, _checksum = complete_backup(root, '20261001T010000Z')
+    with pytest.raises(restore.RestoreCheckError, match='group or others'):
+        restore.select_latest_backup(root)
+
+    root.chmod(0o700)
+    path.write_text('corrupt')
+    with pytest.raises(restore.RestoreCheckError, match='checksum'):
+        restore.select_latest_backup(root)
+
+
+def test_source_image_must_be_an_immutable_docker_id():
+    good_id = f"sha256:{'a' * 64}"
+
+    def good_runner(_command):
+        return SimpleNamespace(stdout=f'{good_id}\n')
+
+    assert restore.source_image_id('pcep_db', good_runner) == good_id
+
+    def bad_runner(_command):
+        return SimpleNamespace(stdout='postgres:latest\n')
+
+    with pytest.raises(restore.RestoreCheckError, match='invalid image ID'):
+        restore.source_image_id('pcep_db', bad_runner)
+
+
+def test_restore_container_command_is_ephemeral_and_isolated():
+    image_id = f"sha256:{'b' * 64}"
+    command = restore.docker_run_command('pcep_db_restore_check', image_id)
+
+    assert command[-1] == image_id
+    assert command[command.index('--network') + 1] == 'none'
+    assert command[command.index('--user') + 1] == 'postgres'
+    assert command[command.index('--cap-drop') + 1] == 'ALL'
+    assert 'no-new-privileges:true' in command
+    assert '/var/lib/postgresql/data:rw,noexec,nosuid,nodev,size=256m,mode=0700,uid=70,gid=70' in command
+    assert not {'--publish', '-p', '--volume', '-v'} & set(command)
+
+
+def test_disposable_container_is_removed_after_a_failed_check():
+    calls = []
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout='', stderr='')
+
+    image_id = f"sha256:{'c' * 64}"
+    with pytest.raises(RuntimeError, match='synthetic failure'):
+        with restore.disposable_restore_container(
+            'pcep_db_restore_check', image_id, runner
+        ):
+            raise RuntimeError('synthetic failure')
+
+    assert calls[-1] == ['docker', 'rm', '--force', 'pcep_db_restore_check']
+
+
+def test_validates_restored_schema_and_question_integrity():
+    metrics = valid_metrics()
+    assert restore.validate_metrics(json.dumps(metrics)) == metrics
+
+    failures = [
+        ({'questions': 0}, 'questions'),
+        ({'migrations': True}, 'migrations'),
+        ({'question_owner': 'postgres'}, 'wrong owner'),
+        ({'unique_index_valid': False}, 'index'),
+        ({'invalid_choice_counts': 1}, 'invalid_choice_counts'),
+        ({'invalid_correct_counts': 1}, 'invalid_correct_counts'),
+    ]
+    for override, message in failures:
+        with pytest.raises(restore.RestoreCheckError, match=message):
+            restore.validate_metrics(json.dumps(valid_metrics(**override)))
+
+
+@pytest.mark.parametrize('name', ['', '-bad', 'bad/name', 'bad name'])
+def test_rejects_unsafe_container_names(name):
+    with pytest.raises(restore.RestoreCheckError, match='container name'):
+        restore.validate_container_name(name, 'test')
