@@ -2483,6 +2483,16 @@ digest-pinned Node 24.21.0/Alpine builder also installs the graph from scratch a
 produces the PWA successfully. This is a source and build-tooling change only; no
 production service was deployed or restarted and no production data was touched.
 
+### Exact-main CI recovery trigger — 2026-10-06
+
+The coordinated Vite 8 pull request passed dependency review and every required CI
+job. GitHub then created no push-triggered CI run for the rebased `main` commit,
+although the later scheduled production smoke succeeded on that exact SHA. The CI
+workflow now also accepts a manual dispatch, allowing an operator to run the same
+four bounded jobs against current `main` when event delivery is absent. PR and push
+triggers, required-check names, permissions and branch protection remain unchanged.
+This recovery control neither contacts production nor changes deployment state.
+
 ## 15. Breaking changes
 
 None.

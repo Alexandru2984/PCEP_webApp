@@ -996,3 +996,13 @@ Browser tests use mocked APIs; Python execution uses the real self-hosted runtim
 The push/pull-request CI never calls production. The scheduled dependency audit
 only reads manifests and advisory services; the separate scheduled smoke workflow
 performs only the bounded public checks documented above.
+
+CI also supports an explicit manual dispatch so an operator can validate the exact
+current `main` commit if GitHub misses a push event. This does not replace PR checks
+or bypass branch protection:
+
+```bash
+gh workflow run ci.yml --ref main
+gh run list --workflow ci.yml --branch main --event workflow_dispatch --limit 1
+gh run watch <run-id> --exit-status
+```
