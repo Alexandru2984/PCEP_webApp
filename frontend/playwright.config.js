@@ -13,6 +13,10 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:4173',
+    // Axe must inspect settled colors rather than an intermediate frame of a
+    // CSS transition. The app already exposes reduced-motion styles for this
+    // user preference, so exercise that accessibility contract in every flow.
+    reducedMotion: 'reduce',
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
