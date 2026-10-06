@@ -5,11 +5,7 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const lifecycleNames = ['preinstall', 'install', 'postinstall']
 const expectedLockEntries = new Map([
-  [
-    'node_modules/esbuild',
-    { version: '0.25.12', optional: false, disposition: 'approved' },
-  ],
-  ['node_modules/fsevents', { version: '2.3.3', optional: true, disposition: 'blocked' }],
+  ['node_modules/fsevents', { version: '2.3.3', optional: true }],
 ])
 
 function fail(message) {
@@ -142,20 +138,9 @@ for (const [path, installed] of installedScripts) {
   if (installed.version !== expected.version) {
     fail(`${path} installed version does not match the reviewed lock entry`)
   }
-  if (
-    expected.disposition === 'approved' &&
-    JSON.stringify(installed.scripts) !==
-      JSON.stringify({ postinstall: 'node install.js' })
-  ) {
-    fail(`${path} changed its reviewed lifecycle command`)
-  }
-}
-
-if (!installedScripts.has('node_modules/esbuild')) {
-  fail('the approved esbuild installer is not present')
 }
 
 if (process.exitCode) process.exit(process.exitCode)
 console.log(
-  'Install-script inventory verified: esbuild@0.25.12 approved; fsevents@2.3.3 blocked.'
+  'Install-script inventory verified: fsevents@2.3.3 is optional and blocked; no lifecycle scripts were executed.'
 )

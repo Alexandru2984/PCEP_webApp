@@ -145,9 +145,9 @@ python manage.py runserver
 ### Frontend
 
 Use Node 24.21.0 with npm 11.19.0. The installer blocks every dependency lifecycle
-script, verifies the exact lockfile and installed-package inventory, then executes
-only the reviewed `esbuild@0.25.12` installer. The manifest records the same
-allow/deny policy for newer npm releases; optional `fsevents` remains blocked.
+script and verifies the exact lockfile and installed-package inventory. The current
+graph needs no lifecycle installer; the manifest also blocks optional `fsevents` as
+defense in depth for npm releases that support `allowScripts`.
 
 ```bash
 cd frontend

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { pwaOptions } from './pwa.config'
+import { pwaOptions } from './pwa.config.js'
 
 // Backend the dev server proxies to. Override with VITE_API_TARGET to point at
 // a backend on another port/host without editing this file.
