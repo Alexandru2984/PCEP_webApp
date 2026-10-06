@@ -8,8 +8,9 @@ unit_root="$root/ops/systemd"
 
 die() { echo "systemd-check: $*" >&2; exit 1; }
 
-command -v systemd-analyze >/dev/null 2>&1 \
-    || die 'systemd-analyze is required.'
+for command in cp find install mktemp sort systemd-analyze; do
+    command -v "$command" >/dev/null 2>&1 || die "$command is required."
+done
 [[ -d "$unit_root" && ! -L "$unit_root" ]] \
     || die 'ops/systemd must be a real directory.'
 
@@ -65,8 +66,56 @@ done < <(
         | sort -z
 )
 
-SYSTEMD_UNIT_PATH="$unit_root:/usr/lib/systemd/system:/lib/systemd/system" \
-    systemd-analyze verify "${units[@]}"
+# Verify against an isolated filesystem so production-only executable paths do
+# not depend on what happens to exist on a CI runner. Empty executable stubs are
+# never run; they let systemd validate the exact unit syntax and sandbox settings.
+stage="$(mktemp -d /tmp/pcep-systemd-check.XXXXXX)"
+cleanup() {
+    case "$stage" in
+        /tmp/pcep-systemd-check.*) find "$stage" -depth -delete ;;
+        *) echo "systemd-check: refusing unsafe temporary cleanup: $stage" >&2 ;;
+    esac
+}
+trap cleanup EXIT
+
+stage_units="$stage/etc/systemd/system"
+install -d -m 0755 \
+    "$stage_units" \
+    "$stage/home/micu/PCEP_webApp/backend/.venv/bin" \
+    "$stage/usr/bin"
+cp -a "$unit_root/." "$stage_units/"
+install -m 0755 /dev/null \
+    "$stage/home/micu/PCEP_webApp/backend/.venv/bin/python"
+install -m 0755 /dev/null "$stage/usr/bin/install"
+
+# Repository units legitimately depend on these host-provided units. Minimal
+# fixtures make dependency resolution deterministic without importing a runner's
+# mutable system unit inventory into the validation result.
+printf '%s\n' \
+    '[Service]' \
+    'Type=oneshot' \
+    'ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python' \
+    >"$stage_units/docker.service"
+for target in basic.target network-online.target shutdown.target sysinit.target timers.target; do
+    printf '%s\n' '[Unit]' "Description=Validation fixture for $target" \
+        >"$stage_units/$target"
+done
+
+if ! diagnostics="$(
+    SYSTEMD_UNIT_PATH='/etc/systemd/system' \
+        systemd-analyze \
+            --root="$stage" \
+            --generators=no \
+            --man=no \
+            verify "${units[@]}" 2>&1
+)"; then
+    [[ -z "$diagnostics" ]] || printf '%s\n' "$diagnostics" >&2
+    die 'systemd-analyze rejected the staged units.'
+fi
+if [[ -n "$diagnostics" ]]; then
+    printf '%s\n' "$diagnostics" >&2
+    die 'systemd-analyze reported diagnostics for the staged units.'
+fi
 
 printf 'Verified %d systemd unit(s) and %d drop-in(s).\n' \
     "${#units[@]}" "$dropin_count"
