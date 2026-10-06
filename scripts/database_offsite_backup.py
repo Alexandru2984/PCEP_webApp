@@ -111,8 +111,14 @@ def parse_redacted_remote(config_text, remote_name):
         raise OffsiteBackupError('The crypt remote requires a password and second salt.')
 
     wrapped = section.get('remote', '')
-    if ':' not in wrapped or not wrapped.split(':', 1)[1].strip('/'):
-        raise OffsiteBackupError('The crypt remote must wrap a dedicated non-root path.')
+    try:
+        wrapped_name, _wrapped_path = parse_remote(wrapped)
+    except OffsiteBackupError as error:
+        raise OffsiteBackupError(
+            'The crypt remote must wrap a dedicated non-root path with safe segments.'
+        ) from error
+    if wrapped_name == remote_name:
+        raise OffsiteBackupError('The crypt remote must not wrap itself.')
 
 
 def validate_crypt_remote(remote_name, rclone, config_path, runner=run_rclone):

@@ -290,6 +290,12 @@ client or a crypt key stored only on this host. The runbook requires a dedicated
 crypt remote, provider immutability/versioning, offline recovery material and a
 tested independent alert.
 
+The preflight validates both the requested destination and the backend path wrapped
+by the crypt remote. It rejects absolute, empty, repeated or traversal segments and
+a crypt remote that references itself. This path validation demonstrates safe
+structure only; provider-side least privilege and a PCEP-dedicated bucket or prefix
+must still be reviewed independently.
+
 `make offsite-backup-preflight` performs no upload. `make offsite-backup` is allowed
 only for a manually reviewed first run after every activation gate passes. Neither
 command deletes or applies retention to remote data. Both require an explicit
