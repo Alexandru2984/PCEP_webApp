@@ -2412,6 +2412,16 @@ suite, ShellCheck, isolated systemd validation, actionlint and pedantic offline
 zizmor also pass. These corrections change tests and CI validation only; they do not
 alter the application bundle, production services or backup activation state.
 
+The subsequent `main` run exposed one more browser-only timing condition. Axe
+sampled both quiz workspace tabs during their color transition immediately after
+the progress view opened. The serialized trace showed transient contrast ratios
+of 1.72:1 and 4.44:1 even though both settled light-theme states meet the required
+ratio. Playwright now emulates the reduced-motion user preference for every E2E
+flow, exercising the application's existing reduced-motion stylesheet and letting
+accessibility scans inspect settled colors deterministically. Reduced motion also
+limits animations to one iteration. The contrast rule remains enabled; no Axe
+finding is suppressed or excluded.
+
 ## 15. Breaking changes
 
 None.
