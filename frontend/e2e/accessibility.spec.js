@@ -137,7 +137,7 @@ test('populated study momentum is accessible and responsive', async ({ page }) =
 
   await expect(page.getByRole('heading', { name: 'Study momentum' })).toBeVisible()
   await expect(page.getByText('+30 pts')).toBeVisible()
-  await expect(page.getByText('4d')).toHaveCount(2)
+  await expect(page.getByText('4d', { exact: true })).toHaveCount(2)
   await fitsEveryWidth(page)
   await accessible(page)
 })

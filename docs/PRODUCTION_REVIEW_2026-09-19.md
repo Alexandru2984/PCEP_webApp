@@ -2390,6 +2390,28 @@ a hosted pull-request run confirmed and its check then marked required. No repos
 push, production deployment or service restart was performed; the only external
 mutation was enabling the dependency graph and Dependabot alerts.
 
+### Hosted CI portability corrections — 2026-10-06
+
+The first GitHub-hosted execution exposed three environment-dependent assumptions
+that local validation did not reproduce. One offsite-backup test requested mode
+`0770` through `mkdir` but did not account for the runner's `0022` umask removing
+group write; the test now applies the intentionally unsafe mode explicitly before
+asserting its rejection. The systemd validator also resolved production's absolute
+Python path against the runner filesystem. It now stages the exact units and
+drop-ins in an isolated temporary root with non-executed fixtures for the expected
+host dependencies, and treats every `systemd-analyze` diagnostic as a failure.
+
+The browser run found an ambiguous text locator because the temporary merge SHA
+itself contained `4d`, matching a two-statistic assertion, plus a race where a
+multi-tab recovery test read local storage before React persisted the session. The
+locator now requires exact text and the ownership test polls the observable storage
+contract instead of assuming synchronous persistence. The exact failing merge SHA
+was reproduced locally: all 31 Playwright flows passed without a retry, and the
+multi-tab case passed ten consecutive repetitions. The complete 262-test backend
+suite, ShellCheck, isolated systemd validation, actionlint and pedantic offline
+zizmor also pass. These corrections change tests and CI validation only; they do not
+alter the application bundle, production services or backup activation state.
+
 ## 15. Breaking changes
 
 None.
