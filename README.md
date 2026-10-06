@@ -242,13 +242,13 @@ minor/patch changes; the cooldown does not apply to security-update PRs when tha
 repository feature is enabled. Every proposal triggers the full CI suite and awaits
 human review—nothing is auto-merged by this configuration.
 The repository dependency graph and Dependabot alerts are enabled, and the project
-includes a PR-only GitHub dependency review workflow. Once the workflow reaches the
-default branch, it fails on newly added or upgraded dependencies with
+includes a required PR-only GitHub dependency review workflow. It fails on newly
+added or upgraded dependencies with
 moderate-or-higher known vulnerabilities in runtime, development or unknown scopes.
 The review has read-only repository access, neither comments on the PR nor grants
 write permission, and deliberately does not enforce a license allowlist until the
-project adopts a reviewed license policy. Make its check required through branch
-protection or a ruleset only after a successful hosted test run.
+project adopts a reviewed license policy. Protected `main` also requires all four
+CI jobs, an up-to-date PR branch, resolved conversations and linear history.
 The separate **Production smoke** workflow runs every six hours and on manual
 dispatch. It uses bounded read-only requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,

@@ -173,11 +173,23 @@ enabled. Do not disable it; GitHub's disable endpoint removes both alerts and th
 dependency graph that this workflow requires. Dependabot security updates remain a
 separate, disabled setting and no security-update PR is created automatically.
 
-After the workflow reaches the default branch, confirm its hosted check on a pull
-request. A workflow failure prevents merging only when the check is required by
-branch protection or a ruleset; add that requirement after the first successful run
-has registered the check name. Keep the existing audits as the effective merge
-control until that external gate is complete.
+The hosted dependency review and all four CI jobs are required by `main` branch
+protection. Required checks are bound to the GitHub Actions app rather than accepted
+from any producer with a matching name. The branch must be current before merge;
+pull requests, resolved conversations and linear history are mandatory, including
+for repository administrators. Zero approving reviews are required because this is
+a single-maintainer repository, while force pushes and branch deletion are blocked.
+Inspect the live control without changing it with:
+
+```bash
+gh api repos/Alexandru2984/PCEP_webApp/branches/main/protection
+```
+
+Do not rename or remove a required workflow job until its replacement has completed
+successfully on a pull request and the protection setting has been updated. If an
+incident requires a temporary gate change, record the reason and exact prior JSON,
+make the narrowest change through repository administration, then restore and
+re-verify protection immediately after the incident.
 
 Python is deliberately excluded because its two SHA-256 lock files must be
 regenerated together with `make lock-backend`, reviewed and audited. Container base

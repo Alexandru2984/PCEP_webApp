@@ -1676,8 +1676,7 @@ and `sw.js` has SHA-256
 `e2e5bf6bc11aaf2e4c2fc7638448ad001bdd5a159358fa7b78bf901075f7e9da`.
 The live asset directory decreased from 318 files to 202; both the rollback root
 and external backup retain all 318 prior files. The preceding entry chunk and its
-lazy Review chunk return 200, while a deliberately checked expired chunk returns
-404. Fresh live Chromium at 390 px loaded the new entry, Dashboard and Exam lazy
+lazy Review chunk return 200, while a deliberately checked expired chunk returns 404. Fresh live Chromium at 390 px loaded the new entry, Dashboard and Exam lazy
 chunks with 200 responses. The active Exam was axe-clean, fit the viewport, raised
 no page error and cleared recovery after confirmed Quit. The only console error was
 the already tracked CSP rejection of Cloudflare's injected inline script. The
@@ -2421,6 +2420,25 @@ flow, exercising the application's existing reduced-motion stylesheet and lettin
 accessibility scans inspect settled colors deterministically. Reduced motion also
 limits animations to one iteration. The contrast rule remains enabled; no Axe
 finding is suppressed or excluded.
+
+### Enforced `main` merge controls — 2026-10-06
+
+GitHub branch protection now applies to `main`, including repository administrators.
+Every change must use a pull request whose head is current with `main`; conversations
+must be resolved and the resulting history must remain linear. Force pushes and
+branch deletion are disabled. The approval count is deliberately zero because the
+repository has one maintainer, avoiding a rule that could never be satisfied while
+still preventing direct pushes.
+
+The four CI jobs plus `Reject newly vulnerable dependencies` are required and bound
+to GitHub Actions app ID 15368, so a different integration cannot satisfy a gate by
+reusing its display name. GitGuardian remains advisory because the repository-owned
+Ops job already performs a blocking tracked-file and Git-history secret scan; an
+external service outage therefore cannot prevent an emergency maintenance PR. The
+protection API returned the exact configured checks, strict update requirement,
+administrator enforcement, pull-request requirement, linear-history requirement,
+conversation-resolution requirement and disabled force-push/deletion settings.
+This setting change did not deploy code, restart a service or alter production data.
 
 ## 15. Breaking changes
 
