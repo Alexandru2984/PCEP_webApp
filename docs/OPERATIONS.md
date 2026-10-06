@@ -88,13 +88,12 @@ lifecycle scripts, including on older npm releases that predate `allowScripts`.
 checks the lockfile and installed package metadata against an exact reviewed
 inventory. Every downloaded dependency artifact must resolve from
 `registry.npmjs.org` with SHA-512 integrity; `inBundle` entries must trace to such a
-parent artifact. It runs `npm rebuild` only for `esbuild@0.25.12` and exercises its
-binary. The package manifest records the same explicit esbuild approval and denies
-the optional macOS-only `fsevents@2.3.3` installer for npm versions that understand
-that policy. A new version, lifecycle command or package with an install script
-fails before any such code runs.
+parent artifact. The current graph needs no lifecycle installer. The package
+manifest also denies the optional macOS-only `fsevents@2.3.3` installer for npm
+versions that understand `allowScripts`. A new version, lifecycle command or
+package with an install script fails before any such code runs.
 After a dependency change, review both inventory failures before updating the
-checker; never replace the targeted rebuild with a blanket script enablement.
+checker; never replace the script-free install with blanket lifecycle enablement.
 
 `workbox-build@7.4.1` still requests `glob@^11.0.1`. Its resolved 11.1.0 release is
 patched for the known CLI injection advisory but is deprecated upstream. Neither

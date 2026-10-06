@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install dependencies without scripts, approve the exact inventory, then rebuild esbuild only.
+# Install dependencies without scripts, then verify the exact lifecycle inventory.
 
 set -euo pipefail
 
@@ -19,8 +19,5 @@ command -v "$node_bin" >/dev/null 2>&1 || {
 cd "$root"
 "$npm_bin" ci --ignore-scripts
 "$node_bin" scripts/check-install-scripts.mjs
-"$npm_bin" rebuild esbuild --ignore-scripts=false
-"$node_bin" -e \
-    "require('esbuild').transformSync('const verified = true', { loader: 'js' })"
 
-printf '%s\n' 'Installed dependencies with only esbuild@0.25.12 lifecycle code executed.'
+printf '%s\n' 'Installed dependencies with all lifecycle scripts disabled.'

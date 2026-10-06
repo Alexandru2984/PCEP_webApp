@@ -2457,6 +2457,32 @@ vulnerabilities; all 518 installed packages have verified registry signatures an
 all 305 Vitest tests and all 31 Playwright flows pass. This remediation changes no
 production service, database, environment or deployment state.
 
+### Frontend test and build toolchain modernization — 2026-10-06
+
+The independent `@testing-library/jest-dom` 7 and Vitest 5 Dependabot updates were
+reviewed against their Node and assertion-contract breaking changes, merged, and
+confirmed by a fully green `main` run. The standalone Vite 8 update could not even
+install because `@vitejs/plugin-react` 4 does not declare a Vite 8 peer range. The
+build upgrade therefore moves Vite 6.4.3 to exact 8.3.1 together with the smallest
+compatible plugin release, `@vitejs/plugin-react` 5.2.0. The config's local PWA
+import now includes its `.js` extension, removing Vite's native-config-loader
+compatibility warning.
+
+The seven-day dependency cooldown is preserved across the resolved graph. Vite
+8.3.3 and plugin-react 6.1.2 were published inside that window and were not selected.
+Vite's Rolldown range is explicitly held at 1.2.11 because a fresh npm resolution
+otherwise selected 1.2.12 before it completed the same cooldown. Vite 8 replaces
+esbuild with Rolldown, so the graph no longer needs any lifecycle installer. The
+script-free installer and inventory checker now execute no dependency code at all;
+optional macOS-only `fsevents@2.3.3` remains explicitly blocked.
+
+The final locked graph reports zero npm vulnerabilities, 514 verified registry
+signatures and 170 verified provenance attestations. Lint, Prettier, all 305 Vitest
+tests, the PWA production build and all 31 Playwright flows pass on the host. The
+digest-pinned Node 24.21.0/Alpine builder also installs the graph from scratch and
+produces the PWA successfully. This is a source and build-tooling change only; no
+production service was deployed or restarted and no production data was touched.
+
 ## 15. Breaking changes
 
 None.
