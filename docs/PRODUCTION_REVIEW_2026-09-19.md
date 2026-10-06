@@ -2493,6 +2493,25 @@ four bounded jobs against current `main` when event delivery is absent. PR and p
 triggers, required-check names, permissions and branch protection remain unchanged.
 This recovery control neither contacts production nor changes deployment state.
 
+### Offsite activation preflight hardening — 2026-10-06
+
+The activation audit confirmed that the PCEP offsite service and backup-success
+drop-in remain uninstalled, with no PCEP environment file or encrypted systemd
+credential present. The operator's existing shared rclone configuration contains a
+Google Drive crypt remote that is not PCEP-dedicated and a raw R2 backend; neither
+meets the activation gates and neither was reused. No upload or remote mutation was
+performed. The latest private local dump was instead restored successfully in the
+network-isolated disposable PostgreSQL container, reproducing 308 questions, 1,232
+choices and 29 migrations.
+
+The fail-closed preflight now applies its bounded safe-segment grammar to the backend
+path wrapped by the crypt remote as well as to the requested destination. Absolute
+paths, trailing or repeated separators, traversal, unsafe backend names and a crypt
+remote that wraps itself are rejected before backend feature checks or any transfer.
+Thirty-one focused tests cover the offsite control. Independent credentials,
+provider versioning/object lock, an offline recovery key, a tested alert and vendor
+review are still absent, so the CISO verdict remains **BLOCK activation**.
+
 ## 15. Breaking changes
 
 None.

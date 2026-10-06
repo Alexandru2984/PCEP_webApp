@@ -129,8 +129,10 @@ systemd credential alone cannot recover backups after total host loss.
 Before upload, the script requires a real mode-`0600` config owned by the service
 user and checks the redacted remote definition. It accepts only `type=crypt` with
 explicit standard filename encryption, directory encryption, both crypt secrets and
-a non-root wrapped backend path. Any rclone diagnostic fails the run, including the
-shared-Google-client retirement notice.
+a non-root wrapped backend path. The wrapped backend must use the same bounded safe
+name/path grammar as the destination: absolute paths, empty or repeated segments,
+traversal and self-wrapping crypt remotes are rejected. Any rclone diagnostic fails
+the run, including the shared-Google-client retirement notice.
 
 The job selects the newest private backup/checksum pair, verifies all complete local
 pairs and rejects a scheduled backup older than six hours. It uploads with immutable

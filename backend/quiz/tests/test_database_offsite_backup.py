@@ -97,6 +97,33 @@ def test_crypt_configuration_is_fail_closed(replacement, message):
         offsite.parse_redacted_remote(changed, 'pcep-crypt')
 
 
+@pytest.mark.parametrize(
+    'wrapped',
+    [
+        'r2:/bucket/pcep',
+        'r2:bucket/pcep/',
+        'r2:bucket//pcep',
+        'r2:bucket/../pcep',
+        '-bad:bucket/pcep',
+    ],
+)
+def test_crypt_configuration_rejects_unsafe_wrapped_paths(wrapped):
+    changed = crypt_config().replace(
+        'remote = r2:pcep-encrypted/database', f'remote = {wrapped}'
+    )
+    with pytest.raises(offsite.OffsiteBackupError, match='safe segments'):
+        offsite.parse_redacted_remote(changed, 'pcep-crypt')
+
+
+def test_crypt_configuration_rejects_self_wrapping_remote():
+    changed = crypt_config().replace(
+        'remote = r2:pcep-encrypted/database',
+        'remote = pcep-crypt:pcep-encrypted/database',
+    )
+    with pytest.raises(offsite.OffsiteBackupError, match='must not wrap itself'):
+        offsite.parse_redacted_remote(changed, 'pcep-crypt')
+
+
 def test_backend_diagnostics_fail_preflight():
     calls = []
 
