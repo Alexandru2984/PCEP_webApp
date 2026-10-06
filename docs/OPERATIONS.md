@@ -286,8 +286,14 @@ PCEP-only rclone config path; they never fall back to the operator's shared conf
 
 Run `make check-systemd` after changing any file under `ops/systemd`. It verifies all
 repository-owned services and timers with the host's `systemd-analyze`, loads
-adjacent drop-ins through the same unit search path and rejects an orphan or unsafe
-drop-in name. Push/pull-request CI runs this check on Ubuntu 24.04 as well.
+adjacent drop-ins and rejects an orphan or unsafe drop-in name. The validator stages
+the exact repository tree inside a mode-0700 temporary filesystem root together with
+non-executed placeholders for the fixed production interpreter and host-provided
+units. This makes validation independent of a developer or CI runner having
+`/home/micu/PCEP_webApp` installed while preserving `systemd-analyze`'s executable,
+dependency, directive and sandbox checks. Any diagnostic, including a warning that
+would otherwise return success, fails the command. Push/pull-request CI runs this
+check on Ubuntu 24.04 as well.
 
 ## Backend Deploy
 

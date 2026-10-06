@@ -232,6 +232,9 @@ def test_success_status_rejects_unsafe_directory_and_symlink(tmp_path):
     backup = tmp_path / 'pcep_db_daily_20261005T010000Z.sql.gz'
     status_root = tmp_path / 'status'
     status_root.mkdir(mode=0o770)
+    # mkdir applies the process umask; force the unsafe mode so this assertion
+    # behaves identically on developer machines and hosted CI runners.
+    status_root.chmod(0o770)
     status = status_root / 'last-success'
     current = datetime(2026, 10, 5, 2, tzinfo=timezone.utc)
 
