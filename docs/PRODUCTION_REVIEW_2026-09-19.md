@@ -2440,6 +2440,23 @@ administrator enforcement, pull-request requirement, linear-history requirement,
 conversation-resolution requirement and disabled force-push/deletion settings.
 This setting change did not deploy code, restart a service or alter production data.
 
+### Immediate transitive npm advisory response — 2026-10-06
+
+The first `main` run after branch-protection documentation detected a newly reported
+HIGH-severity event-loop denial-of-service advisory in the development-only
+`source-map-js@1.2.1` resolution. The package is transitive through the existing
+PostCSS, Tailwind and jsdom toolchain; no application manifest requested it directly.
+The preceding pull-request audit had passed, so the later push failure demonstrates
+that registry-backed audits fail closed when advisory data changes between runs.
+
+The lockfile alone now resolves the already-compatible parent ranges to patched
+`source-map-js@1.2.2`, updating its tarball URL and verified integrity value without
+adding a direct dependency or changing any other resolution. npm reports zero
+vulnerabilities; all 518 installed packages have verified registry signatures and
+169 have verified provenance attestations. Lint, formatting, the production build,
+all 305 Vitest tests and all 31 Playwright flows pass. This remediation changes no
+production service, database, environment or deployment state.
+
 ## 15. Breaking changes
 
 None.
