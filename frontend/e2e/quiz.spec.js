@@ -21,6 +21,18 @@ async function answerConfirmation(page, action, accept = true) {
   return message
 }
 
+async function activeExamOwner(page) {
+  return page.evaluate(() => {
+    const serialized = localStorage.getItem('pcep.activeExam')
+    if (!serialized) return null
+    try {
+      return JSON.parse(serialized)?.data?.sessionId ?? null
+    } catch {
+      return null
+    }
+  })
+}
+
 // --- Tests ------------------------------------------------------------------
 test('setup screen loads and shows the question-bank snapshot', async ({ page }) => {
   await mockApi(page)
@@ -991,29 +1003,28 @@ test('resuming an exam in another tab transfers recovery ownership', async ({
   await page.goto('/')
   await page.getByRole('button', { name: /Exam simulation/ }).click()
   await page.getByRole('button', { name: /Start exam/ }).click()
-  const firstOwner = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('pcep.activeExam')).data.sessionId
-  )
+  await expect.poll(() => activeExamOwner(page)).not.toBeNull()
+  const firstOwner = await activeExamOwner(page)
 
   const secondTab = await context.newPage()
   await mockApi(secondTab)
   await secondTab.goto('/')
   await secondTab.getByRole('button', { name: 'Resume exam' }).click()
   await expect(secondTab.getByText('Question 1 of 4')).toBeVisible()
-  const currentOwner = await secondTab.evaluate(
-    () => JSON.parse(localStorage.getItem('pcep.activeExam')).data.sessionId
-  )
+  await expect
+    .poll(async () => {
+      const owner = await activeExamOwner(secondTab)
+      return owner !== null && owner !== firstOwner
+    })
+    .toBe(true)
+  const currentOwner = await activeExamOwner(secondTab)
   expect(currentOwner).not.toBe(firstOwner)
 
   await expect(page.getByRole('heading', { name: 'Resume saved exam' })).toBeVisible()
   await expect(
     page.getByRole('alert').filter({ hasText: 'active quiz changed in another tab' })
   ).toBeVisible()
-  expect(
-    await page.evaluate(
-      () => JSON.parse(localStorage.getItem('pcep.activeExam')).data.sessionId
-    )
-  ).toBe(currentOwner)
+  await expect.poll(() => activeExamOwner(page)).toBe(currentOwner)
   await secondTab.close()
 })
 
