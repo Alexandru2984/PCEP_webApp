@@ -122,6 +122,16 @@ Actionlint checks schema, expressions and embedded shell; zizmor's pedantic offl
 persona checks hash pinning, permissions, triggers, secret handling and other static
 CI security properties. No GitHub token is exposed to the scanner.
 
+`.github/workflows/codeql.yml` runs GitHub CodeQL advanced setup for the repository's
+GitHub Actions, Python and JavaScript/TypeScript sources. Pull requests and pushes
+to `main` are analyzed immediately; the Thursday schedule catches query-pack
+improvements while the repository is idle, and manual dispatch supports incident
+response. The workflow uses the `security-extended` suite, no-build analysis for
+all three interpreted languages, a 20-minute bound and a separate matrix result per
+language. Repository access remains read-only except for the job-scoped
+`security-events: write` permission required to publish SARIF results. Keep both
+CodeQL action steps on the same reviewed full commit SHA.
+
 The command supplies trusted tool configuration, disables repository ignore rules,
 passes every workflow explicitly, and rejects symlinks, nested entries and unsafe
 filenames in the workflow directory. Update each version, archive checksum and this

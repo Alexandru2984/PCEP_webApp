@@ -215,6 +215,11 @@ cd frontend && npm run e2e
 
 Push/PR CI runs the backend, frontend, audit and build checks without calling
 production, plus `manage.py check --deploy` against a production-like config.
+An independent CodeQL workflow analyzes GitHub Actions, Python and
+JavaScript/TypeScript on every push and pull request to `main`, weekly, and on
+manual dispatch. It runs GitHub's `security-extended` query suite and uploads
+results with a job-scoped `security-events: write` permission; all action
+revisions are pinned to reviewed commit SHAs.
 Its jobs use the explicit Ubuntu 24.04 runner image; Python jobs use the same
 3.12.14 patch release as the backend runtime, avoiding unreviewed toolchain changes
 when GitHub advances its `ubuntu-latest` alias.
