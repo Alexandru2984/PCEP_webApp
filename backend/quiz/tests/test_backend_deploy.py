@@ -11,9 +11,16 @@ spec = importlib.util.spec_from_file_location(
 )
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+VERIFY_DATABASE_ROLES = release.verify_database_roles
 
 CANDIDATE_IMAGE = f'sha256:{"a" * 64}'
 FALLBACK_IMAGE = f'sha256:{"b" * 64}'
+
+
+@pytest.fixture(autouse=True)
+def isolated_database_role_check(monkeypatch):
+    monkeypatch.setattr(release, 'verify_database_roles', lambda *_args: {})
+    monkeypatch.setattr(release, 'database_admin_sql', lambda *_args: '')
 
 
 def candidate_capture(args):
@@ -134,6 +141,17 @@ def test_reviewed_migrations_use_plan_instead_of_refusing_them(tmp_path, monkeyp
         if command[-2:] == ('migrate', '--check')
     ]
     assert plan_index < up_index
+    migration_index = commands.index(
+        (
+            'docker', 'compose', '--profile', 'maintenance', 'run', '--rm',
+            '--no-deps', '--env', 'POSTGRES_USER', '--env', 'POSTGRES_PASSWORD',
+            '--env', 'PGOPTIONS', 'backend-migrate',
+        )
+    )
+    scan_index = commands.index(
+        ('make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}')
+    )
+    assert scan_index < migration_index < up_index
     assert len(migrate_checks) == 1
     assert migrate_checks[0] > up_index
 
@@ -299,3 +317,108 @@ def test_deploy_refuses_tracked_changes_even_with_explicit_release(tmp_path, mon
 
     with pytest.raises(release.ReleaseError, match='tracked uncommitted'):
         release.deploy(config(tmp_path))
+
+
+def valid_role_posture(**overrides):
+    limited = {
+        'login': False,
+        'inherit': False,
+        'superuser': False,
+        'createdb': False,
+        'createrole': False,
+        'replication': False,
+        'bypassrls': False,
+    }
+    posture = {
+        'app_role': {**limited, 'login': True, 'inherit': True},
+        'owner_role': limited,
+        'migrator_role': {**limited, 'password_absent': True},
+        'migrator_is_owner_member': True,
+        'app_is_owner_member': False,
+        'unexpected_owner_members': 0,
+        'unexpected_role_memberships': 0,
+        'database_owner': 'pcep_owner',
+        'schema_owner': 'pcep_owner',
+        'app_connect': True,
+        'app_create_database_objects': False,
+        'app_temporary': False,
+        'app_schema_usage': True,
+        'app_schema_create': False,
+        'wrong_table_owners': 0,
+        'wrong_sequence_owners': 0,
+        'tables_without_app_dml': 0,
+        'tables_with_app_ddl': 0,
+        'sequences_without_app_runtime': 0,
+        'sequences_with_app_update': 0,
+        'default_table_app_privileges': ['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
+        'default_sequence_app_privileges': ['SELECT', 'USAGE'],
+        'unexpected_default_grants': 0,
+    }
+    posture.update(overrides)
+    return posture
+
+
+def test_database_role_verification_requires_exact_least_privilege_posture(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        release,
+        'database_admin_sql',
+        lambda *_args: json.dumps(valid_role_posture()),
+    )
+    assert VERIFY_DATABASE_ROLES(config(tmp_path)) == valid_role_posture()
+
+    monkeypatch.setattr(
+        release,
+        'database_admin_sql',
+        lambda *_args: json.dumps(valid_role_posture(app_schema_create=True)),
+    )
+    with pytest.raises(release.ReleaseError, match='least-privilege posture'):
+        VERIFY_DATABASE_ROLES(config(tmp_path))
+
+
+def test_migrator_password_is_ephemeral_and_never_placed_in_argv(
+    tmp_path, monkeypatch
+):
+    events = []
+    secret = 'test-only-ephemeral-secret'
+    monkeypatch.setattr(release.secrets, 'token_urlsafe', lambda _size: secret)
+    monkeypatch.setattr(
+        release,
+        'database_admin_sql',
+        lambda _config, sql: events.append(('sql', sql)) or '',
+    )
+
+    def run(args, **kwargs):
+        events.append(('run', tuple(args), kwargs.get('env', {}).copy()))
+
+    monkeypatch.setattr(release, 'run_command', run)
+
+    release.run_reviewed_migrations(config(tmp_path), {'PCEP_RELEASE': 'test'})
+
+    run_event = next(event for event in events if event[0] == 'run')
+    assert secret not in run_event[1]
+    assert run_event[2]['POSTGRES_PASSWORD'] == secret
+    assert run_event[2]['POSTGRES_USER'] == 'pcep_migrator'
+    assert run_event[2]['PGOPTIONS'] == '-c role=pcep_owner'
+    assert secret in events[0][1]
+    assert 'NOLOGIN PASSWORD NULL' in events[-1][1]
+
+
+def test_migrator_is_disabled_when_migration_command_fails(tmp_path, monkeypatch):
+    sql = []
+    monkeypatch.setattr(
+        release, 'database_admin_sql', lambda _config, statement: sql.append(statement) or ''
+    )
+
+    def fail(_args, **_kwargs):
+        raise release.subprocess.CalledProcessError(1, 'migration')
+
+    monkeypatch.setattr(release, 'run_command', fail)
+
+    with pytest.raises(release.subprocess.CalledProcessError):
+        release.run_reviewed_migrations(config(tmp_path), {})
+
+    assert len(sql) == 2
+    assert 'LOGIN PASSWORD' in sql[0]
+    assert 'NOLOGIN PASSWORD NULL' in sql[1]

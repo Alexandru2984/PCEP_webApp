@@ -25,7 +25,10 @@ POSTGRES_VERSION_PATTERN = re.compile(r'^postgres \(PostgreSQL\) (?P<major>\d+)(
 RESTORE_DATABASE = 'pcep_restore'
 RESTORE_ADMIN = 'pcep_restore_admin'
 RESTORE_APP_USER = 'pcep_user'
+RESTORE_OWNER_ROLE = 'pcep_owner'
+RESTORE_MIGRATOR_ROLE = 'pcep_migrator'
 RESTORE_PASSWORD = 'disposable-restore-check-only'
+ROLE_PATTERN = re.compile(r'^[A-Za-z_][A-Za-z0-9_]{0,62}$')
 
 VALIDATION_SQL = r"""
 SELECT json_build_object(
@@ -171,6 +174,31 @@ def source_postgres_major(source_container, runner=run_command):
     return match.group('major')
 
 
+def source_table_owner(source_container, runner=run_command):
+    validate_container_name(source_container, 'source')
+    result = runner(
+        [
+            'docker', 'exec', '--interactive', '--user', 'postgres', source_container,
+            'sh', '-ceu',
+            (
+                'exec psql --no-psqlrc --no-password --tuples-only --no-align '
+                '--quiet --set=ON_ERROR_STOP=on --username "$POSTGRES_USER" '
+                '--dbname "$POSTGRES_DB"'
+            ),
+        ],
+        input_text=(
+            "SELECT pg_get_userbyid(relowner) FROM pg_class "
+            "WHERE oid = 'public.quiz_question'::regclass;\n"
+        ),
+    )
+    owner = result.stdout.strip()
+    if owner not in {RESTORE_APP_USER, RESTORE_OWNER_ROLE}:
+        raise RestoreCheckError(
+            f'The source question table has an unexpected owner: {owner!r}.'
+        )
+    return owner
+
+
 def validate_image_reference(value):
     if not value or not IMAGE_REFERENCE_PATTERN.fullmatch(value):
         raise RestoreCheckError('Fallback image must be a bounded local image reference.')
@@ -285,6 +313,10 @@ def docker_run_command(container, image_id):
         f'PCEP_APP_USER={RESTORE_APP_USER}',
         '--env',
         f'PCEP_APP_PASSWORD={RESTORE_PASSWORD}',
+        '--env',
+        f'PCEP_OWNER_ROLE={RESTORE_OWNER_ROLE}',
+        '--env',
+        f'PCEP_MIGRATOR_USER={RESTORE_MIGRATOR_ROLE}',
         image_id,
     ]
 
@@ -336,6 +368,31 @@ def verify_runtime_security(container):
         raise RestoreCheckError('Restore container retained Linux capabilities.')
     if not re.search(r'^NoNewPrivs:\s+1$', result.stdout, re.MULTILINE):
         raise RestoreCheckError('Restore container lacks no-new-privileges.')
+
+
+def prepare_restore_roles(container):
+    sql = f"""
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{RESTORE_OWNER_ROLE}') THEN
+    CREATE ROLE {RESTORE_OWNER_ROLE}
+      NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{RESTORE_MIGRATOR_ROLE}') THEN
+    CREATE ROLE {RESTORE_MIGRATOR_ROLE}
+      NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+  END IF;
+END
+$roles$;
+"""
+    run_command(
+        [
+            'docker', 'exec', '--interactive', '--user', 'postgres', container,
+            'psql', '--username', RESTORE_ADMIN, '--dbname', RESTORE_DATABASE,
+            '--no-password', '--no-psqlrc', '--set', 'ON_ERROR_STOP=on',
+        ],
+        input_text=sql,
+    )
 
 
 def restore_dump(backup, container, timeout_seconds=600):
@@ -406,7 +463,9 @@ def restore_dump(backup, container, timeout_seconds=600):
         )
 
 
-def validate_metrics(payload):
+def validate_metrics(payload, expected_owner=RESTORE_APP_USER):
+    if not ROLE_PATTERN.fullmatch(expected_owner):
+        raise RestoreCheckError('Expected table owner is invalid.')
     try:
         metrics = json.loads(payload)
     except json.JSONDecodeError as error:
@@ -418,7 +477,7 @@ def validate_metrics(payload):
         value = metrics.get(key)
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise RestoreCheckError(f'Restore validation failed for {key}.')
-    if metrics.get('question_owner') != RESTORE_APP_USER:
+    if metrics.get('question_owner') != expected_owner:
         raise RestoreCheckError('Restored question table has the wrong owner.')
     if metrics.get('unique_index_valid') is not True:
         raise RestoreCheckError('The one-correct-choice index is absent or invalid.')
@@ -428,7 +487,7 @@ def validate_metrics(payload):
     return metrics
 
 
-def validate_restored_database(container):
+def validate_restored_database(container, expected_owner=RESTORE_APP_USER):
     result = run_command(
         [
             'docker',
@@ -453,7 +512,16 @@ def validate_restored_database(container):
         ],
         timeout=60,
     )
-    return validate_metrics(result.stdout.strip())
+    return validate_metrics(result.stdout.strip(), expected_owner)
+
+
+def validate_backup_in_isolation(backup, container, image_id, expected_owner):
+    with disposable_restore_container(container, image_id):
+        wait_for_database(container)
+        verify_runtime_security(container)
+        prepare_restore_roles(container)
+        restore_dump(backup, container)
+        return validate_restored_database(container, expected_owner)
 
 
 def execute(backup_root, source_container, restore_container, fallback_image=None):
@@ -461,6 +529,7 @@ def execute(backup_root, source_container, restore_container, fallback_image=Non
     validate_container_name(restore_container, 'restore')
     backup_module = load_database_backup()
     backup, checksum = select_latest_backup(backup_root, backup_module)
+    expected_owner = source_table_owner(source_container)
     image_id, used_fallback = select_restore_image(source_container, fallback_image)
     if used_fallback:
         print(
@@ -469,11 +538,9 @@ def execute(backup_root, source_container, restore_container, fallback_image=Non
             flush=True,
         )
 
-    with disposable_restore_container(restore_container, image_id):
-        wait_for_database(restore_container)
-        verify_runtime_security(restore_container)
-        restore_dump(backup, restore_container)
-        metrics = validate_restored_database(restore_container)
+    metrics = validate_backup_in_isolation(
+        backup, restore_container, image_id, expected_owner
+    )
 
     backup_module.verify_checksum(backup, checksum)
     print(f'Isolated database restore passed: {backup}')

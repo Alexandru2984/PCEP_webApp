@@ -29,6 +29,7 @@ services:
       retries: 5
 
   backend:
+    image: pcep_webapp-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -68,6 +69,33 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend-migrate:
+    image: pcep_webapp-backend:latest
+    profiles: [maintenance]
+    restart: "no"
+    user: appuser
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 256m
+    tmpfs:
+      - /tmp:size=32m,mode=1777,noexec,nosuid,nodev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pcep_db}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_CONN_MAX_AGE: 0
+      DJANGO_SECRET_KEY: migration-only-container-does-not-serve-http
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: migration.invalid
+      CORS_ALLOWED_ORIGINS: https://migration.invalid
+    entrypoint: ["python", "manage.py"]
+    command: ["migrate", "--noinput"]
     depends_on:
       db:
         condition: service_healthy
