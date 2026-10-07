@@ -1050,16 +1050,17 @@ both PCEP vhosts. Back up outside sites-enabled, run `sudo nginx -t`, then use
 `sudo systemctl reload nginx` (graceful). The 2026-09-18 vhost backup is in
 `/home/micu/backups/pcep/security-20260918/nginx.before`.
 
-The public vhost deliberately returns 404 for both `/admin` and `/admin/`. Do not
-restore the Django admin proxy on the learner origin. A future operator interface
-requires a separate origin protected by Cloudflare Access (or equivalent),
-phishing-resistant MFA, explicit operator enrollment and a tested emergency access
-procedure before its Nginx route is enabled.
+The public vhost deliberately returns 404 for both `/admin` and `/admin/`, and the
+production Django settings neither install the admin application nor register its
+URL route. The validated editor remains available only with `DEBUG=True` for local
+maintenance. Do not restore the Django admin proxy on the learner origin. A future
+operator interface requires a separate origin protected by Cloudflare Access (or
+equivalent), phishing-resistant MFA, explicit operator enrollment and a tested
+emergency access procedure before its Nginx route is enabled.
 The API has a shared 3 requests/second IP limit with a burst of 30, 64 KB body
 limit, short connection timeout and JSON 413/429 errors. Those Nginx-generated
 errors carry `Cache-Control: no-store` and the same restrictive API CSP
-(`default-src 'none'; frame-ancestors 'none'`) as proxied API responses. Admin
-retains its 20/minute limit and Django CSRF behavior. The analytics proxy exposes only
+(`default-src 'none'; frame-ancestors 'none'`) as proxied API responses. The analytics proxy exposes only
 GET tracker script and POST event collection; its dashboard is not routed.
 Hashed assets get immutable caching and real 404s for missing files; shell,
 worker, Pyodide and study pages send no-cache/no-store/must-revalidate.

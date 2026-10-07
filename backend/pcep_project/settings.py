@@ -34,8 +34,9 @@ if not DEBUG:
             'DJANGO_ALLOWED_HOSTS must be restricted (not "*") when DEBUG=False.'
         )
 
+DJANGO_ADMIN_ENABLED = DEBUG
+
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -45,6 +46,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'quiz',
 ]
+if DJANGO_ADMIN_ENABLED:
+    # The learner-facing production service has no operator surface at all.
+    # Development keeps the validated question editor available locally.
+    INSTALLED_APPS.insert(0, 'django.contrib.admin')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
