@@ -84,7 +84,7 @@ def production_origin(value):
     return value.rstrip('/')
 
 
-def public_get(origin, path, attempts=3):
+def public_get(origin, path, attempts=3, expected_status=200):
     url = f'{origin}/{path.lstrip("/")}'
     request = Request(
         url,
@@ -97,21 +97,33 @@ def public_get(origin, path, attempts=3):
     last_error = None
     for attempt in range(attempts):
         try:
-            with urlopen(
-                request,
-                timeout=20,
-                context=ssl.create_default_context(),
-            ) as response:
+            try:
+                response = urlopen(
+                    request,
+                    timeout=20,
+                    context=ssl.create_default_context(),
+                )
+            except HTTPError as error:
+                if error.code != expected_status:
+                    raise
+                response = error
+            with response:
                 body = response.read(MAX_RESPONSE_BYTES + 1)
                 require(
                     len(body) <= MAX_RESPONSE_BYTES,
                     f'{path} exceeded the response-size limit.',
                 )
-                require(response.status == 200, f'{path} returned HTTP {response.status}.')
+                status = getattr(response, 'status', None)
+                if status is None:
+                    status = response.code
+                require(
+                    status == expected_status,
+                    f'{path} returned HTTP {status}, expected {expected_status}.',
+                )
                 require(response.geturl() == url, f'{path} redirected unexpectedly.')
                 return PublicResponse(
                     url=url,
-                    status=response.status,
+                    status=status,
                     headers={key.lower(): value for key, value in response.headers.items()},
                     body=body,
                 )
@@ -238,6 +250,31 @@ def check_shell(response):
     require("'unsafe-eval'" not in scripts, 'Shell CSP permits unsafe-eval.')
     require("'unsafe-inline'" not in scripts, 'Shell CSP permits inline scripts.')
     return shell_assets(response.body), shell_release(response.body)
+
+
+def check_admin_unavailable(response):
+    label = 'Public admin route'
+    require(response.status == 404, f'{label} is reachable.')
+    check_shared_security_headers(response, label)
+    require('no-store' in response.headers.get('cache-control', ''), f'{label} is cacheable.')
+    require(
+        csp_directives(response.headers.get('content-security-policy', ''))
+        == {
+            'default-src': ["'none'"],
+            'frame-ancestors': ["'none'"],
+        },
+        f'{label} CSP drifted.',
+    )
+    require('set-cookie' not in response.headers, f'{label} sets a cookie.')
+    require(
+        REQUEST_ID_PATTERN.fullmatch(response.headers.get('x-request-id', '')) is not None,
+        f'{label} has an invalid request ID.',
+    )
+    body = response.body.lower()
+    require(
+        b'django administration' not in body and b'admin login' not in body,
+        f'{label} discloses the administration interface.',
+    )
 
 
 def check_api_headers(response, releases, label):
@@ -479,6 +516,9 @@ def check_search(payload):
 def run(origin):
     releases = set()
 
+    admin = public_get(origin, '/admin/login/', expected_status=404)
+    check_admin_unavailable(admin)
+
     shell = public_get(origin, '/')
     assets, frontend_release = check_shell(shell)
     for asset_path in assets:
@@ -567,6 +607,7 @@ def run(origin):
         'questions': total,
         'targeted_order': targeted_ids,
         'assets': len(assets),
+        'admin': 'disabled',
     }
 
 
@@ -588,6 +629,7 @@ def main(argv=None):
         f'frontend_release={result["frontend_release"]} '
         f'questions={result["questions"]} '
         f'assets={result["assets"]} '
+        f'admin={result["admin"]} '
         f'targeted_order={",".join(map(str, result["targeted_order"]))}'
     )
 

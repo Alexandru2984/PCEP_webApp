@@ -36,6 +36,24 @@ port=$(docker port "$container" 443/tcp)
 port=${port##*:}
 base_url="https://pcep.micutu.com:$port"
 
+for admin_path in /admin /admin/login/; do
+    admin_label=${admin_path//\//_}
+    status=$(curl --http1.1 --insecure --silent --show-error \
+        --resolve "pcep.micutu.com:$port:127.0.0.1" \
+        --dump-header "$stage/$admin_label.headers" \
+        --output "$stage/$admin_label.body" \
+        --write-out '%{http_code}' "$base_url$admin_path")
+    [[ "$status" == 404 ]]
+    tr -d '\r' < "$stage/$admin_label.headers" > "$stage/$admin_label.headers.clean"
+    grep -Fqi 'Cache-Control: no-store' "$stage/$admin_label.headers.clean"
+    grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" "$stage/$admin_label.headers.clean"
+    grep -Fqi 'X-Content-Type-Options: nosniff' "$stage/$admin_label.headers.clean"
+    grep -Fqi 'X-Frame-Options: DENY' "$stage/$admin_label.headers.clean"
+    grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' "$stage/$admin_label.headers.clean"
+    ! grep -Eqi '^Set-Cookie:' "$stage/$admin_label.headers.clean"
+    ! grep -Eqi 'Django administration|admin login' "$stage/$admin_label.body"
+done
+
 status=''
 for _ in $(seq 1 30); do
     status=$(curl --http1.1 --insecure --silent --show-error \
@@ -72,4 +90,4 @@ grep -Fqi 'Retry-After: 1' "$stage/429.headers.clean"
 grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' "$stage/429.headers.clean"
 grep -Fqx '{"detail":"Too many requests. Please wait and retry."}' "$stage/429.body"
 
-printf '%s\n' 'Nginx syntax and generated API error contracts: OK'
+printf '%s\n' 'Nginx syntax, disabled admin and generated API error contracts: OK'

@@ -215,6 +215,8 @@ JS/CSS entry assets, immutable asset caching, service-worker policy, liveness,
 database readiness, separate frontend and backend release markers, request IDs,
 aggregate question counts,
 module/objective/difficulty matrices, security headers and API no-store behavior.
+It also requires `/admin/login/` to remain a non-redirecting, cookie-free 404 with
+a deny-all CSP, so a vhost regression cannot silently republish Django admin.
 It validates strict answer-safe shapes for random, daily, detail and search
 responses, then verifies that a three-question targeted drill preserves the
 requested order. It never calls an answer, grade or other write endpoint and does
@@ -938,6 +940,12 @@ Install `nginx/snippets/pcep-*.conf` into `/etc/nginx/snippets/` before installi
 the vhost. Back up outside sites-enabled, run `sudo nginx -t`, then use
 `sudo systemctl reload nginx` (graceful). The 2026-09-18 vhost backup is in
 `/home/micu/backups/pcep/security-20260918/nginx.before`.
+
+The public vhost deliberately returns 404 for both `/admin` and `/admin/`. Do not
+restore the Django admin proxy on the learner origin. A future operator interface
+requires a separate origin protected by Cloudflare Access (or equivalent),
+phishing-resistant MFA, explicit operator enrollment and a tested emergency access
+procedure before its Nginx route is enabled.
 The API has a shared 3 requests/second IP limit with a burst of 30, 64 KB body
 limit, short connection timeout and JSON 413/429 errors. Those Nginx-generated
 errors carry `Cache-Control: no-store` and the same restrictive API CSP
