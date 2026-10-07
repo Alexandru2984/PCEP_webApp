@@ -22,6 +22,7 @@ BACKEND_DEPLOY_FLAGS ?=
 TRIVY_IMAGE ?= ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
+DATABASE_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PRODUCTION_URL ?= https://pcep.micutu.com
 
 .PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
@@ -89,20 +90,12 @@ audit-secrets:
 	TRIVY_IMAGE="$(TRIVY_IMAGE)" bash scripts/check_tracked_secrets.sh
 
 audit-image:
-	mkdir -p "$(TRIVY_CACHE)"
-	docker run --rm \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v "$(TRIVY_CACHE):/root/.cache/" \
-		"$(TRIVY_IMAGE)" image --scanners vuln --severity HIGH,CRITICAL \
-		--ignore-unfixed --exit-code 1 --no-progress "$(BACKEND_IMAGE)"
+	TRIVY_IMAGE="$(TRIVY_IMAGE)" TRIVY_CACHE="$(TRIVY_CACHE)" \
+		bash scripts/audit_docker_image.sh "$(BACKEND_IMAGE)"
 
 audit-db-image:
-	mkdir -p "$(TRIVY_CACHE)"
-	docker run --rm \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v "$(TRIVY_CACHE):/root/.cache/" \
-		"$(TRIVY_IMAGE)" image --scanners vuln --severity HIGH,CRITICAL \
-		--ignore-unfixed --exit-code 1 --no-progress pcep_webapp-postgres:16.15-alpine3.24
+	TRIVY_IMAGE="$(TRIVY_IMAGE)" TRIVY_CACHE="$(TRIVY_CACHE)" \
+		bash scripts/audit_docker_image.sh "$(DATABASE_IMAGE)"
 
 check-workflows:
 	bash scripts/check_github_workflows.sh

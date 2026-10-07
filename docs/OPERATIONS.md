@@ -49,7 +49,11 @@ unit/lint/format/build checks. CI runs the backend suite against PostgreSQL.
 The pinned image scans cover the backend's Debian/Python packages and the database's
 Alpine packages, and fail on fixable HIGH/CRITICAL findings. Unfixed vendor findings
 remain visible in a full Trivy report and are reviewed separately rather than
-permanently breaking CI. The PostgreSQL runtime check builds the reviewed image,
+permanently breaking CI. Each audit resolves the requested image to its immutable
+ID, exports that exact image to a private temporary archive, and gives the scanner
+only the archive and its cache. Never mount the Docker daemon socket into the
+scanner: socket access is equivalent to privileged control of the host. The
+PostgreSQL runtime check builds the reviewed image,
 starts a disposable cluster with the production restrictions, writes data, verifies
 the kernel controls and read-only root, restarts it and verifies persistence.
 The runtime base pins both Python 3.12.14 and the official multi-architecture
