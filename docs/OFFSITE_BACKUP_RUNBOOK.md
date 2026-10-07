@@ -4,7 +4,7 @@ Status: **BLOCKED FOR ACTIVATION**. The implementation is ready for review, but 
 offsite upload or automatic trigger is authorized until every activation gate below
 is complete.
 
-## CISO review — 2026-10-05
+## CISO review — 2026-10-05, R2 profile reviewed 2026-10-07
 
 ### Threat model
 
@@ -83,10 +83,25 @@ review. No claim of SOC 2, ISO 27001, HIPAA or payment-card scope is made.
 ### Vendor and supply chain
 
 No new vendor is approved by this change. Google Drive is blocked because the
-configured crypt remote depends on rclone's retiring shared OAuth client. The current
-R2 remote is blocked because it is a raw S3 backend without a dedicated PCEP crypt
-wrapper. A DPA, subprocessor decision, provider security review, regional/storage
-location and versioning/object-lock settings have not yet been recorded.
+configured crypt remote depends on rclone's retiring shared OAuth client. The
+operator's current R2 remote is also blocked: it is shared, raw S3 storage with
+unknown credential scope and no dedicated PCEP crypt wrapper.
+
+Cloudflare's official controls make a **new**, PCEP-only R2 bucket a technically
+eligible candidate, but not an approved destination. It must be created in the
+[EU jurisdiction](https://developers.cloudflare.com/r2/reference/data-location/)
+rather than with a best-effort location hint, use a
+[bucket-scoped Object Read & Write token](https://developers.cloudflare.com/r2/api/tokens/),
+and protect the encrypted prefix with a native
+[R2 Bucket Lock](https://developers.cloudflare.com/r2/buckets/bucket-locks/). R2
+does not implement the standard S3 versioning or S3 Object Lock interfaces, so do
+not claim either control; record the native Bucket Lock rule instead. Cloudflare
+[Audit Logs](https://developers.cloudflare.com/r2/platform/audit-logs/) cover
+configuration changes, not object access.
+[Data Access Logs](https://developers.cloudflare.com/r2/buckets/data-access-logs/)
+are best-effort, incomplete and generally available only for buckets without a
+jurisdiction, so they cannot replace the independent missed-success alert. The DPA,
+subprocessor decision and account terms still require owner review.
 
 **Verdict: 🔴 BLOCK activation.** Mitigate the gates below, repeat this review, then
 perform a manually observed first upload and restore before installing the automatic
@@ -108,6 +123,67 @@ perform a manually observed first upload and restore before installing the autom
 - Run `make offsite-backup-preflight` and a manually observed first
   `make offsite-backup` followed by `make verify-database-restore`.
 - Tabletop the response steps above and record the date and participants.
+
+## Reviewed Cloudflare R2 candidate profile
+
+This profile narrows the acceptable R2 design; it does not authorize bucket creation
+or upload. Record screenshots or exported settings without secret values for every
+item before changing the verdict:
+
+- Create a new private bucket for PCEP with **EU jurisdiction** at creation. A
+  Western/Eastern Europe location hint is not equivalent. Jurisdiction cannot be
+  changed later. Keep `r2.dev` access and custom public domains disabled.
+- Create an R2 **Object Read & Write** token scoped only to that bucket. Do not put an
+  Admin token or a token able to create/delete buckets or edit Bucket Lock rules on
+  the application host. Set an expiry/rotation date and a named owner.
+- Add a native R2 Bucket Lock rule for the physical `encrypted/` prefix with at least
+  30 days of age-based retention. This matches the clear prefix in the backend
+  remote; names below it are encrypted by rclone. Verify the rule using an account
+  identity separate from the host token, and record its rule ID and retention.
+- Retain Cloudflare account audit evidence outside the bucket and alert a named
+  operator on bucket deletion, visibility/lifecycle changes, token changes and
+  Bucket Lock changes where the account tooling exposes them. Independently alert
+  when `/var/lib/pcep-db-offsite/last-success` is older than 24 hours; provider logs
+  alone do not satisfy this gate.
+- Review and record the current Cloudflare DPA, subprocessors, billing/retention
+  impact and account-recovery/MFA controls. A 30-day Bucket Lock can increase storage
+  and prevents overwrite/deletion while its rule applies.
+
+Build the dedicated config interactively and store only the resulting mode-`0600`
+file. The required shape is shown below with placeholders; do not commit a populated
+copy. Cloudflare R2's
+[S3 compatibility table](https://developers.cloudflare.com/r2/api/s3/api/) marks
+ACL headers, bucket versioning and standard S3 Object Lock as unsupported, so no
+`acl` option is specified. `no_check_bucket` prevents rclone from attempting bucket
+creation and supports the least-privilege host token.
+
+```ini
+[pcep-r2-eu]
+type = s3
+provider = Cloudflare
+access_key_id = <DEDICATED_BUCKET_SCOPED_ACCESS_KEY_ID>
+secret_access_key = <DEDICATED_SECRET_ACCESS_KEY>
+endpoint = https://<ACCOUNT_ID>.eu.r2.cloudflarestorage.com
+region = auto
+no_check_bucket = true
+
+[pcep-r2-crypt]
+type = crypt
+remote = pcep-r2-eu:<PCEP_ONLY_BUCKET>/encrypted
+password = <RCLONE_OBSCURED_STRONG_PASSWORD>
+password2 = <RCLONE_OBSCURED_DISTINCT_SECOND_SALT>
+filename_encryption = standard
+directory_name_encryption = true
+```
+
+The two crypt values must be generated independently through rclone's supported
+configuration flow. Rclone's obscured representation is not a secret-management
+control; protection comes from the encrypted systemd credential and the separate
+offline recovery copy. The environment destination remains below the wrapper:
+
+```text
+PCEP_OFFSITE_REMOTE=pcep-r2-crypt:pcep/database/daily
+```
 
 ## Safe configuration and operation
 

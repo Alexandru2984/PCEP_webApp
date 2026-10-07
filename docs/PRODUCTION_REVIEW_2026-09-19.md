@@ -2512,6 +2512,25 @@ Thirty-one focused tests cover the offsite control. Independent credentials,
 provider versioning/object lock, an offline recovery key, a tested alert and vendor
 review are still absent, so the CISO verdict remains **BLOCK activation**.
 
+### Cloudflare R2 offsite candidate profile — 2026-10-07
+
+Official provider and local rclone documentation were reviewed without using or
+revealing the operator's existing credentials. A new Cloudflare R2 bucket is a
+technically eligible destination only when created in the EU jurisdiction, kept
+private, accessed with an Object Read & Write token scoped to that bucket, wrapped by
+the dedicated rclone crypt remote and protected by a native R2 Bucket Lock on the
+physical `encrypted/` prefix for at least 30 days. R2 does not expose standard S3
+versioning or S3 Object Lock; the provider-native lock must be recorded accurately.
+
+Cloudflare account audit logs cover configuration actions but not object access.
+Data Access Logs are best-effort, omit failed requests and are generally unavailable
+for jurisdictional buckets, so they cannot satisfy the independent detection gate.
+The runbook now includes the exact secret-free configuration shape and evidence
+requirements. No bucket, token, lock, upload, credential, systemd unit or production
+service was changed. DPA/subprocessor review, offline key custody, independent alert
+testing and an incident tabletop remain open; the verdict remains **BLOCK
+activation**.
+
 ## 15. Breaking changes
 
 None.

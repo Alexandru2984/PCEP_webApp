@@ -296,6 +296,14 @@ a crypt remote that references itself. This path validation demonstrates safe
 structure only; provider-side least privilege and a PCEP-dedicated bucket or prefix
 must still be reviewed independently.
 
+The reviewed Cloudflare R2 candidate profile requires a new private bucket created
+with EU jurisdiction, a bucket-scoped Object Read & Write token, and a native Bucket
+Lock on the physical encrypted prefix. The existing shared raw R2 remote is not
+eligible. Standard S3 versioning/Object Lock APIs are not available on R2, and its
+provider logs do not replace the independent 24-hour missed-success alert. Exact
+evidence requirements and the secret-free rclone configuration shape are in the
+runbook.
+
 `make offsite-backup-preflight` performs no upload. `make offsite-backup` is allowed
 only for a manually reviewed first run after every activation gate passes. Neither
 command deletes or applies retention to remote data. Both require an explicit
