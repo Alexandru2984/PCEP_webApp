@@ -120,7 +120,7 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ```
 Internet → Cloudflare → cloudflared → HTTPS loopback Nginx
-                                      ├── /admin*         → 404 (publicly disabled)
+                                      ├── /admin*         → 404 (also absent in production Django)
                                       ├── /api/           → 127.0.0.1:8001
                                       │                     → Docker: Gunicorn → PostgreSQL
                                       ├── /practice/      → generated public study pages
@@ -202,7 +202,7 @@ make production-smoke
 # After intentionally changing a Python requirement:
 make lock-backend
 
-# Backend — 296 tests (API/security, backup, integrity, startup, release, SEO and smoke behavior)
+# Backend — 298 tests (API/security, backup, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
