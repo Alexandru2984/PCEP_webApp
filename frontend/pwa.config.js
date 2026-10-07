@@ -12,7 +12,12 @@ export const pwaOptions = {
     // page reload exactly once under the new shell.
     clientsClaim: true,
     globPatterns: ['**/*.{js,css,html,svg,webmanifest}'],
-    globIgnores: ['**/pyodide/**'],
+    globIgnores: [
+      '**/pyodide/**',
+      '**/py-worker.js',
+      '**/runner.html',
+      '**/runner-bridge.js',
+    ],
     inlineWorkboxRuntime: true,
     cleanupOutdatedCaches: true,
     navigateFallback: '/index.html',
@@ -24,21 +29,13 @@ export const pwaOptions = {
       /^\/practice(?:\/|$)/,
       /^\/u(?:\/|$)/,
       /^\/pyodide(?:\/|$)/,
+      /^\/(?:py-worker\.js|runner\.html|runner-bridge\.js)$/,
       /^\/assets(?:\/|$)/,
       /^\/(?:robots\.txt|sitemap\.xml)$/,
     ],
-    runtimeCaching: [
-      {
-        urlPattern: ({ url, sameOrigin }) =>
-          sameOrigin && url.pathname.startsWith('/pyodide/'),
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'pyodide-runtime-0.29.4',
-          expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 },
-          cacheableResponse: { statuses: [200] },
-        },
-      },
-    ],
+    // The hostile-code origin owns the runtime. The learner-origin service
+    // worker must never fetch, cache or serve runner files.
+    runtimeCaching: [],
   },
   devOptions: { enabled: false },
 }

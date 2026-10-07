@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+DEFAULT_RUNNER_ORIGIN = 'https://pcep-runner.micutu.com'
 RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 REQUEST_ID_PATTERN = re.compile(r'[0-9a-f]{32}')
 ASSET_PATH_PATTERN = re.compile(
@@ -233,7 +234,7 @@ def check_asset(response, path):
     require(response.body, f'{label} is empty.')
 
 
-def check_shell(response):
+def check_shell(response, runner_origin=DEFAULT_RUNNER_ORIGIN):
     require(
         response.headers.get('content-type', '').startswith('text/html'),
         'The application shell did not return HTML.',
@@ -245,15 +246,21 @@ def check_shell(response):
     require("'self'" in directives.get('default-src', []), 'Shell CSP default-src drifted.')
     require("'none'" in directives.get('object-src', []), 'Shell CSP permits objects.')
     require("'none'" in directives.get('frame-ancestors', []), 'Shell CSP permits framing.')
+    require(
+        directives.get('frame-src') == [runner_origin],
+        'Shell CSP does not isolate the Python runner.',
+    )
     scripts = directives.get('script-src', [])
-    require("'wasm-unsafe-eval'" in scripts, 'Shell CSP no longer permits the Pyodide runtime.')
+    require(
+        "'wasm-unsafe-eval'" not in scripts,
+        'Shell CSP still permits same-origin WASM compilation.',
+    )
     require("'unsafe-eval'" not in scripts, 'Shell CSP permits unsafe-eval.')
     require("'unsafe-inline'" not in scripts, 'Shell CSP permits inline scripts.')
     return shell_assets(response.body), shell_release(response.body)
 
 
-def check_admin_unavailable(response):
-    label = 'Public admin route'
+def check_public_404(response, label, forbidden=()):
     require(response.status == 404, f'{label} is reachable.')
     check_shared_security_headers(response, label)
     require('no-store' in response.headers.get('cache-control', ''), f'{label} is cacheable.')
@@ -272,8 +279,118 @@ def check_admin_unavailable(response):
     )
     body = response.body.lower()
     require(
-        b'django administration' not in body and b'admin login' not in body,
-        f'{label} discloses the administration interface.',
+        all(value.lower().encode() not in body for value in forbidden),
+        f'{label} discloses forbidden content.',
+    )
+
+
+def check_admin_unavailable(response):
+    check_public_404(
+        response,
+        'Public admin route',
+        forbidden=('Django administration', 'admin login'),
+    )
+
+
+def check_runner_headers(response, label):
+    require(
+        response.headers.get('strict-transport-security', '').startswith('max-age='),
+        f'{label} is missing HSTS.',
+    )
+    require(
+        response.headers.get('x-content-type-options', '').lower() == 'nosniff',
+        f'{label} is missing nosniff.',
+    )
+    require(
+        response.headers.get('referrer-policy') == 'no-referrer',
+        f'{label} leaks referrers.',
+    )
+    require(
+        response.headers.get('permissions-policy')
+        == 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()',
+        f'{label} has an unexpected permissions policy.',
+    )
+    require(
+        response.headers.get('cross-origin-resource-policy') == 'same-origin',
+        f'{label} has an unexpected resource policy.',
+    )
+    require(
+        response.headers.get('origin-agent-cluster') == '?1',
+        f'{label} is not origin-keyed.',
+    )
+    require('x-frame-options' not in response.headers, f'{label} cannot be embedded.')
+    require('set-cookie' not in response.headers, f'{label} sets a cookie.')
+    require('no-store' in response.headers.get('cache-control', ''), f'{label} is cacheable.')
+    require(
+        REQUEST_ID_PATTERN.fullmatch(response.headers.get('x-request-id', '')) is not None,
+        f'{label} has an invalid request ID.',
+    )
+
+
+def check_runner_contract(origin, app_origin):
+    page = public_get(origin, '/runner.html')
+    check_runner_headers(page, 'Runner document')
+    require(
+        page.headers.get('content-type', '').startswith('text/html'),
+        'Runner document did not return HTML.',
+    )
+    directives = csp_directives(page.headers.get('content-security-policy', ''))
+    expected = {
+        'default-src': ["'none'"],
+        'base-uri': ["'none'"],
+        'object-src': ["'none'"],
+        'frame-ancestors': [app_origin],
+        'form-action': ["'none'"],
+        'script-src': ["'self'"],
+        'worker-src': ["'self'"],
+        'connect-src': ["'none'"],
+    }
+    require(directives == expected, 'Runner document CSP drifted.')
+    require(
+        b'<script src="/runner-bridge.js" defer></script>' in page.body,
+        'Runner document does not load the reviewed bridge.',
+    )
+
+    bridge = public_get(origin, '/runner-bridge.js')
+    check_runner_headers(bridge, 'Runner bridge')
+    require(
+        'javascript' in bridge.headers.get('content-type', '').lower(),
+        'Runner bridge has an invalid media type.',
+    )
+    require(
+        csp_directives(bridge.headers.get('content-security-policy', ''))
+        == {'default-src': ["'none'"]},
+        'Runner bridge CSP drifted.',
+    )
+
+    worker = public_get(origin, '/py-worker.js')
+    check_runner_headers(worker, 'Python worker')
+    require(
+        'javascript' in worker.headers.get('content-type', '').lower(),
+        'Python worker has an invalid media type.',
+    )
+    worker_csp = csp_directives(worker.headers.get('content-security-policy', ''))
+    require(worker_csp.get('default-src') == ["'none'"], 'Worker default CSP drifted.')
+    require(
+        worker_csp.get('script-src') == ["'self'", "'wasm-unsafe-eval'"],
+        'Worker script CSP drifted.',
+    )
+    require(worker_csp.get('connect-src') == ["'self'"], 'Worker can leave its origin.')
+    require(worker_csp.get('worker-src') == ["'none'"], 'Worker can create subworkers.')
+
+    version = public_get(origin, '/pyodide/VERSION')
+    check_runner_headers(version, 'Python runtime version')
+    require(version.body.strip() == b'0.29.4', 'Python runtime version drifted.')
+
+    absent = public_get(origin, '/api/live/', expected_status=404)
+    check_runner_headers(absent, 'Runner API route')
+    require(
+        csp_directives(absent.headers.get('content-security-policy', ''))
+        == {
+            'default-src': ["'none'"],
+            'frame-ancestors': ["'none'"],
+        },
+        'Runner fallback CSP drifted.',
     )
 
 
@@ -513,14 +630,30 @@ def check_search(payload):
     return results
 
 
-def run(origin):
+def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     releases = set()
+    require(runner_origin != origin, 'Python runner still shares the application origin.')
 
     admin = public_get(origin, '/admin/login/', expected_status=404)
     check_admin_unavailable(admin)
 
+    for path in (
+        '/runner.html',
+        '/runner.html/probe',
+        '/runner-bridge.js',
+        '/runner-bridge.js/probe',
+        '/py-worker.js',
+        '/py-worker.js/probe',
+        '/pyodide',
+        '/pyodide/VERSION',
+    ):
+        isolated = public_get(origin, path, expected_status=404)
+        check_public_404(isolated, f'Learner-origin runner path {path}')
+
+    check_runner_contract(runner_origin, origin)
+
     shell = public_get(origin, '/')
-    assets, frontend_release = check_shell(shell)
+    assets, frontend_release = check_shell(shell, runner_origin)
     for asset_path in assets:
         check_asset(public_get(origin, asset_path), asset_path)
 
@@ -608,6 +741,7 @@ def run(origin):
         'targeted_order': targeted_ids,
         'assets': len(assets),
         'admin': 'disabled',
+        'runner': 'isolated',
     }
 
 
@@ -618,9 +752,17 @@ def main(argv=None):
         default='https://pcep.micutu.com',
         help='Production HTTPS origin (default: %(default)s)',
     )
+    parser.add_argument(
+        '--runner-url',
+        default=DEFAULT_RUNNER_ORIGIN,
+        help='isolated Python runner HTTPS origin (default: %(default)s)',
+    )
     args = parser.parse_args(argv)
     try:
-        result = run(production_origin(args.base_url))
+        result = run(
+            production_origin(args.base_url),
+            production_origin(args.runner_url),
+        )
     except SmokeError as error:
         parser.exit(1, f'Production smoke failed: {error}\n')
     print(
@@ -630,6 +772,7 @@ def main(argv=None):
         f'questions={result["questions"]} '
         f'assets={result["assets"]} '
         f'admin={result["admin"]} '
+        f'runner={result["runner"]} '
         f'targeted_order={",".join(map(str, result["targeted_order"]))}'
     )
 

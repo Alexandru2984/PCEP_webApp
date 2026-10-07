@@ -24,26 +24,17 @@ describe('public-only service worker policy', () => {
         path
       ).toBe(true)
   })
-  it('caches only successful same-origin Python runtime requests', () => {
-    expect(workbox.runtimeCaching).toHaveLength(1)
-    const rule = workbox.runtimeCaching[0]
-    for (const path of ['/api/grade/', '/api/questions/1/answer/', '/u/api/send'])
+  it('never fetches or caches isolated Python runner files', () => {
+    expect(workbox.runtimeCaching).toEqual([])
+    for (const path of [
+      '/pyodide/pyodide.js',
+      '/py-worker.js',
+      '/runner.html',
+      '/runner-bridge.js',
+    ])
       expect(
-        rule.urlPattern({ url: new URL(path, 'https://pcep.test'), sameOrigin: true })
-      ).toBe(false)
-    expect(
-      rule.urlPattern({
-        url: new URL('https://evil.test/pyodide/a.js'),
-        sameOrigin: false,
-      })
-    ).toBe(false)
-    expect(
-      rule.urlPattern({
-        url: new URL('https://pcep.test/pyodide/pyodide.js'),
-        sameOrigin: true,
-      })
-    ).toBe(true)
-    expect(rule.options.cacheableResponse.statuses).toEqual([200])
-    expect(rule.options.cacheName).toContain('0.29.4')
+        workbox.navigateFallbackDenylist.some((rule) => rule.test(path)),
+        path
+      ).toBe(true)
   })
 })

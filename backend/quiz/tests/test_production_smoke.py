@@ -145,14 +145,14 @@ def test_api_headers_require_release_request_id_no_store_and_strict_csp():
         smoke.check_api_headers(invalid, set(), 'API')
 
 
-def test_shell_csp_keeps_pyodide_without_general_eval_or_inline_scripts():
+def test_shell_csp_delegates_python_to_the_isolated_runner_origin():
     headers = {
         **SHARED_HEADERS,
         'content-type': 'text/html',
         'cache-control': 'no-cache, no-store',
         'content-security-policy': (
             "default-src 'self'; object-src 'none'; frame-ancestors 'none'; "
-            "script-src 'self' 'wasm-unsafe-eval'"
+            "frame-src https://pcep-runner.micutu.com; script-src 'self'"
         ),
     }
     body = b'''<meta name="pcep-release" content="abc123def456">
@@ -164,12 +164,21 @@ def test_shell_csp_keeps_pyodide_without_general_eval_or_inline_scripts():
         'abc123def456',
     )
 
-    unsafe = response({
-        **headers,
-        'content-security-policy': headers['content-security-policy'] + " 'unsafe-eval'",
-    }, body)
-    with pytest.raises(smoke.SmokeError, match='unsafe-eval'):
-        smoke.check_shell(unsafe)
+    for directive, message in [
+        ("'wasm-unsafe-eval'", 'WASM'),
+        ("'unsafe-eval'", 'unsafe-eval'),
+    ]:
+        unsafe = response(
+            {
+                **headers,
+                'content-security-policy': (
+                    headers['content-security-policy'] + f' {directive}'
+                ),
+            },
+            body,
+        )
+        with pytest.raises(smoke.SmokeError, match=message):
+            smoke.check_shell(unsafe)
 
 
 def test_public_admin_must_be_a_strict_cookie_free_404():
@@ -188,6 +197,31 @@ def test_public_admin_must_be_a_strict_cookie_free_404():
     ]:
         with pytest.raises(smoke.SmokeError):
             smoke.check_admin_unavailable(invalid)
+
+
+def test_runner_headers_forbid_credentials_and_cross_origin_resources():
+    headers = {
+        'strict-transport-security': 'max-age=31536000; includeSubDomains',
+        'x-content-type-options': 'nosniff',
+        'referrer-policy': 'no-referrer',
+        'permissions-policy': (
+            'camera=(), microphone=(), geolocation=(), payment=(), '
+            'usb=(), serial=(), bluetooth=()'
+        ),
+        'cross-origin-resource-policy': 'same-origin',
+        'origin-agent-cluster': '?1',
+        'x-request-id': 'a' * 32,
+        'cache-control': 'no-store',
+    }
+    smoke.check_runner_headers(response(headers), 'Runner')
+
+    for invalid in [
+        response({**headers, 'set-cookie': 'session=secret'}),
+        response({**headers, 'x-frame-options': 'DENY'}),
+        response({**headers, 'cross-origin-resource-policy': 'cross-origin'}),
+    ]:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_runner_headers(invalid, 'Runner')
 
 
 def test_shell_assets_require_safe_hashed_asset_paths():

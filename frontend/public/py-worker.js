@@ -6,8 +6,8 @@
 // (src/pyRunner.js) can terminate this worker to kill a runaway `while True:` —
 // something that is impossible on the main thread.
 //
-// Loaded same-origin from /pyodide/ (self-hosted, see scripts/fetch-pyodide.sh) so
-// the page's CSP needs no third-party origin — only 'wasm-unsafe-eval' for WASM.
+// Loaded from /pyodide/ on the dedicated runner origin. Python can reach the JS
+// bridge, so the worker must never be served from the privileged learner origin.
 
 const PYODIDE_BASE = '/pyodide/'
 const MAX_OUTPUT = 10000 // chars; guards against a runaway print loop flooding postMessage
@@ -34,7 +34,13 @@ async function getPyodide() {
   if (pyodidePromise) return pyodidePromise
   pyodidePromise = (async () => {
     importScripts(PYODIDE_BASE + 'pyodide.js')
-    const pyodide = await loadPyodide({ indexURL: PYODIDE_BASE })
+    // An empty JS global hides ambient capabilities from ordinary snippets. This
+    // is defense in depth only: origin separation and the runner CSP are the
+    // hostile-code boundary.
+    const pyodide = await loadPyodide({
+      indexURL: PYODIDE_BASE,
+      jsglobals: Object.freeze(Object.create(null)),
+    })
     pyodide.setStdout({ batched: (s) => pushOutput('stdout', s + '\n') })
     pyodide.setStderr({ batched: (s) => pushOutput('stderr', s + '\n') })
     return pyodide

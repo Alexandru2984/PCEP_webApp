@@ -25,6 +25,7 @@ TRIVY_CACHE ?= /tmp/pcep-trivy-cache
 BACKEND_IMAGE ?= pcep_webapp-backend:latest
 DATABASE_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PRODUCTION_URL ?= https://pcep.micutu.com
+PYTHON_RUNNER_ORIGIN ?= https://pcep-runner.micutu.com
 
 .PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
 
@@ -74,7 +75,7 @@ test-backend:
 	cd backend && "$(PYTHON_BIN)" -m pytest -q
 
 test-frontend: fetch-pyodide
-	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" $(NPM) run build
+	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" $(NPM) run build
 
 audit: audit-backend audit-frontend audit-secrets
 
@@ -107,12 +108,12 @@ check-systemd:
 build: build-frontend
 
 build-frontend: fetch-pyodide
-	cd frontend && VITE_PCEP_RELEASE="$(RELEASE)" $(NPM) run build
+	cd frontend && VITE_PCEP_RELEASE="$(RELEASE)" VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" $(NPM) run build
 
 # Match the bind-mounted source/output ownership instead of assuming host UID 1000.
 # HOME/cache stay on the disposable container filesystem for arbitrary host UIDs.
 compose-build-frontend:
-	$(COMPOSE) --profile build run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --env NPM_CONFIG_CACHE=/tmp/npm-cache frontend-builder
+	$(COMPOSE) --profile build run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --env NPM_CONFIG_CACHE=/tmp/npm-cache --env VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" frontend-builder
 
 # Self-hosted Python runtime for the in-browser code runner (git-ignored, ~12 MB).
 # Fetched only when missing so repeat builds stay fast.
@@ -123,7 +124,7 @@ django-check:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.settings DJANGO_DEBUG=False DJANGO_SECRET_KEY=a-sufficiently-long-production-secret-key-for-local-check DJANGO_ALLOWED_HOSTS=pcep.micutu.com POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=dummy POSTGRES_HOST=localhost POSTGRES_PORT=5432 "$(PYTHON_BIN)" manage.py check --deploy --fail-level WARNING
 
 production-smoke:
-	"$(PYTHON_BIN)" scripts/production_smoke.py --base-url "$(PRODUCTION_URL)"
+	"$(PYTHON_BIN)" scripts/production_smoke.py --base-url "$(PRODUCTION_URL)" --runner-url "$(PYTHON_RUNNER_ORIGIN)"
 
 compose-build:
 	PCEP_RELEASE="$(RELEASE)" $(COMPOSE) build backend

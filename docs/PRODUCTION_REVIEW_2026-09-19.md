@@ -12,10 +12,13 @@ Browser
       ├─ / and versioned assets → /var/www/pcep/frontend
       ├─ /practice/, sitemap, robots → /var/www/pcep/seo
       ├─ /static/ and /media/ → host release directories
-      ├─ /api/ and /admin/ → 127.0.0.1:8001
-      │                         → pcep_backend (Gunicorn, three workers)
-      │                         → pcep_db (PostgreSQL 16)
+      ├─ /api/ → 127.0.0.1:8001
+      │            → pcep_backend (Gunicorn, three workers)
+      │            → pcep_db (PostgreSQL 16)
+      ├─ /admin* and runner paths → hardened 404
       └─ exact /u/ collection routes → loopback Umami service
+
+pcep-runner.micutu.com → static bridge, worker and Pyodide only
 ```
 
 Cloudflared and Nginx are shared with other applications. The tunnel has explicit
@@ -89,8 +92,10 @@ the built OS and Python packages with a digest-pinned Trivy release. The runtime
 stage also applies current Debian updates, closing the gap between a fixed Python
 image digest and later security fixes from the distribution repositories.
 
-The CSP keeps `wasm-unsafe-eval`, which Pyodide needs, and does not grant
-`unsafe-eval` or `unsafe-inline`. API responses use `default-src 'none'`.
+The learner CSP no longer grants `wasm-unsafe-eval`; Pyodide runs on the dedicated
+`pcep-runner.micutu.com` origin with a CSP restricted to its own static runtime.
+Neither origin grants `unsafe-eval` or `unsafe-inline`. API responses use
+`default-src 'none'`.
 Workbox never stores API, answer, admin, study-page or analytics responses.
 Browser progress import is schema-, type-, size- and count-bounded and never
 contains an answer key.
@@ -225,9 +230,10 @@ learner's setup choices.
 
 The Pyodide manager bounds startup at 30 seconds, a run at eight seconds, source
 at 20,000 characters, output at 10,000 characters and active/queued jobs at
-four. Timeout or fatal failure replaces the worker. The pinned 0.29.4 npm
-tarball is verified by SHA-512 before staged extraction. These are browser
-resource controls, not a hostile-code sandbox.
+four. Timeout or fatal failure replaces the complete cross-origin iframe and
+worker. The pinned 0.29.4 npm tarball is verified by SHA-512 before staged
+extraction. The resource controls are not a memory sandbox; the separate static
+origin, private message capability and restrictive CSP contain JS-bridge access.
 The manager also marks results as truncated when its independent character or
 chunk bounds discard worker data, so defensive client-side truncation cannot be
 mistaken for complete Python output.
@@ -307,7 +313,8 @@ assistive-technology certification.
 
 The stats endpoint now performs one grouped query. Questions prefetch choices;
 no N+1 path was introduced. API payloads are capped and public answer data stays
-minimal. Pyodide remains lazy and same-origin. Hashed frontend/admin assets are
+minimal. Pyodide remains lazy but runs on a dedicated capability-free origin.
+Hashed frontend/admin assets are
 compressed and immutable; unversioned shell, worker, manifest and runtime entry
 points revalidate. The current main production bundle is approximately 295.0 KB
 JavaScript (91.4 KB gzip) and 47.0 KB CSS (8.5 KB gzip), excluding lazy chunks
