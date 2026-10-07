@@ -17,7 +17,10 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=pcep.micutu.com' -k
 cp "$root"/nginx/snippets/pcep-*.conf "$stage/snippets/"
 cp "$root/frontend/public/runner.html" "$root/frontend/public/runner-bridge.js" \
     "$root/frontend/public/py-worker.js" "$stage/frontend/"
-cp "$root/frontend/public/pyodide/VERSION" "$stage/frontend/pyodide/"
+# The Ops job intentionally does not download the 12 MB runtime. This fixture
+# exercises Nginx routing only; fetch/build and production smoke verify the real
+# pinned runtime independently.
+printf '%s\n' '0.29.4' > "$stage/frontend/pyodide/VERSION"
 printf 'location ~ /\\. { deny all; }\n' > "$stage/snippets/block-dotfiles.conf"
 # Shared variables/includes are provided by the actual production host.
 sed -e '/include \/etc\/letsencrypt\/options-ssl-nginx.conf;/d' -e '/ssl_dhparam \/etc\/letsencrypt\/ssl-dhparams.pem;/d' "$root/nginx/pcep.micutu.com.conf" > "$stage/pcep.conf"
