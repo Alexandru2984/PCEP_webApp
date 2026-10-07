@@ -203,12 +203,20 @@ config. Keep an independently controlled encrypted recovery copy: the host-bound
 systemd credential alone cannot recover backups after total host loss.
 
 Before upload, the script requires a real mode-`0600` config owned by the service
-user and checks the redacted remote definition. It accepts only `type=crypt` with
-explicit standard filename encryption, directory encryption, both crypt secrets and
-a non-root wrapped backend path. The wrapped backend must use the same bounded safe
-name/path grammar as the destination: absolute paths, empty or repeated segments,
-traversal and self-wrapping crypt remotes are rejected. Any rclone diagnostic fails
-the run, including the shared-Google-client retirement notice.
+user and checks the complete redacted configuration. The `cloudflare-r2-eu` profile
+allows exactly the crypt and backend remotes and rejects options outside the reviewed
+shape. It requires the Cloudflare S3 provider, a 32-hex-account EU jurisdiction
+endpoint, `region = auto`, `no_check_bucket = true`, static credentials, no ambient
+authentication or session token, and exactly `bucket-name/encrypted` as the physical
+backend path. The crypt remote must explicitly use standard filename encryption,
+directory encryption and both crypt secrets. Absolute paths, empty or repeated
+segments, traversal and self-wrapping crypt remotes are rejected. Any rclone
+diagnostic fails the run, including the shared-Google-client retirement notice.
+
+These local checks prove configuration shape, not Cloudflare control-plane state.
+They cannot prove that the token is bucket-scoped, the named bucket was created with
+EU jurisdiction, public access is disabled or the Bucket Lock exists. Preserve and
+review the provider evidence for those gates separately.
 
 The job selects the newest private backup/checksum pair, verifies all complete local
 pairs and rejects a scheduled backup older than six hours. It uploads with immutable

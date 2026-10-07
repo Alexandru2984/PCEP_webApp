@@ -304,6 +304,12 @@ provider logs do not replace the independent 24-hour missed-success alert. Exact
 evidence requirements and the secret-free rclone configuration shape are in the
 runbook.
 
+The preflight enforces that reviewed local shape: exactly two remotes, the Cloudflare
+provider, the jurisdiction-specific EU endpoint, static non-ambient credentials,
+disabled bucket-creation checks and a `bucket-name/encrypted` backend path. This does
+not attest the token scope, bucket jurisdiction, public-access state or Bucket Lock;
+those remain provider-side activation evidence.
+
 `make offsite-backup-preflight` performs no upload. `make offsite-backup` is allowed
 only for a manually reviewed first run after every activation gate passes. Neither
 command deletes or applies retention to remote data. Both require an explicit

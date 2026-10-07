@@ -31,9 +31,18 @@ def complete_backup(root, stamp='20261005T010000Z'):
 
 def crypt_config(name='pcep-crypt'):
     return f"""
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = dedicated-access-key
+secret_access_key = XXX
+endpoint = https://0123456789abcdef0123456789abcdef.eu.r2.cloudflarestorage.com
+region = auto
+no_check_bucket = true
+
 [{name}]
 type = crypt
-remote = r2:pcep-encrypted/database
+remote = r2:pcep-backups/encrypted
 password = XXX
 password2 = XXX
 filename_encryption = standard
@@ -109,7 +118,7 @@ def test_crypt_configuration_is_fail_closed(replacement, message):
 )
 def test_crypt_configuration_rejects_unsafe_wrapped_paths(wrapped):
     changed = crypt_config().replace(
-        'remote = r2:pcep-encrypted/database', f'remote = {wrapped}'
+        'remote = r2:pcep-backups/encrypted', f'remote = {wrapped}'
     )
     with pytest.raises(offsite.OffsiteBackupError, match='safe segments'):
         offsite.parse_redacted_remote(changed, 'pcep-crypt')
@@ -117,8 +126,8 @@ def test_crypt_configuration_rejects_unsafe_wrapped_paths(wrapped):
 
 def test_crypt_configuration_rejects_self_wrapping_remote():
     changed = crypt_config().replace(
-        'remote = r2:pcep-encrypted/database',
-        'remote = pcep-crypt:pcep-encrypted/database',
+        'remote = r2:pcep-backups/encrypted',
+        'remote = pcep-crypt:pcep-backups/encrypted',
     )
     with pytest.raises(offsite.OffsiteBackupError, match='must not wrap itself'):
         offsite.parse_redacted_remote(changed, 'pcep-crypt')
@@ -129,7 +138,7 @@ def test_backend_diagnostics_fail_preflight():
 
     def runner(rclone, config, arguments, **_kwargs):
         calls.append((rclone, config, arguments))
-        if arguments[:2] == ['config', 'redacted']:
+        if arguments == ['config', 'redacted']:
             return SimpleNamespace(stdout=crypt_config(), stderr='', returncode=0)
         raise offsite.OffsiteBackupError(
             'rclone backend emitted a diagnostic: retiring shared client'
@@ -140,6 +149,79 @@ def test_backend_diagnostics_fail_preflight():
             'pcep-crypt', 'rclone', Path('/config'), runner
         )
     assert len(calls) == 2
+
+
+def test_cloudflare_r2_eu_profile_accepts_minimal_dedicated_config():
+    backend_name, backend_path = offsite.parse_redacted_remote(
+        crypt_config(), 'pcep-crypt'
+    )
+
+    offsite.validate_cloudflare_r2_eu_backend(
+        crypt_config(), 'pcep-crypt', backend_name, backend_path
+    )
+
+
+@pytest.mark.parametrize(
+    'original,replacement,message',
+    [
+        ('provider = Cloudflare', 'provider = AWS', 'Cloudflare S3'),
+        (
+            'endpoint = https://0123456789abcdef0123456789abcdef.eu.r2.cloudflarestorage.com',
+            'endpoint = https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com',
+            'EU endpoint',
+        ),
+        ('region = auto', 'region = us-east-1', 'region'),
+        ('no_check_bucket = true', 'no_check_bucket = false', 'bucket creation'),
+        ('access_key_id = dedicated-access-key', 'access_key_id =', 'static token'),
+        ('secret_access_key = XXX', 'secret_access_key =', 'static token'),
+        ('no_check_bucket = true', 'no_check_bucket = true\nenv_auth = true', 'ambient'),
+        ('no_check_bucket = true', 'no_check_bucket = true\nsession_token = XXX', 'session token'),
+        (
+            'remote = r2:pcep-backups/encrypted',
+            'remote = r2:pcep-backups/other',
+            'bucket-name/encrypted',
+        ),
+        (
+            'no_check_bucket = true',
+            'no_check_bucket = true\nacl = public-read',
+            'outside the approved profile',
+        ),
+    ],
+)
+def test_cloudflare_r2_eu_profile_rejects_unsafe_backend(
+    original, replacement, message
+):
+    changed = crypt_config().replace(original, replacement)
+    backend_name, backend_path = offsite.parse_redacted_remote(
+        changed, 'pcep-crypt'
+    )
+
+    with pytest.raises(offsite.OffsiteBackupError, match=message):
+        offsite.validate_cloudflare_r2_eu_backend(
+            changed, 'pcep-crypt', backend_name, backend_path
+        )
+
+
+def test_cloudflare_r2_eu_profile_rejects_extra_remote():
+    changed = f'{crypt_config()}\n[shared]\ntype = drive\n'
+    backend_name, backend_path = offsite.parse_redacted_remote(
+        changed, 'pcep-crypt'
+    )
+
+    with pytest.raises(offsite.OffsiteBackupError, match='only the crypt and backend'):
+        offsite.validate_cloudflare_r2_eu_backend(
+            changed, 'pcep-crypt', backend_name, backend_path
+        )
+
+
+def test_crypt_profile_rejects_unapproved_options():
+    changed = crypt_config().replace(
+        'directory_name_encryption = true',
+        'directory_name_encryption = true\npass_bad_blocks = true',
+    )
+
+    with pytest.raises(offsite.OffsiteBackupError, match='approved profile'):
+        offsite.parse_redacted_remote(changed, 'pcep-crypt')
 
 
 def test_round_trip_uploads_only_verified_pair_without_deleting(tmp_path, monkeypatch):

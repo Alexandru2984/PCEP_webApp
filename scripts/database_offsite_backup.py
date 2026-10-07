@@ -17,6 +17,10 @@ import uuid
 DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
 REMOTE_NAME_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
 REMOTE_SEGMENT_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
+CLOUDFLARE_R2_EU_ENDPOINT_PATTERN = re.compile(
+    r'^https://[0-9a-fA-F]{32}\.eu\.r2\.cloudflarestorage\.com$'
+)
+DEFAULT_BACKEND_PROFILE = 'cloudflare-r2-eu'
 BACKUP_STAMP_PATTERN = re.compile(
     r'^pcep_db_daily_(\d{8}T\d{6}Z)\.sql\.gz$'
 )
@@ -101,6 +105,18 @@ def parse_redacted_remote(config_text, remote_name):
     if not parser.has_section(remote_name):
         raise OffsiteBackupError('Encrypted rclone remote is not configured.')
     section = parser[remote_name]
+    allowed_options = {
+        'type',
+        'remote',
+        'password',
+        'password2',
+        'filename_encryption',
+        'directory_name_encryption',
+    }
+    if set(section) - allowed_options:
+        raise OffsiteBackupError(
+            'The crypt remote contains options outside the approved profile.'
+        )
     if section.get('type') != 'crypt':
         raise OffsiteBackupError('Offsite destination must be an rclone crypt remote.')
     if section.get('filename_encryption') != 'standard':
@@ -119,16 +135,102 @@ def parse_redacted_remote(config_text, remote_name):
         ) from error
     if wrapped_name == remote_name:
         raise OffsiteBackupError('The crypt remote must not wrap itself.')
+    return wrapped_name, _wrapped_path
 
 
-def validate_crypt_remote(remote_name, rclone, config_path, runner=run_rclone):
+def validate_cloudflare_r2_eu_backend(
+    config_text, crypt_remote_name, backend_name, backend_path
+):
+    parser = configparser.RawConfigParser(interpolation=None)
+    try:
+        parser.read_string(config_text)
+    except configparser.Error as error:
+        raise OffsiteBackupError('Cannot parse redacted rclone configuration.') from error
+
+    expected_remotes = {crypt_remote_name, backend_name}
+    if set(parser.sections()) != expected_remotes:
+        raise OffsiteBackupError(
+            'The PCEP rclone config must contain only the crypt and backend remotes.'
+        )
+    if not parser.has_section(backend_name):
+        raise OffsiteBackupError('The wrapped rclone backend is not configured.')
+
+    section = parser[backend_name]
+    allowed_options = {
+        'type',
+        'provider',
+        'access_key_id',
+        'secret_access_key',
+        'endpoint',
+        'region',
+        'no_check_bucket',
+        'env_auth',
+        'session_token',
+    }
+    if set(section) - allowed_options:
+        raise OffsiteBackupError(
+            'The Cloudflare R2 backend contains options outside the approved profile.'
+        )
+    if section.get('type') != 's3' or section.get('provider') != 'Cloudflare':
+        raise OffsiteBackupError(
+            'The cloudflare-r2-eu profile requires the Cloudflare S3 backend.'
+        )
+    if not CLOUDFLARE_R2_EU_ENDPOINT_PATTERN.fullmatch(
+        section.get('endpoint', '')
+    ):
+        raise OffsiteBackupError(
+            'The cloudflare-r2-eu profile requires the jurisdiction-specific EU endpoint.'
+        )
+    if section.get('region') != 'auto':
+        raise OffsiteBackupError('The Cloudflare R2 region must be explicitly auto.')
+    if section.get('no_check_bucket') != 'true':
+        raise OffsiteBackupError(
+            'The Cloudflare R2 backend must explicitly disable bucket creation checks.'
+        )
+    if section.get('env_auth', 'false') != 'false':
+        raise OffsiteBackupError(
+            'The Cloudflare R2 backend must not inherit ambient credentials.'
+        )
+    if not section.get('access_key_id') or not section.get('secret_access_key'):
+        raise OffsiteBackupError(
+            'The Cloudflare R2 backend requires its dedicated static token credentials.'
+        )
+    if section.get('session_token'):
+        raise OffsiteBackupError(
+            'The Cloudflare R2 backend must not configure an unrelated session token.'
+        )
+
+    backend_segments = PurePosixPath(backend_path).parts
+    if len(backend_segments) != 2 or backend_segments[1] != 'encrypted':
+        raise OffsiteBackupError(
+            'The Cloudflare R2 backend path must be bucket-name/encrypted.'
+        )
+
+
+def validate_crypt_remote(
+    remote_name,
+    rclone,
+    config_path,
+    runner=run_rclone,
+    *,
+    backend_profile=DEFAULT_BACKEND_PROFILE,
+):
     redacted = runner(
         rclone,
         config_path,
-        ['config', 'redacted', remote_name],
+        ['config', 'redacted'],
         timeout=30,
     )
-    parse_redacted_remote(redacted.stdout, remote_name)
+    backend_name, backend_path = parse_redacted_remote(redacted.stdout, remote_name)
+    if backend_profile == 'cloudflare-r2-eu':
+        validate_cloudflare_r2_eu_backend(
+            redacted.stdout,
+            remote_name,
+            backend_name,
+            backend_path,
+        )
+    else:
+        raise OffsiteBackupError('Unsupported offsite backend profile.')
     features = runner(
         rclone,
         config_path,
@@ -273,6 +375,7 @@ def execute(
     rclone_config,
     *,
     rclone='rclone',
+    backend_profile=DEFAULT_BACKEND_PROFILE,
     preflight_only=False,
     max_age_hours=48,
     status_file=None,
@@ -285,10 +388,17 @@ def execute(
     backup_module = load_database_backup()
     backup, checksum = latest_backup(backup_root, backup_module)
     verify_backup_freshness(backup, bounded_hours(max_age_hours), moment)
-    validate_crypt_remote(remote_name, rclone, config_path, runner)
+    validate_crypt_remote(
+        remote_name,
+        rclone,
+        config_path,
+        runner=runner,
+        backend_profile=backend_profile,
+    )
 
     if preflight_only:
         print(f'Encrypted offsite preflight passed for {remote_name}.')
+        print(f'Backend profile: {backend_profile}')
         print(f'Newest verified local backup: {backup.name}')
         return backup
 
@@ -344,6 +454,11 @@ def main():
         default=os.environ.get('PCEP_RCLONE_CONFIG'),
     )
     parser.add_argument('--rclone', default='rclone')
+    parser.add_argument(
+        '--backend-profile',
+        choices=(DEFAULT_BACKEND_PROFILE,),
+        default=DEFAULT_BACKEND_PROFILE,
+    )
     parser.add_argument('--max-age-hours', type=bounded_hours, default=48)
     parser.add_argument('--status-file', type=Path)
     parser.add_argument('--preflight-only', action='store_true')
@@ -358,6 +473,7 @@ def main():
             args.remote,
             args.rclone_config,
             rclone=args.rclone,
+            backend_profile=args.backend_profile,
             preflight_only=args.preflight_only,
             max_age_hours=args.max_age_hours,
             status_file=args.status_file,
