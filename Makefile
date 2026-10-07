@@ -60,11 +60,11 @@ help:
 install: install-backend install-frontend
 
 install-backend:
-	"$(PIP_BIN)" install --require-hashes --only-binary=:all: -r backend/requirements-dev.lock
+	"$(PIP_BIN)" install --require-hashes --only-binary=:all: -r backend/requirements-dev.txt
 
 lock-backend:
-	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --output-file backend/requirements.lock backend/requirements.txt
-	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --output-file backend/requirements-dev.lock backend/requirements-dev.txt
+	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --pip-args="--only-binary=:all:" --output-file backend/requirements.txt backend/requirements.in
+	CUSTOM_COMPILE_COMMAND="make lock-backend" "$(LOCK_COMPILER_BIN)" --quiet --allow-unsafe --generate-hashes --resolver=backtracking --strip-extras --pip-args="--only-binary=:all:" --output-file backend/requirements-dev.txt backend/requirements-dev.in
 
 install-frontend:
 	NPM="$(NPM)" bash frontend/scripts/install-dependencies.sh
@@ -81,8 +81,8 @@ audit: audit-backend audit-frontend audit-secrets
 
 audit-backend:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.test_settings "$(PYTHON_BIN)" manage.py audit_questions --fail-on-warnings
-	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements.lock
-	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements-dev.lock
+	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements.txt
+	cd backend && "$(PYTHON_BIN)" -m pip_audit -r requirements-dev.txt
 
 audit-frontend:
 	cd frontend && $(NPM) audit --audit-level=moderate

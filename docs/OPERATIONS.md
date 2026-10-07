@@ -65,8 +65,10 @@ requirements are excluded from the production build context. Production and
 development Python installs use committed transitive locks with SHA-256 hashes;
 the Docker build verifies the production lock once while collecting wheels and
 again during its network-free runtime install. After intentionally changing an
-input requirement, install the development lock and run `make lock-backend`, then
-review both lock diffs and repeat the audit and image build.
+input `.in` manifest, install the development lock and run `make lock-backend`,
+then review both `.txt` lock diffs and repeat the audit and image build. CI reruns
+`pip-compile` with the pinned Python and `pip-tools` versions, restricts resolution
+to binary distributions and rejects either lock if regeneration changes it.
 
 `make audit-secrets` creates a mode-0700 temporary tree containing only paths known
 to Git plus a text rendering of all reachable commit history. It deliberately
@@ -150,17 +152,20 @@ attestations for the resolved packages. Reproduce either failure locally with
 `make audit` before changing a version pin.
 
 `.github/dependabot.yml` proposes reviewed version updates for GitHub Actions each
-Monday and frontend npm dependencies each Tuesday at 05:23 Europe/Bucharest. A
-seven-day cooldown applies only to routine version updates; GitHub security updates
-are not delayed by that setting. Compatible minor/patch updates are grouped by
-ecosystem and npm dependency type, while major upgrades stay isolated. At most
-three routine PRs per ecosystem remain open; security PRs are outside that limit.
-There is no auto-merge configuration.
+Monday, frontend npm dependencies each Tuesday and backend pip/pip-compile
+dependencies each Wednesday at 05:23 Europe/Bucharest. Python uses conventional
+`requirements.in` and `requirements-dev.in` manifests with generated, hashed
+`.txt` locks; CI regenerates both locks and rejects drift. A seven-day cooldown
+applies only to routine version updates; GitHub security updates are not delayed by
+that setting. Compatible minor/patch updates are grouped by ecosystem and dependency
+type, while major upgrades stay isolated. At most three routine PRs per ecosystem
+remain open; security PRs are outside that limit. There is no auto-merge
+configuration.
 
 The configuration file enables version-update proposals after it reaches the
 default branch. Dependabot alerts and security updates remain repository settings;
-confirm they are enabled under GitHub's security settings. If enabled, this file's
-cooldown and routine PR limit do not delay or count their security-update PRs.
+both are enabled. This file's cooldown and routine PR limit do not delay or count
+security-update PRs.
 
 `.github/workflows/dependency-review.yml` compares the dependency snapshots for
 every pull request targeting `main` through GitHub's dependency review API. It
@@ -183,12 +188,14 @@ GitHub's initial SBOM contains 609 packages and 1,150 relationships, with no ope
 Dependabot alert at activation time. Check the current setting without changing it
 with `gh api -i repos/Alexandru2984/PCEP_webApp/vulnerability-alerts`: HTTP 204 means
 enabled. Do not disable it; GitHub's disable endpoint removes both alerts and the
-dependency graph that this workflow requires. Dependabot security updates remain a
-separate, disabled setting and no security-update PR is created automatically.
+dependency graph that this workflow requires. Dependabot security updates were
+enabled on 2026-10-07. GitHub may now open a security-update PR when it can resolve
+an alert, but branch protection and CI still prevent automatic merging.
 
-The hosted dependency review and all four CI jobs are required by `main` branch
-protection. Required checks are bound to the GitHub Actions app rather than accepted
-from any producer with a matching name. The branch must be current before merge;
+The hosted dependency review, all four CI jobs and all three CodeQL language jobs
+are required by `main` branch protection. Required checks are bound to the GitHub
+Actions app rather than accepted from any producer with a matching name. The branch
+must be current before merge;
 pull requests, resolved conversations and linear history are mandatory, including
 for repository administrators. Zero approving reviews are required because this is
 a single-maintainer repository, while force pushes and branch deletion are blocked.
@@ -204,12 +211,13 @@ incident requires a temporary gate change, record the reason and exact prior JSO
 make the narrowest change through repository administration, then restore and
 re-verify protection immediately after the incident.
 
-Python is deliberately excluded because its two SHA-256 lock files must be
-regenerated together with `make lock-backend`, reviewed and audited. Container base
-updates are also kept manual because each tag/digest pair must be rebuilt, runtime
-tested and scanned together. The daily advisory workflow still detects vulnerable
-Python and npm resolutions between upgrades. `make check-workflows` validates both
-the workflows and Dependabot configuration with strict offline zizmor collection.
+Python is included through pip-compile's supported `.in`/`.txt` convention. Both
+SHA-256 locks must still be regenerated together with `make lock-backend`, reviewed
+and audited. Container base updates remain manual because each tag/digest pair must
+be rebuilt, runtime tested and scanned together. The daily advisory workflow still
+detects vulnerable Python and npm resolutions between upgrades.
+`make check-workflows` validates both the workflows and Dependabot configuration
+with strict offline zizmor collection.
 
 ## Public Production Smoke
 
