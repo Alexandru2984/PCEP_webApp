@@ -28,8 +28,9 @@ sed -e '/include \/etc\/letsencrypt\/options-ssl-nginx.conf;/d' -e '/ssl_dhparam
 # shellcheck disable=SC2016 # Nginx variable must remain literal.
 printf 'geo $from_cloudflare_origin { default 1; }\n' > "$stage/shared.conf"
 mounts=(
-    -v "$stage/pcep.conf:/etc/nginx/conf.d/default.conf:ro"
-    -v "$stage/pcep-runner.conf:/etc/nginx/conf.d/pcep-runner.conf:ro"
+    # Match sites-enabled ordering: pcep-runner sorts before pcep.micutu.com.
+    -v "$stage/pcep.conf:/etc/nginx/conf.d/pcep.micutu.com.conf:ro"
+    -v "$stage/pcep-runner.conf:/etc/nginx/conf.d/pcep-runner.micutu.com.conf:ro"
     -v "$stage/shared.conf:/etc/nginx/conf.d/shared.conf:ro"
     -v "$stage/snippets:/etc/nginx/snippets:ro"
     -v "$stage/certs:/etc/letsencrypt/live/pcep.micutu.com:ro"
