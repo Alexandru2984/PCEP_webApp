@@ -97,10 +97,9 @@ contains an answer key.
 
 Remaining security work:
 
-- The admin login remains Internet-reachable behind Nginx rate limiting and
-  Django authentication. Cloudflare Access and enforced operator MFA would
-  reduce credential-attack exposure, but require account/dashboard changes that
-  were not available locally.
+- The public learner vhost now returns a cookie-free 404 for `/admin` and every
+  `/admin/` path. A future operator interface belongs on a separate origin behind
+  enforced phishing-resistant MFA and a tested emergency access procedure.
 - Cloudflare currently injects a dynamic inline JavaScript-detection challenge.
   CSP blocks it, producing a console warning while leaving the application
   functional. Disable that edge feature rather than weaken CSP.
@@ -1044,8 +1043,9 @@ generated-by attribution was added.
 
 ## 13. Remaining opportunities
 
-1. Protect `/admin/` with Cloudflare Access and operator MFA, after verifying an
-   emergency/bypass procedure to avoid lockout.
+1. If an operator UI becomes necessary, place it on a separate origin behind
+   Cloudflare Access and phishing-resistant MFA, after verifying an emergency
+   procedure to avoid lockout. Never republish it on the learner origin.
 2. Disable or correctly scope Cloudflare JavaScript detection, then repeat the
    public console/CSP check. Review the dashboard's cache rules and tunnel
    hostname ownership directly.

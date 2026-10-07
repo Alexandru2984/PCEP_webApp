@@ -119,8 +119,9 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 
 ```
 Internet → Cloudflare → cloudflared → HTTPS loopback Nginx
-                                      ├── /admin/, /api/ → 127.0.0.1:8001
-                                      │                   → Docker: Gunicorn → PostgreSQL
+                                      ├── /admin*         → 404 (publicly disabled)
+                                      ├── /api/           → 127.0.0.1:8001
+                                      │                     → Docker: Gunicorn → PostgreSQL
                                       ├── /practice/      → generated public study pages
                                       └── /               → /var/www/pcep/frontend
 ```

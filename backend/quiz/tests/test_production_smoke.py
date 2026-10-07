@@ -22,10 +22,10 @@ SHARED_HEADERS = {
 }
 
 
-def response(headers=None, body=b''):
+def response(headers=None, body=b'', status=200):
     return smoke.PublicResponse(
         url='https://example.test/api/live/',
-        status=200,
+        status=status,
         headers=headers or {},
         body=body,
     )
@@ -170,6 +170,24 @@ def test_shell_csp_keeps_pyodide_without_general_eval_or_inline_scripts():
     }, body)
     with pytest.raises(smoke.SmokeError, match='unsafe-eval'):
         smoke.check_shell(unsafe)
+
+
+def test_public_admin_must_be_a_strict_cookie_free_404():
+    headers = {
+        **SHARED_HEADERS,
+        'cache-control': 'no-store',
+        'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+        'x-request-id': 'a' * 32,
+    }
+    smoke.check_admin_unavailable(response(headers, b'Not found', status=404))
+
+    for invalid in [
+        response(headers, b'Django administration', status=404),
+        response({**headers, 'set-cookie': 'sessionid=secret'}, status=404),
+        response(headers, status=200),
+    ]:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_admin_unavailable(invalid)
 
 
 def test_shell_assets_require_safe_hashed_asset_paths():
