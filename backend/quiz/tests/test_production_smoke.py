@@ -206,7 +206,7 @@ def test_runner_headers_forbid_credentials_and_cross_origin_resources():
         'referrer-policy': 'no-referrer',
         'permissions-policy': (
             'camera=(), microphone=(), geolocation=(), payment=(), '
-            'usb=(), serial=(), bluetooth=()'
+            'usb=(), serial=()'
         ),
         'cross-origin-resource-policy': 'same-origin',
         'origin-agent-cluster': '?1',

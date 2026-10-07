@@ -307,7 +307,7 @@ def check_runner_headers(response, label):
     )
     require(
         response.headers.get('permissions-policy')
-        == 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()',
+        == 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=()',
         f'{label} has an unexpected permissions policy.',
     )
     require(
