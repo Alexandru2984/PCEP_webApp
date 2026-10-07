@@ -7,21 +7,25 @@ import { describe, expect, it, vi } from 'vitest'
 const source = readFileSync(resolve(cwd(), 'public/py-worker.js'), 'utf8')
 function worker(execute) {
   let stdout
+  let options
   const namespace = { destroy: vi.fn() }
   const context = {
     self: { postMessage: vi.fn() },
     importScripts: vi.fn(),
-    loadPyodide: async () => ({
-      setStdout: ({ batched }) => {
-        stdout = batched
-      },
-      setStderr: vi.fn(),
-      runPython: () => namespace,
-      runPythonAsync: async () => execute(stdout),
-    }),
+    loadPyodide: async (received) => {
+      options = received
+      return {
+        setStdout: ({ batched }) => {
+          stdout = batched
+        },
+        setStderr: vi.fn(),
+        runPython: () => namespace,
+        runPythonAsync: async () => execute(stdout),
+      }
+    },
   }
   runInNewContext(source, context)
-  return { context, namespace }
+  return { context, namespace, options: () => options }
 }
 describe('Python worker output limits', () => {
   it('bounds huge output, reports truncation and destroys the run namespace', async () => {
@@ -46,5 +50,11 @@ describe('Python worker output limits', () => {
     await other.self.onmessage({ data: { type: 'run', id: 2, code: 'x'.repeat(20001) } })
     expect(other.importScripts).not.toHaveBeenCalled()
     expect(other.self.postMessage.mock.calls.at(-1)[0].error).toMatch(/too large/)
+  })
+  it('hides ambient worker globals from ordinary Python JS imports', async () => {
+    const isolated = worker(vi.fn())
+    await isolated.context.self.onmessage({ data: { type: 'init' } })
+    expect(Object.getPrototypeOf(isolated.options().jsglobals)).toBeNull()
+    expect(Object.isFrozen(isolated.options().jsglobals)).toBe(true)
   })
 })

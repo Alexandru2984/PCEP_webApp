@@ -65,7 +65,7 @@ def test_initial_publication_is_atomic_and_separate(tmp_path):
 
 def test_frontend_keeps_old_lazy_chunks_and_rejects_missing_new_asset(tmp_path):
     source = tmp_path / 'source'
-    for name in ['sw.js', 'py-worker.js', 'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip', 'assets/new.js']:
+    for name in ['sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js', 'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip', 'assets/new.js']:
         path = source / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('public data')
@@ -86,7 +86,7 @@ def test_frontend_keeps_old_lazy_chunks_and_rejects_missing_new_asset(tmp_path):
 
 def test_frontend_bounds_old_chunks_and_keeps_the_previous_generation(tmp_path):
     source = tmp_path / 'source'
-    for name in ['sw.js', 'py-worker.js', 'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip', 'assets/new.js']:
+    for name in ['sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js', 'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip', 'assets/new.js']:
         path = source / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('new release')

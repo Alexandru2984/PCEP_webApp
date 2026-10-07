@@ -35,7 +35,8 @@ def validate_release(source, kind='frontend'):
         if path.is_symlink() or path.name.startswith('.') or path.suffix in ('.pem', '.key'):
             raise ValueError(f'Unsafe file in release: {path.relative_to(source)}')
     required = ['admin/css/base.css', 'admin/js/core.js'] if kind == 'static' else [
-        'index.html', 'sw.js', 'py-worker.js', 'manifest.webmanifest',
+        'index.html', 'sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js',
+        'manifest.webmanifest',
         'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js',
         'pyodide/pyodide.asm.wasm', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip',
     ]

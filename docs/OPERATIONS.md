@@ -217,6 +217,10 @@ aggregate question counts,
 module/objective/difficulty matrices, security headers and API no-store behavior.
 It also requires `/admin/login/` to remain a non-redirecting, cookie-free 404 with
 a deny-all CSP, so a vhost regression cannot silently republish Django admin.
+The same contract requires every runner path to be 404 on the learner origin,
+then verifies the separate runner document, bridge, worker, pinned runtime version,
+cookie-free headers, exact CSPs and absence of an API route. It does not execute
+arbitrary Python during the six-hourly read-only probe.
 It validates strict answer-safe shapes for random, daily, detail and search
 responses, then verifies that a three-question targeted drill preserves the
 requested order. It never calls an answer, grade or other write endpoint and does
@@ -462,21 +466,55 @@ Node 24 LTS is used in CI and the non-root frontend builder because Node 20 is E
 
 `make build-frontend` depends on `fetch-pyodide`, which downloads the self-hosted
 Pyodide runtime into `frontend/public/pyodide/` (git-ignored, ~12 MB) only when
-it is missing. `vite build` then copies it into `dist/`, so it publishes
-same-origin at `/pyodide/*` alongside `/py-worker.js` — no third-party CDN.
+it is missing. `vite build` copies the reviewed bridge, worker and runtime into
+one release root, but Nginx exposes them only through `pcep-runner.micutu.com`.
+The learner vhost explicitly returns 404 for `/runner.html`, `/runner-bridge.js`,
+`/py-worker.js` and `/pyodide/*`.
 
-The SPA `location /` block in `nginx/pcep.micutu.com.conf` already grants the two
-CSP capabilities the runner needs: `worker-src 'self'` (the Web Worker) and
-`script-src 'wasm-unsafe-eval'` (WASM compilation). No `'unsafe-eval'` is required.
-After changing the live vhost, keep backups **outside** `sites-enabled/`
-(e.g. `/etc/nginx/_mybackups/`) so a stray `.bak` is not parsed as a second vhost,
-then `sudo nginx -t && sudo systemctl reload nginx`.
+The SPA creates a hidden credentialless iframe on the runner origin. After exact
+parent-origin validation, the iframe transfers one private `MessagePort` to a
+minimal bridge. The bridge never gives that capability to the Python worker and
+bounds every request/result independently. The runner has no API proxy, admin,
+authentication, uploads, SPA fallback or cookies. Its worker CSP permits only
+self-hosted scripts, WASM compilation and same-origin connections. The learner
+origin has no `wasm-unsafe-eval`; its only new capability is
+`frame-src https://pcep-runner.micutu.com`.
+
+The runner vhost uses the existing `pcep.micutu.com` certificate lineage, whose
+SAN set must contain both hostnames. Bootstrap a new host only after the runner's
+port-80 ACME block is installed and reachable through the tunnel:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/letsencrypt \
+  --cert-name pcep.micutu.com --expand --non-interactive \
+  -d pcep.micutu.com -d pcep-runner.micutu.com
+sudo certbot renew --dry-run --cert-name pcep.micutu.com
+```
+
+Add an explicit tunnel rule before the learner rule and catch-all. This prevents
+the global `noTLSVerify` fallback from weakening runner transport:
+
+```yaml
+- hostname: pcep-runner.micutu.com
+  service: https://127.0.0.1:443
+  originRequest:
+    originServerName: pcep-runner.micutu.com
+    httpHostHeader: pcep-runner.micutu.com
+    noTLSVerify: false
+    connectTimeout: 10s
+```
+
+Keep Nginx and cloudflared backups outside parsed configuration directories.
+Validate both before reload/restart, then run the full public smoke contract.
 
 Smoke-test after deploy:
 
 ```bash
-curl -fsS https://pcep.micutu.com/py-worker.js -o /dev/null
-curl -fsS https://pcep.micutu.com/pyodide/pyodide.asm.wasm -o /dev/null   # ~8 MB, application/wasm
+curl -fsS https://pcep-runner.micutu.com/runner.html -o /dev/null
+curl -fsS https://pcep-runner.micutu.com/py-worker.js -o /dev/null
+curl -fsS https://pcep-runner.micutu.com/pyodide/pyodide.asm.wasm -o /dev/null
+curl -fsS -o /dev/null -w '%{http_code}\n' https://pcep.micutu.com/py-worker.js # 404
+make production-smoke
 ```
 
 ## Rollback
@@ -838,13 +876,12 @@ a second deliberate Save may replace the newer stored note.
 
 The Python runner limits source to 20,000 characters, output/tracebacks to
 10,000 characters, queued/running jobs to four, startup to 30 seconds and each
-execution to eight seconds. Timeout terminates the worker; later Run recreates
-it. Failed startup/crash also permits retry. Both the worker and its manager enforce
-the output bound; if either layer discards excess text or chunks, the result is marked
-as truncated so the UI does not present incomplete output as complete. These are
-responsiveness/resource protections, not a hardened sandbox: arbitrary Python can
-use the JavaScript bridge and can still exhaust browser memory before a timeout.
-Do not run untrusted snippets in an authenticated admin browser.
+execution to eight seconds. Timeout removes the complete runner iframe and worker;
+later Run recreates both. Failed startup/crash also permits retry. The worker,
+cross-origin bridge and learner-origin manager each enforce output bounds. Arbitrary
+Python can reach its worker's JavaScript bridge, but the dedicated origin and CSP
+deny access to the learner API, DOM, storage and cookies. CPU timeout is enforced;
+browser memory exhaustion remains possible before termination.
 
 The question audit canonicalizes valid Python snippets through the standard AST
 before duplicate comparison. This catches semantically identical questions that
@@ -937,7 +974,7 @@ can briefly return an edge 530; it does not require an Nginx, Docker or database
 restart.
 
 Install `nginx/snippets/pcep-*.conf` into `/etc/nginx/snippets/` before installing
-the vhost. Back up outside sites-enabled, run `sudo nginx -t`, then use
+both PCEP vhosts. Back up outside sites-enabled, run `sudo nginx -t`, then use
 `sudo systemctl reload nginx` (graceful). The 2026-09-18 vhost backup is in
 `/home/micu/backups/pcep/security-20260918/nginx.before`.
 
@@ -998,8 +1035,11 @@ of complete accessibility certification.
 ## PWA update and cache policy
 
 `frontend/pwa.config.js` contains the tested cache policy. Only the public shell
-is precached. Runtime caching accepts HTTP 200 same-origin `/pyodide/` files in
-`pyodide-runtime-0.29.4`; opaque responses and API feedback are excluded.
+is precached. The learner service worker never fetches or caches the runner bridge,
+worker or Pyodide runtime; those files belong exclusively to the isolated origin.
+On first load after migration, the app also deletes the retired
+`pyodide-runtime-0.29.4` learner-origin cache; failure is harmless because no new
+code requests those same-origin paths.
 API/admin/static/media, study pages, analytics, asset/runtime paths and
 robots/sitemap are exempt from offline SPA navigation fallback. A newly installed
 worker remains waiting and shows a notice; the Reload action sends the worker's

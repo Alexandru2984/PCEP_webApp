@@ -41,9 +41,10 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🐍 **Run the code, don't just read it** — every snippet has a built-in Python
   interpreter (Pyodide on WebAssembly). Edit it, hit **Run**, and see real
   `stdout`/tracebacks **entirely in your browser** — no backend, no server cost.
-  Each run is isolated in a replaceable Web Worker with startup, execution,
-  source, queue and output limits. This protects responsiveness; it is not a
-  security sandbox for hostile code.
+  Each run lives in a replaceable worker on a dedicated, capability-free origin,
+  reached through a bounded private message channel. CSP prevents that origin
+  from contacting the learner app. Startup, execution, source, queue and output
+  limits protect responsiveness; browser memory exhaustion is still possible.
 - 🎯 **Per-option explanations** — a wrong pick explains the exact misconception
   _and_ why the correct answer is right (skipped exam questions included)
 - ⏱️ **Three study modes** — Practice (instant feedback), a timed **Exam
@@ -124,6 +125,8 @@ Internet → Cloudflare → cloudflared → HTTPS loopback Nginx
                                       │                     → Docker: Gunicorn → PostgreSQL
                                       ├── /practice/      → generated public study pages
                                       └── /               → /var/www/pcep/frontend
+
+pcep-runner.micutu.com → static bridge + Pyodide only (no API/auth/SPA fallback)
 ```
 
 ## Local development
@@ -159,8 +162,9 @@ npm run dev             # Vite dev server, proxies /api to Django (see vite.conf
 ```
 
 > The build succeeds without the Pyodide step, but the **Run** button needs it.
-> `npm run build` copies `public/pyodide/` into `dist/`, so it ships same-origin
-> at `/pyodide/*` — no third-party CDN, and the CSP only needs `'wasm-unsafe-eval'`.
+> `npm run build` copies `public/pyodide/` into `dist/`, but production serves the
+> runtime only from `https://pcep-runner.micutu.com`. The learner origin explicitly
+> returns 404 for runner files and does not grant `'wasm-unsafe-eval'`.
 
 ### With Docker
 
