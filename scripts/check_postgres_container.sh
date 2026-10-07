@@ -74,6 +74,11 @@ PY
 )"
 
 docker compose build db >/dev/null
+restore_profile="$(
+  docker image inspect "$db_image" \
+    --format '{{ index .Config.Labels "com.pcep.restore-profile" }}'
+)"
+test "$restore_profile" = 'pcep-postgres-16-v1'
 docker volume create "$volume" >/dev/null
 docker run -d \
   --name "$candidate" \

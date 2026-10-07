@@ -12,6 +12,7 @@ DATABASE_BACKUP_ROOT ?= $(BACKUP_ROOT)/daily
 DATABASE_BACKUP_KEEP ?= 30
 DATABASE_CONTAINER ?= pcep_db
 DATABASE_RESTORE_CONTAINER ?= pcep_db_restore_check
+DATABASE_RESTORE_FALLBACK_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PCEP_OFFSITE_REMOTE ?=
 OFFSITE_RCLONE_CONFIG ?=
 OFFSITE_BACKUP_MAX_AGE_HOURS ?= 48
@@ -134,7 +135,7 @@ backup-database:
 	"$(PYTHON_BIN)" scripts/database_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --keep "$(DATABASE_BACKUP_KEEP)"
 
 verify-database-restore:
-	"$(PYTHON_BIN)" scripts/database_restore_check.py --backup-root "$(DATABASE_BACKUP_ROOT)" --source-container "$(DATABASE_CONTAINER)" --restore-container "$(DATABASE_RESTORE_CONTAINER)"
+	"$(PYTHON_BIN)" scripts/database_restore_check.py --backup-root "$(DATABASE_BACKUP_ROOT)" --source-container "$(DATABASE_CONTAINER)" --restore-container "$(DATABASE_RESTORE_CONTAINER)" --fallback-image "$(DATABASE_RESTORE_FALLBACK_IMAGE)"
 
 offsite-backup-preflight:
 	@test -n "$(PCEP_OFFSITE_REMOTE)" || { printf '%s\n' 'PCEP_OFFSITE_REMOTE is required.'; exit 1; }

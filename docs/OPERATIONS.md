@@ -279,6 +279,15 @@ then verifies the source checksum again and removes the container. Inspect runs 
 backup-code, PostgreSQL or schema changes; never test a restore over the live
 database.
 
+Docker can lose the metadata for an image while a container created from its
+layers continues to run. If the exact live ID is no longer runnable, the scheduled
+service falls back only to the reviewed `pcep_webapp-postgres:16.15-alpine3.24`
+image. The fallback is resolved to an immutable ID and accepted only when it runs
+as `postgres`, has the reviewed restore-profile label and entrypoint, embeds no
+runtime secret and matches the live server's PostgreSQL major version. Build and
+scan that fallback with `bash scripts/check_postgres_container.sh` and
+`make audit-db-image` before installing an updated restore unit.
+
 These local logical dumps improve recovery point coverage but remain on the same
 physical host; they do not protect against host or disk loss. Replication to
 independently controlled storage remains required when an off-host destination and
