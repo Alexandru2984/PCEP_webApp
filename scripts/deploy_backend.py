@@ -3,13 +3,14 @@
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import gzip
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import subprocess
 import time
@@ -21,6 +22,9 @@ RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 IMAGE_ID_PATTERN = re.compile(r'sha256:[0-9a-f]{64}')
 IMAGE_REFERENCE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}')
 BACKEND_IMAGE = 'pcep_webapp-backend:latest'
+APP_DATABASE_ROLE = 'pcep_user'
+DATABASE_OWNER_ROLE = 'pcep_owner'
+DATABASE_MIGRATOR_ROLE = 'pcep_migrator'
 SENSITIVE_IMAGE_ENV_PREFIXES = (
     'CORS_',
     'DATABASE_',
@@ -73,6 +77,340 @@ def capture_command(args, *, cwd, env=None):
             f'Command failed with exit code {completed.returncode}: {detail or args[0]}'
         )
     return completed.stdout.strip()
+
+
+def database_admin_sql(config, sql):
+    """Run SQL over the container-local socket without exposing admin secrets."""
+    command = [
+        'docker', 'exec', '--interactive', '--user', 'postgres',
+        config.database_container, 'sh', '-ceu',
+        (
+            'exec psql --no-psqlrc --no-password --set=ON_ERROR_STOP=on '
+            '--tuples-only --no-align --quiet '
+            '--username "$POSTGRES_USER" --dbname "$POSTGRES_DB"'
+        ),
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=config.project_root,
+        input=sql,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode:
+        detail = (completed.stderr or completed.stdout).strip()[-2000:]
+        raise ReleaseError(
+            'PostgreSQL administrator command failed '
+            f'({completed.returncode}): {detail or "psql"}'
+        )
+    return completed.stdout.strip()
+
+
+def verify_database_roles(config):
+    payload = database_admin_sql(
+        config,
+        f"""
+SELECT json_build_object(
+  'app_role', (
+    SELECT json_build_object(
+      'login', rolcanlogin,
+      'inherit', rolinherit,
+      'superuser', rolsuper,
+      'createdb', rolcreatedb,
+      'createrole', rolcreaterole,
+      'replication', rolreplication,
+      'bypassrls', rolbypassrls
+    ) FROM pg_roles WHERE rolname = '{APP_DATABASE_ROLE}'
+  ),
+  'owner_role', (
+    SELECT json_build_object(
+      'login', rolcanlogin,
+      'inherit', rolinherit,
+      'superuser', rolsuper,
+      'createdb', rolcreatedb,
+      'createrole', rolcreaterole,
+      'replication', rolreplication,
+      'bypassrls', rolbypassrls
+    ) FROM pg_roles WHERE rolname = '{DATABASE_OWNER_ROLE}'
+  ),
+  'migrator_role', (
+    SELECT json_build_object(
+      'login', rolcanlogin,
+      'inherit', rolinherit,
+      'password_absent', rolpassword IS NULL,
+      'superuser', rolsuper,
+      'createdb', rolcreatedb,
+      'createrole', rolcreaterole,
+      'replication', rolreplication,
+      'bypassrls', rolbypassrls
+    ) FROM pg_authid WHERE rolname = '{DATABASE_MIGRATOR_ROLE}'
+  ),
+  'migrator_is_owner_member', pg_has_role(
+    '{DATABASE_MIGRATOR_ROLE}', '{DATABASE_OWNER_ROLE}', 'MEMBER'
+  ),
+  'app_is_owner_member', pg_has_role(
+    '{APP_DATABASE_ROLE}', '{DATABASE_OWNER_ROLE}', 'MEMBER'
+  ),
+  'unexpected_owner_members', (
+    SELECT count(*) FROM pg_auth_members
+    WHERE roleid = (SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_OWNER_ROLE}')
+      AND member <> (SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_MIGRATOR_ROLE}')
+  ),
+  'unexpected_role_memberships', (
+    SELECT count(*) FROM pg_auth_members
+    WHERE member IN (
+      SELECT oid FROM pg_roles
+      WHERE rolname IN (
+        '{APP_DATABASE_ROLE}', '{DATABASE_OWNER_ROLE}', '{DATABASE_MIGRATOR_ROLE}'
+      )
+    )
+      AND NOT (
+        roleid = (SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_OWNER_ROLE}')
+        AND member = (SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_MIGRATOR_ROLE}')
+      )
+  ),
+  'database_owner', (
+    SELECT pg_get_userbyid(datdba) FROM pg_database
+    WHERE datname = current_database()
+  ),
+  'schema_owner', (
+    SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'public'
+  ),
+  'app_connect', has_database_privilege(
+    '{APP_DATABASE_ROLE}', current_database(), 'CONNECT'
+  ),
+  'app_create_database_objects', has_database_privilege(
+    '{APP_DATABASE_ROLE}', current_database(), 'CREATE'
+  ),
+  'app_temporary', has_database_privilege(
+    '{APP_DATABASE_ROLE}', current_database(), 'TEMPORARY'
+  ),
+  'app_schema_usage', has_schema_privilege(
+    '{APP_DATABASE_ROLE}', 'public', 'USAGE'
+  ),
+  'app_schema_create', has_schema_privilege(
+    '{APP_DATABASE_ROLE}', 'public', 'CREATE'
+  ),
+  'wrong_table_owners', (
+    SELECT count(*) FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND pg_get_userbyid(relation.relowner) <> '{DATABASE_OWNER_ROLE}'
+  ),
+  'wrong_sequence_owners', (
+    SELECT count(*) FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind = 'S'
+      AND pg_get_userbyid(relation.relowner) <> '{DATABASE_OWNER_ROLE}'
+  ),
+  'tables_without_app_dml', (
+    SELECT count(*) FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND NOT (
+        has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'SELECT')
+        AND has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'INSERT')
+        AND has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'UPDATE')
+        AND has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'DELETE')
+      )
+  ),
+  'tables_with_app_ddl', (
+    SELECT count(*) FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND (
+        has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'TRUNCATE')
+        OR has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'REFERENCES')
+        OR has_table_privilege('{APP_DATABASE_ROLE}', relation.oid, 'TRIGGER')
+      )
+  ),
+  'sequences_without_app_runtime', (
+    SELECT count(*) FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND CASE WHEN relation.relkind = 'S' THEN NOT (
+          has_sequence_privilege('{APP_DATABASE_ROLE}', relation.oid, 'USAGE')
+          AND has_sequence_privilege('{APP_DATABASE_ROLE}', relation.oid, 'SELECT')
+        ) ELSE false END
+  ),
+  'sequences_with_app_update', (
+    SELECT count(*) FROM pg_class AS relation
+    JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND CASE WHEN relation.relkind = 'S' THEN
+        has_sequence_privilege('{APP_DATABASE_ROLE}', relation.oid, 'UPDATE')
+      ELSE false END
+  ),
+  'default_table_app_privileges', (
+    SELECT COALESCE(
+      json_agg(privilege_type ORDER BY privilege_type), '[]'::json
+    )
+    FROM pg_default_acl AS defaults
+    CROSS JOIN LATERAL aclexplode(defaults.defaclacl) AS privilege
+    WHERE defaults.defaclrole = (
+        SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_OWNER_ROLE}'
+      )
+      AND defaults.defaclnamespace = (
+        SELECT oid FROM pg_namespace WHERE nspname = 'public'
+      )
+      AND defaults.defaclobjtype = 'r'
+      AND privilege.grantee = (
+        SELECT oid FROM pg_roles WHERE rolname = '{APP_DATABASE_ROLE}'
+      )
+  ),
+  'default_sequence_app_privileges', (
+    SELECT COALESCE(
+      json_agg(privilege_type ORDER BY privilege_type), '[]'::json
+    )
+    FROM pg_default_acl AS defaults
+    CROSS JOIN LATERAL aclexplode(defaults.defaclacl) AS privilege
+    WHERE defaults.defaclrole = (
+        SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_OWNER_ROLE}'
+      )
+      AND defaults.defaclnamespace = (
+        SELECT oid FROM pg_namespace WHERE nspname = 'public'
+      )
+      AND defaults.defaclobjtype = 'S'
+      AND privilege.grantee = (
+        SELECT oid FROM pg_roles WHERE rolname = '{APP_DATABASE_ROLE}'
+      )
+  ),
+  'unexpected_default_grants', (
+    SELECT count(*)
+    FROM pg_default_acl AS defaults
+    CROSS JOIN LATERAL aclexplode(defaults.defaclacl) AS privilege
+    WHERE defaults.defaclrole = (
+        SELECT oid FROM pg_roles WHERE rolname = '{DATABASE_OWNER_ROLE}'
+      )
+      AND defaults.defaclnamespace = (
+        SELECT oid FROM pg_namespace WHERE nspname = 'public'
+      )
+      AND (
+        (
+          defaults.defaclobjtype IN ('r', 'S')
+          AND privilege.grantee NOT IN (
+            defaults.defaclrole,
+            (SELECT oid FROM pg_roles WHERE rolname = '{APP_DATABASE_ROLE}')
+          )
+        ) OR (
+          defaults.defaclobjtype = 'f'
+          AND privilege.grantee <> defaults.defaclrole
+        )
+      )
+  )
+)::text;
+""",
+    )
+    try:
+        posture = json.loads(payload)
+    except json.JSONDecodeError as error:
+        raise ReleaseError('Database role verification returned invalid JSON.') from error
+
+    expected_limited_role = {
+        'login': False,
+        'inherit': False,
+        'superuser': False,
+        'createdb': False,
+        'createrole': False,
+        'replication': False,
+        'bypassrls': False,
+    }
+    expected = {
+        'app_role': {**expected_limited_role, 'login': True, 'inherit': True},
+        'owner_role': expected_limited_role,
+        'migrator_role': {**expected_limited_role, 'password_absent': True},
+        'migrator_is_owner_member': True,
+        'app_is_owner_member': False,
+        'unexpected_owner_members': 0,
+        'unexpected_role_memberships': 0,
+        'database_owner': DATABASE_OWNER_ROLE,
+        'schema_owner': DATABASE_OWNER_ROLE,
+        'app_connect': True,
+        'app_create_database_objects': False,
+        'app_temporary': False,
+        'app_schema_usage': True,
+        'app_schema_create': False,
+        'wrong_table_owners': 0,
+        'wrong_sequence_owners': 0,
+        'tables_without_app_dml': 0,
+        'tables_with_app_ddl': 0,
+        'sequences_without_app_runtime': 0,
+        'sequences_with_app_update': 0,
+        'default_table_app_privileges': [
+            'DELETE', 'INSERT', 'SELECT', 'UPDATE'
+        ],
+        'default_sequence_app_privileges': ['SELECT', 'USAGE'],
+        'unexpected_default_grants': 0,
+    }
+    if posture != expected:
+        raise ReleaseError(
+            'Database roles are not in the reviewed least-privilege posture: '
+            + json.dumps(posture, sort_keys=True)
+        )
+    return posture
+
+
+def sql_literal(value):
+    return "'" + value.replace("'", "''") + "'"
+
+
+def run_reviewed_migrations(config, environment):
+    password = secrets.token_urlsafe(48)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+    database_admin_sql(
+        config,
+        f"""
+BEGIN;
+SELECT pg_advisory_xact_lock(hashtextextended('pcep-migrator-activation', 0));
+DO $activate_migrator$
+DECLARE
+  currently_login boolean;
+  password_present boolean;
+BEGIN
+  SELECT rolcanlogin, rolpassword IS NOT NULL
+    INTO currently_login, password_present
+    FROM pg_authid
+    WHERE rolname = '{DATABASE_MIGRATOR_ROLE}';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'migration role is missing';
+  END IF;
+  IF currently_login OR password_present THEN
+    RAISE EXCEPTION 'migration role is already active';
+  END IF;
+END
+$activate_migrator$;
+ALTER ROLE {DATABASE_MIGRATOR_ROLE}
+  LOGIN PASSWORD {sql_literal(password)}
+  VALID UNTIL {sql_literal(expires.isoformat())};
+COMMIT;
+""",
+    )
+    migration_environment = environment.copy()
+    migration_environment.update(
+        {
+            'POSTGRES_USER': DATABASE_MIGRATOR_ROLE,
+            'POSTGRES_PASSWORD': password,
+            'PGOPTIONS': f'-c role={DATABASE_OWNER_ROLE}',
+        }
+    )
+    command = [
+        'docker', 'compose', '--profile', 'maintenance', 'run', '--rm',
+        '--no-deps', '--env', 'POSTGRES_USER', '--env', 'POSTGRES_PASSWORD',
+        '--env', 'PGOPTIONS', 'backend-migrate',
+    ]
+    try:
+        run_command(command, cwd=config.project_root, env=migration_environment)
+    finally:
+        database_admin_sql(
+            config,
+            f'ALTER ROLE {DATABASE_MIGRATOR_ROLE} NOLOGIN PASSWORD NULL;\n',
+        )
+    verify_database_roles(config)
 
 
 def validate_release(value):
@@ -369,6 +707,7 @@ def deploy(config):
     environment = release_environment(config)
     ensure_tracked_tree_is_clean(root)
     run_command(['docker', 'compose', 'config', '--quiet'], cwd=root, env=environment)
+    verify_database_roles(config)
 
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     rollback_tag = snapshot_running_backend(config, stamp)
@@ -426,6 +765,8 @@ def deploy(config):
         cwd=root,
         env=environment,
     )
+    if config.allow_migrations:
+        run_reviewed_migrations(config, environment)
 
     run_command(
         ['docker', 'compose', 'up', '-d', '--no-deps', 'backend'],

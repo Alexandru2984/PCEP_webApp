@@ -14,14 +14,16 @@ cleanup() {
 trap cleanup EXIT
 
 cd "$root"
-docker compose config --format json >"$config_file"
+docker compose --profile maintenance config --format json >"$config_file"
 
 db_image="$(python3 - "$config_file" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as config_file:
-    service = json.load(config_file)["services"]["db"]
+    services = json.load(config_file)["services"]
+    service = services["db"]
+    migrator = services["backend-migrate"]
 
 
 def require(condition, message):
@@ -69,6 +71,40 @@ require(
     len(data_mounts) == 1 and data_mounts[0].get("type") == "volume",
     "PGDATA must use exactly one Docker volume",
 )
+require(
+    migrator.get("profiles") == ["maintenance"],
+    "the migrator must remain outside the default service profile",
+)
+require(
+    migrator.get("image") == services["backend"].get("image"),
+    "the migrator must use the exact candidate backend image",
+)
+require(migrator.get("user") == "appuser", "the migrator must run as appuser")
+require(migrator.get("read_only") is True, "the migrator filesystem must be read-only")
+require(migrator.get("cap_drop") == ["ALL"], "the migrator must drop all capabilities")
+require(
+    "no-new-privileges:true" in migrator.get("security_opt", []),
+    "the migrator must disable privilege escalation",
+)
+require(migrator.get("pids_limit") == 64, "the migrator PID limit must remain 64")
+require(migrator.get("mem_limit") == "268435456", "the migrator memory limit must remain 256 MiB")
+require(not migrator.get("ports"), "the migrator must not publish ports")
+require(not migrator.get("volumes"), "the migrator must not mount persistent data")
+require(
+    migrator.get("entrypoint") == ["python", "manage.py"]
+    and migrator.get("command") == ["migrate", "--noinput"],
+    "the migrator must run only the reviewed Django migration command",
+)
+require(
+    migrator.get("depends_on", {}).get("db", {}).get("condition") == "service_healthy",
+    "the migrator must wait for a healthy database",
+)
+migrator_environment = migrator.get("environment", {})
+require(
+    "POSTGRES_USER" not in migrator_environment
+    and "POSTGRES_PASSWORD" not in migrator_environment,
+    "migration credentials must be inherited ephemerally, not stored in Compose",
+)
 print(service["image"])
 PY
 )"
@@ -97,15 +133,23 @@ docker run -d \
   -e PCEP_APP_DB=hardening_db \
   -e PCEP_APP_USER=hardening_user \
   -e PCEP_APP_PASSWORD=hardening-app-test-only \
+  -e PCEP_OWNER_ROLE=hardening_owner \
+  -e PCEP_MIGRATOR_USER=hardening_migrator \
   "$db_image" >/dev/null
 
 wait_for_database() {
   local remaining=30
+  local consecutive=0
   while ((remaining > 0)); do
     if docker exec --user postgres "$candidate" \
       psql -U hardening_user -d hardening_db -Atqc 'SELECT 1' 2>/dev/null \
       | grep -qx '1'; then
-      return 0
+      consecutive=$((consecutive + 1))
+      if ((consecutive == 3)); then
+        return 0
+      fi
+    else
+      consecutive=0
     fi
     remaining=$((remaining - 1))
     sleep 1
@@ -118,21 +162,56 @@ wait_for_database
 roles="$(
   docker exec --user postgres "$candidate" \
     psql -U hardening_admin -d hardening_db -AtF: -c \
-    "SELECT rolname,rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname IN ('hardening_admin','hardening_user') ORDER BY rolname;"
+    "SELECT rolname,rolcanlogin,rolinherit,rolsuper,rolcreatedb,rolcreaterole,rolreplication,rolbypassrls FROM pg_roles WHERE rolname IN ('hardening_admin','hardening_migrator','hardening_owner','hardening_user') ORDER BY rolname;"
 )"
-test "$roles" = $'hardening_admin:t:t:t:t:t\nhardening_user:f:f:f:f:f'
+test "$roles" = $'hardening_admin:t:t:t:t:t:t:t\nhardening_migrator:f:f:f:f:f:f:f\nhardening_owner:f:f:f:f:f:f:f\nhardening_user:t:t:f:f:f:f:f'
 owners="$(
   docker exec --user postgres "$candidate" \
     psql -U hardening_admin -d hardening_db -AtF: -c \
-    "SELECT (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='hardening_db'), (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='pg_catalog'), (SELECT pg_get_userbyid(extowner) FROM pg_extension WHERE extname='plpgsql');"
+    "SELECT (SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='hardening_db'), (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='public'), (SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='pg_catalog'), (SELECT pg_get_userbyid(extowner) FROM pg_extension WHERE extname='plpgsql'), pg_has_role('hardening_migrator','hardening_owner','MEMBER');"
 )"
-test "$owners" = 'hardening_user:hardening_admin:hardening_admin'
+test "$owners" = 'hardening_owner:hardening_owner:hardening_admin:hardening_admin:t'
+if docker exec --user postgres "$candidate" \
+  psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 \
+  -c 'CREATE TABLE forbidden_table(id integer);' >/dev/null 2>&1; then
+  echo "PostgreSQL runtime check failed: the application role created a table" >&2
+  exit 1
+fi
+if docker exec --user postgres "$candidate" \
+  psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 \
+  -c 'CREATE TEMP TABLE forbidden_temp(id integer);' >/dev/null 2>&1; then
+  echo "PostgreSQL runtime check failed: the application role created a temporary table" >&2
+  exit 1
+fi
+
+docker exec --user postgres "$candidate" \
+  psql -U hardening_admin -d hardening_db -v ON_ERROR_STOP=1 \
+  -c "ALTER ROLE hardening_migrator LOGIN PASSWORD 'hardening-migrator-test-only' VALID UNTIL 'infinity';" \
+  >/dev/null
+docker exec --user postgres \
+  --env PGPASSWORD=hardening-migrator-test-only \
+  --env 'PGOPTIONS=-c role=hardening_owner' \
+  "$candidate" \
+  psql -h 127.0.0.1 -U hardening_migrator -d hardening_db -v ON_ERROR_STOP=1 \
+  -c "CREATE TABLE hardening_probe(id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, payload text NOT NULL);" \
+  >/dev/null
+docker exec --user postgres "$candidate" \
+  psql -U hardening_admin -d hardening_db -v ON_ERROR_STOP=1 \
+  -c "ALTER ROLE hardening_migrator NOLOGIN PASSWORD NULL;" \
+  >/dev/null
+
 rows="$(
   docker exec --user postgres "$candidate" \
     psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 -Atqc \
-    'CREATE TABLE hardening_probe(id integer PRIMARY KEY); INSERT INTO hardening_probe VALUES (1); SELECT count(*) FROM hardening_probe;'
+    "INSERT INTO hardening_probe(payload) VALUES ('created-by-app'); UPDATE hardening_probe SET payload='updated-by-app'; SELECT count(*) FROM hardening_probe WHERE payload='updated-by-app';"
 )"
 test "$rows" = "1"
+if docker exec --user postgres "$candidate" \
+  psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 \
+  -c 'ALTER TABLE hardening_probe ADD COLUMN forbidden integer;' >/dev/null 2>&1; then
+  echo "PostgreSQL runtime check failed: the application role altered an owned schema object" >&2
+  exit 1
+fi
 if docker exec --user postgres "$candidate" \
   psql -U hardening_user -d hardening_db -v ON_ERROR_STOP=1 \
   -c 'CREATE ROLE forbidden_role;' >/dev/null 2>&1; then
@@ -149,8 +228,15 @@ if docker exec --user postgres "$candidate" sh -c 'touch /rootfs-write-probe' 2>
   exit 1
 fi
 
-docker restart --time 30 "$candidate" >/dev/null
+docker stop --time 30 "$candidate" >/dev/null
+docker start "$candidate" >/dev/null
 wait_for_database
+roles="$(
+  docker exec --user postgres "$candidate" \
+    psql -U hardening_admin -d hardening_db -AtF: -c \
+    "SELECT rolcanlogin,rolpassword IS NULL FROM pg_authid WHERE rolname='hardening_migrator';"
+)"
+test "$roles" = 'f:t'
 rows="$(
   docker exec --user postgres "$candidate" \
     psql -U hardening_user -d hardening_db -Atqc \

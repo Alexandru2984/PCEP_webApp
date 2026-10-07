@@ -137,6 +137,23 @@ def test_uses_reviewed_compatible_fallback_when_live_metadata_is_missing():
     )
 
 
+def test_reads_and_bounds_the_live_table_owner():
+    def owner_runner(command, **kwargs):
+        assert command[:5] == [
+            'docker', 'exec', '--interactive', '--user', 'postgres'
+        ]
+        assert "'public.quiz_question'::regclass" in kwargs['input_text']
+        return SimpleNamespace(returncode=0, stdout='pcep_owner\n', stderr='')
+
+    assert restore.source_table_owner('pcep_db', owner_runner) == 'pcep_owner'
+
+    def unexpected_runner(_command, **_kwargs):
+        return SimpleNamespace(returncode=0, stdout='postgres\n', stderr='')
+
+    with pytest.raises(restore.RestoreCheckError, match='unexpected owner'):
+        restore.source_table_owner('pcep_db', unexpected_runner)
+
+
 def test_refuses_unreviewed_or_secret_bearing_fallbacks():
     fallback_id = f"sha256:{'f' * 64}"
 
@@ -178,6 +195,8 @@ def test_restore_container_command_is_ephemeral_and_isolated():
     assert command[command.index('--cap-drop') + 1] == 'ALL'
     assert 'no-new-privileges:true' in command
     assert '/var/lib/postgresql/data:rw,noexec,nosuid,nodev,size=256m,mode=0700,uid=70,gid=70' in command
+    assert 'PCEP_OWNER_ROLE=pcep_owner' in command
+    assert 'PCEP_MIGRATOR_USER=pcep_migrator' in command
     assert not {'--publish', '-p', '--volume', '-v'} & set(command)
 
 
@@ -213,6 +232,11 @@ def test_validates_restored_schema_and_question_integrity():
     for override, message in failures:
         with pytest.raises(restore.RestoreCheckError, match=message):
             restore.validate_metrics(json.dumps(valid_metrics(**override)))
+
+    owner_metrics = valid_metrics(question_owner='pcep_owner')
+    assert restore.validate_metrics(
+        json.dumps(owner_metrics), expected_owner='pcep_owner'
+    ) == owner_metrics
 
 
 @pytest.mark.parametrize('name', ['', '-bad', 'bad/name', 'bad name'])

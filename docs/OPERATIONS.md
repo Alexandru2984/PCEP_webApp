@@ -296,8 +296,10 @@ performs the same drill on demand. It verifies the newest private dump and check
 uses the exact immutable image ID of the live PostgreSQL container, then restores
 into a disposable container with no network, capabilities, writable root or
 persistent data volume. The drill uses no production database credential and never
-connects to the live database. It verifies the application table owner, migrations,
-the one-correct-choice index and every question's four-choice/one-answer invariants,
+connects to the live database. It verifies the table owner expected by the live
+source (legacy `pcep_user` or separated `pcep_owner`), migrations, the
+one-correct-choice index and every question's
+four-choice/one-answer invariants,
 then verifies the source checksum again and removes the container. Inspect runs with
 `journalctl -u pcep-db-restore-check.service`. Repeat the drill directly after
 backup-code, PostgreSQL or schema changes; never test a restore over the live
@@ -382,9 +384,15 @@ through the public domain. The rollback tag and dump are printed as soon as they
 are safe.
 
 For a reviewed release that intentionally contains migrations, inspect them and
-run `make deploy-backend BACKEND_DEPLOY_FLAGS=--allow-migrations`. This records
-the plan and lets the existing fail-fast entrypoint apply it. Never use that flag
-merely to bypass an unexpected pending migration.
+run `make deploy-backend BACKEND_DEPLOY_FLAGS=--allow-migrations`. The deploy first
+records the plan and scans the exact candidate image. It then enables
+`pcep_migrator` with a cryptographically random password valid for at most ten
+minutes, runs the same candidate image as a one-shot hardened migration container
+with `SET ROLE pcep_owner`, and disables the login plus password in a `finally`
+path before replacing the backend. The password is inherited from the deploy
+process rather than placed in command arguments or a file. A failed migration or
+failed credential revocation aborts the deployment. Never use the flag merely to
+bypass an unexpected pending migration.
 
 `make compose-build`, `make deploy-backend` and `make deploy-frontend` inject the
 current Git revision into their artifacts. Override `RELEASE=<bounded-label>`
@@ -413,10 +421,13 @@ and the blocking image scan, and only then creates the timestamped rollback tag.
 The normal exact-image path remains unchanged.
 
 Never reset/reseed the live bank during routine deployment: question IDs are
-referenced by local progress. Startup runs pending migrations and collectstatic.
+referenced by local progress. Backend startup waits for PostgreSQL and runs
+`collectstatic`, but deliberately never changes the schema. Migrations occur only
+through the reviewed one-shot path above.
 The API has three workers, 30-second request/graceful timeouts, a 45-second
 container shutdown grace period, and a bounded 60-second database startup probe
-(`DB_STARTUP_TIMEOUT_SECONDS`, 1..300). Failed migrations stop startup.
+(`DB_STARTUP_TIMEOUT_SECONDS`, 1..300). A failed one-shot migration stops the
+deployment before backend replacement.
 The non-root backend filesystem is read-only except the existing static/media
 volumes and a 64 MB temporary filesystem. Capabilities are dropped, privilege
 escalation is disabled, and the backend is capped at 512 MB and 128 processes.
@@ -426,10 +437,15 @@ noexec tmpfs mounts for `/tmp` and its Unix socket. Only the external PGDATA vol
 is persistent and writable, and no database port is published to the host. Its local
 image extends a digest-pinned PostgreSQL 16.15 Alpine base only to remove the unused
 root-only `gosu` switcher and its independently compiled runtime.
-Fresh clusters bootstrap `pcep_admin` as the system-object owner and create a
-separate `pcep_user` login for Django. The application role owns only its database
-and public application objects; it cannot create roles or databases, replicate,
-bypass row security or act as a superuser. Only the database service receives
+Fresh clusters bootstrap `pcep_admin` only for container-local administration,
+`pcep_owner` as a non-login database/schema/object owner, `pcep_migrator` as a
+normally `NOLOGIN`/passwordless member that can explicitly assume the owner role,
+and `pcep_user` as Django's permanent login. The application role receives only
+database connect, public-schema usage, table `SELECT`/`INSERT`/`UPDATE`/`DELETE`
+and sequence `USAGE`/`SELECT`; it cannot create temporary or persistent objects,
+alter/drop tables, own objects, create roles/databases, replicate, bypass row
+security or act as a superuser. Default privileges preserve the same boundary for
+future migrations. Only the database service receives
 `.env.db`, so the administrator credential never enters the backend container.
 Healthchecks use the first configured allowed hostname and forwarded HTTPS;
 local hostnames are not required in production ALLOWED_HOSTS. `/api/health/`
@@ -438,6 +454,44 @@ omitted from Gunicorn's access log only when they arrive from container loopback
 Failed probes and public requests remain visible, including requests that copy
 the marker. Gunicorn logs request ID, method, path, status and duration, without
 bodies, cookies, authorization or query strings.
+
+### One-time database role separation
+
+Existing clusters created before the owner/migrator split require one explicit
+transition. First add the non-secret role names from `.env.db.example` to the
+mode-`0600` production `.env.db`, preserving its existing passwords:
+
+```dotenv
+PCEP_OWNER_ROLE=pcep_owner
+PCEP_MIGRATOR_USER=pcep_migrator
+```
+
+Run this only from a clean, reviewed `main` checkout while the current database is
+healthy:
+
+```bash
+make separate-database-roles CONFIRM_DATABASE_ROLE_SEPARATION=yes
+make production-smoke
+make verify-database-restore
+```
+
+The first command refuses tracked changes. Before changing a role or grant, it
+creates a private verified dump and restores that exact dump into a networkless,
+disposable PostgreSQL container. It then performs role creation, membership cleanup,
+ownership reassignment, privilege revocation and least-privilege grants in one
+transaction. Finally it independently checks all role attributes, memberships,
+database/schema/table/sequence ownership and grants, and proves `pcep_user` cannot
+create a table. Re-running it in the verified target state is a no-op.
+
+Any SQL failure rolls the transaction back. If a post-commit application check
+fails, do not grant broad privileges or rerun a dump over the live database. Keep
+the printed `pcep_db_before_role_separation_*.sql.gz` backup immutable, inspect the
+specific missing runtime privilege, and apply the narrowest reviewed correction.
+A full restore is the last-resort recovery path because it discards writes made
+after the snapshot; validate it in isolation again and schedule downtime before
+using the documented recovery procedure. Ownership-only rollback to `pcep_user`
+also deliberately restores the original security weakness and therefore requires
+the same review as a production migration.
 
 ## Frontend Deploy
 

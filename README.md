@@ -138,10 +138,12 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install --require-hashes --only-binary=:all: -r requirements-dev.txt
 
-# Point Django at a local Postgres and seed the bank
+# Use a migration-capable local credential for schema changes, then switch to
+# the restricted application credential before running the server.
 export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=True
-export POSTGRES_HOST=localhost POSTGRES_DB=pcep_db POSTGRES_USER=pcep_user POSTGRES_PASSWORD=...
+export POSTGRES_HOST=localhost POSTGRES_DB=pcep_db POSTGRES_USER=local_migrator POSTGRES_PASSWORD=...
 python manage.py migrate
+export POSTGRES_USER=pcep_user POSTGRES_PASSWORD=...
 python manage.py seed_questions          # idempotent: adds missing questions
 python manage.py runserver
 ```
@@ -200,13 +202,13 @@ make production-smoke
 # After intentionally changing a Python requirement:
 make lock-backend
 
-# Backend — 227 tests (API/security, backup, integrity, startup, release, SEO and smoke behavior)
+# Backend — 296 tests (API/security, backup, integrity, startup, release, SEO and smoke behavior)
 # Local tests use in-memory SQLite; CI also runs the API suite against PostgreSQL.
 cd backend && python -m pytest
 DJANGO_SETTINGS_MODULE=pcep_project.test_settings python manage.py audit_questions --fail-on-warnings
 # Add --show-similar for conservative near-duplicate candidates requiring human review.
 
-# Frontend — 305 Vitest tests, then static checks, the production build and
+# Frontend — 313 Vitest tests, then static checks, the production build and
 # 31 Playwright flows (including axe, daily challenge, full mock, confidence, PWA,
 # notes, search, adaptive study, session recovery and Pyodide).
 cd frontend && npm run test && npm run lint && npm run format:check && npm run build
@@ -275,7 +277,10 @@ Make deploy/build targets inject the current Git revision automatically.
 
 `make deploy-backend` snapshots the running image and creates a verified private
 database dump before it can replace the local image tag, then checks and deploys
-only the backend service. A separate hardened systemd timer creates a private,
+only the backend service. Schema changes run in a separate, one-shot hardened
+container through a normally disabled migration login; the long-lived Django role
+has DML access but cannot own or create database objects. A separate hardened
+systemd timer creates a private,
 checksummed logical backup every day and retains 30 successful daily copies; use
 `make backup-database` for the same operation manually. A weekly timer restores the
 newest verified daily copy into a network-isolated, disposable database and checks

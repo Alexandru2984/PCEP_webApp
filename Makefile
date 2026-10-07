@@ -27,7 +27,7 @@ DATABASE_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PRODUCTION_URL ?= https://pcep.micutu.com
 PYTHON_RUNNER_ORIGIN ?= https://pcep-runner.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
 
 help:
 	@printf '%s\n' \
@@ -49,6 +49,7 @@ help:
 		'  deploy-backend   Backup, validate and deploy one backend release' \
 		'  backup-database  Create and retain a verified daily-style DB backup' \
 		'  verify-database-restore Restore the newest daily backup in isolation' \
+		'  separate-database-roles One-time, backup-gated least-privilege migration' \
 		'  offsite-backup-preflight Validate encrypted offsite config without upload' \
 		'  offsite-backup   Upload and round-trip verify the newest daily backup' \
 		'  compose-up       Start db + backend' \
@@ -137,6 +138,10 @@ backup-database:
 
 verify-database-restore:
 	"$(PYTHON_BIN)" scripts/database_restore_check.py --backup-root "$(DATABASE_BACKUP_ROOT)" --source-container "$(DATABASE_CONTAINER)" --restore-container "$(DATABASE_RESTORE_CONTAINER)" --fallback-image "$(DATABASE_RESTORE_FALLBACK_IMAGE)"
+
+separate-database-roles:
+	@test "$(CONFIRM_DATABASE_ROLE_SEPARATION)" = "yes" || { printf '%s\n' 'Set CONFIRM_DATABASE_ROLE_SEPARATION=yes after reviewing the role-separation runbook.'; exit 1; }
+	"$(PYTHON_BIN)" scripts/separate_database_roles.py --apply --backup-root "$(BACKUP_ROOT)" --database-container "$(DATABASE_CONTAINER)" --fallback-image "$(DATABASE_RESTORE_FALLBACK_IMAGE)"
 
 offsite-backup-preflight:
 	@test -n "$(PCEP_OFFSITE_REMOTE)" || { printf '%s\n' 'PCEP_OFFSITE_REMOTE is required.'; exit 1; }
