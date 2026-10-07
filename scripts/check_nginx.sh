@@ -47,10 +47,15 @@ port=${port##*:}
 base_url="https://pcep.micutu.com:$port"
 runner_url="https://pcep-runner.micutu.com:$port"
 
-status=$(curl --http1.1 --insecure --silent --show-error \
-    --resolve "pcep-runner.micutu.com:$port:127.0.0.1" \
-    --dump-header "$stage/runner.headers" --output "$stage/runner.body" \
-    --write-out '%{http_code}' "$runner_url/runner.html")
+status=''
+for _ in $(seq 1 30); do
+    status=$(curl --http1.1 --insecure --silent --show-error \
+        --resolve "pcep-runner.micutu.com:$port:127.0.0.1" \
+        --dump-header "$stage/runner.headers" --output "$stage/runner.body" \
+        --write-out '%{http_code}' "$runner_url/runner.html" 2>/dev/null || true)
+    [[ "$status" == 200 ]] && break
+    sleep 0.1
+done
 [[ "$status" == 200 ]]
 tr -d '\r' < "$stage/runner.headers" > "$stage/runner.headers.clean"
 grep -Fqi 'Content-Type: text/html' "$stage/runner.headers.clean"
