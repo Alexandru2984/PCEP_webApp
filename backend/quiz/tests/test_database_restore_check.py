@@ -65,16 +65,107 @@ def test_backup_selection_rejects_public_root_and_corruption(tmp_path):
 def test_source_image_must_be_an_immutable_docker_id():
     good_id = f"sha256:{'a' * 64}"
 
-    def good_runner(_command):
+    def good_runner(_command, **_kwargs):
         return SimpleNamespace(stdout=f'{good_id}\n')
 
     assert restore.source_image_id('pcep_db', good_runner) == good_id
 
-    def bad_runner(_command):
+    def bad_runner(_command, **_kwargs):
         return SimpleNamespace(stdout='postgres:latest\n')
 
     with pytest.raises(restore.RestoreCheckError, match='invalid image ID'):
         restore.source_image_id('pcep_db', bad_runner)
+
+
+def fallback_config(**overrides):
+    config = {
+        'User': 'postgres',
+        'Entrypoint': ['docker-entrypoint.sh'],
+        'Cmd': ['postgres'],
+        'Labels': {'com.pcep.restore-profile': restore.RESTORE_IMAGE_PROFILE},
+        'Env': ['PG_MAJOR=16', 'PG_VERSION=16.15', 'PGDATA=/var/lib/postgresql/data'],
+    }
+    config.update(overrides)
+    return config
+
+
+def test_uses_exact_live_image_when_its_metadata_is_available():
+    live_id = f"sha256:{'d' * 64}"
+
+    def runner(command, **_kwargs):
+        if command[:4] == ['docker', 'inspect', '--type', 'container']:
+            return SimpleNamespace(returncode=0, stdout=f'{live_id}\n', stderr='')
+        if command[:4] == ['docker', 'image', 'inspect', live_id]:
+            return SimpleNamespace(returncode=0, stdout=f'{live_id}\n', stderr='')
+        raise AssertionError(command)
+
+    assert restore.select_restore_image('pcep_db', 'unused:fallback', runner) == (
+        live_id,
+        False,
+    )
+
+
+def test_uses_reviewed_compatible_fallback_when_live_metadata_is_missing():
+    live_id = f"sha256:{'d' * 64}"
+    fallback_id = f"sha256:{'e' * 64}"
+    fallback = 'pcep_webapp-postgres:16.15-alpine3.24'
+
+    def runner(command, **_kwargs):
+        if command[:4] == ['docker', 'inspect', '--type', 'container']:
+            return SimpleNamespace(returncode=0, stdout=f'{live_id}\n', stderr='')
+        if command[:4] == ['docker', 'image', 'inspect', live_id]:
+            return SimpleNamespace(returncode=1, stdout='', stderr='missing')
+        if command[:3] == ['docker', 'exec', '--user']:
+            return SimpleNamespace(
+                returncode=0,
+                stdout='postgres (PostgreSQL) 16.15\n',
+                stderr='',
+            )
+        if command[:4] == ['docker', 'image', 'inspect', fallback]:
+            return SimpleNamespace(returncode=0, stdout=f'{fallback_id}\n', stderr='')
+        if command[:4] == ['docker', 'image', 'inspect', fallback_id]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(fallback_config()),
+                stderr='',
+            )
+        raise AssertionError(command)
+
+    assert restore.select_restore_image('pcep_db', fallback, runner) == (
+        fallback_id,
+        True,
+    )
+
+
+def test_refuses_unreviewed_or_secret_bearing_fallbacks():
+    fallback_id = f"sha256:{'f' * 64}"
+
+    def runner_for(config):
+        def runner(command, **_kwargs):
+            output = (
+                fallback_id
+                if command[-2:] == ['--format', '{{.Id}}']
+                else json.dumps(config)
+            )
+            return SimpleNamespace(returncode=0, stdout=output, stderr='')
+
+        return runner
+
+    wrong_profile = fallback_config(Labels={'com.pcep.restore-profile': 'unknown'})
+    with pytest.raises(restore.RestoreCheckError, match='restore profile'):
+        restore.verify_fallback_restore_image(
+            'reviewed:tag', '16', runner_for(wrong_profile)
+        )
+
+    secret = fallback_config(Env=['PG_MAJOR=16', 'POSTGRES_PASSWORD=embedded'])
+    with pytest.raises(restore.RestoreCheckError, match='runtime secrets'):
+        restore.verify_fallback_restore_image('reviewed:tag', '16', runner_for(secret))
+
+    mismatch = fallback_config(Env=['PG_MAJOR=17'])
+    with pytest.raises(restore.RestoreCheckError, match='major version'):
+        restore.verify_fallback_restore_image(
+            'reviewed:tag', '16', runner_for(mismatch)
+        )
 
 
 def test_restore_container_command_is_ephemeral_and_isolated():

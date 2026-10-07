@@ -16,8 +16,11 @@ import time
 DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
 DEFAULT_SOURCE_CONTAINER = 'pcep_db'
 DEFAULT_RESTORE_CONTAINER = 'pcep_db_restore_check'
+RESTORE_IMAGE_PROFILE = 'pcep-postgres-16-v1'
 CONTAINER_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$')
 IMAGE_ID_PATTERN = re.compile(r'^sha256:[0-9a-f]{64}$')
+IMAGE_REFERENCE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$')
+POSTGRES_VERSION_PATTERN = re.compile(r'^postgres \(PostgreSQL\) (?P<major>\d+)(?:\.\d+)*$')
 
 RESTORE_DATABASE = 'pcep_restore'
 RESTORE_ADMIN = 'pcep_restore_admin'
@@ -142,6 +145,99 @@ def source_image_id(source_container, runner=run_command):
     if not IMAGE_ID_PATTERN.fullmatch(image_id):
         raise RestoreCheckError('The source container returned an invalid image ID.')
     return image_id
+
+
+def image_is_available(image_id, runner=run_command):
+    if not IMAGE_ID_PATTERN.fullmatch(image_id):
+        raise RestoreCheckError('Invalid source image ID.')
+    result = runner(
+        ['docker', 'image', 'inspect', image_id, '--format', '{{.Id}}'],
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout.strip() == image_id
+
+
+def source_postgres_major(source_container, runner=run_command):
+    validate_container_name(source_container, 'source')
+    result = runner(
+        [
+            'docker', 'exec', '--user', 'postgres', source_container,
+            'postgres', '--version',
+        ]
+    )
+    match = POSTGRES_VERSION_PATTERN.fullmatch(result.stdout.strip())
+    if not match:
+        raise RestoreCheckError('The source container returned an invalid PostgreSQL version.')
+    return match.group('major')
+
+
+def validate_image_reference(value):
+    if not value or not IMAGE_REFERENCE_PATTERN.fullmatch(value):
+        raise RestoreCheckError('Fallback image must be a bounded local image reference.')
+    return value
+
+
+def verify_fallback_restore_image(reference, expected_major, runner=run_command):
+    reference = validate_image_reference(reference)
+    image_id = runner(
+        ['docker', 'image', 'inspect', reference, '--format', '{{.Id}}']
+    ).stdout.strip()
+    if not IMAGE_ID_PATTERN.fullmatch(image_id):
+        raise RestoreCheckError('The fallback image returned an invalid image ID.')
+
+    raw_config = runner(
+        ['docker', 'image', 'inspect', image_id, '--format', '{{json .Config}}']
+    ).stdout
+    try:
+        config = json.loads(raw_config)
+    except json.JSONDecodeError as error:
+        raise RestoreCheckError('The fallback image has invalid metadata.') from error
+    if not isinstance(config, dict):
+        raise RestoreCheckError('The fallback image has invalid metadata.')
+    if config.get('User') != 'postgres':
+        raise RestoreCheckError('The fallback image must run as postgres.')
+    if config.get('Entrypoint') != ['docker-entrypoint.sh'] or config.get('Cmd') != ['postgres']:
+        raise RestoreCheckError('The fallback image has an unexpected entrypoint.')
+
+    labels = config.get('Labels')
+    environment = config.get('Env')
+    if not isinstance(labels, dict) or not isinstance(environment, list):
+        raise RestoreCheckError('The fallback image is missing required metadata.')
+    if labels.get('com.pcep.restore-profile') != RESTORE_IMAGE_PROFILE:
+        raise RestoreCheckError('The fallback image has the wrong restore profile.')
+
+    environment_values = {}
+    for entry in environment:
+        if not isinstance(entry, str) or '=' not in entry:
+            raise RestoreCheckError('The fallback image has invalid environment metadata.')
+        name, value = entry.split('=', 1)
+        environment_values[name] = value
+    sensitive_names = sorted(
+        name
+        for name in environment_values
+        if any(marker in name.upper() for marker in ('PASSWORD', 'SECRET', 'TOKEN'))
+    )
+    if sensitive_names:
+        raise RestoreCheckError(
+            'The fallback image embeds runtime secrets: ' + ', '.join(sensitive_names)
+        )
+    if environment_values.get('PG_MAJOR') != expected_major:
+        raise RestoreCheckError('The fallback image PostgreSQL major version does not match.')
+    return image_id
+
+
+def select_restore_image(source_container, fallback_image=None, runner=run_command):
+    live_image = source_image_id(source_container, runner)
+    if image_is_available(live_image, runner):
+        return live_image, False
+    if not fallback_image:
+        raise RestoreCheckError(
+            'The exact live PostgreSQL image is unavailable. Supply only a reviewed '
+            '--fallback-image or restore the exact image metadata.'
+        )
+    major = source_postgres_major(source_container, runner)
+    fallback_id = verify_fallback_restore_image(fallback_image, major, runner)
+    return fallback_id, True
 
 
 def docker_run_command(container, image_id):
@@ -360,12 +456,18 @@ def validate_restored_database(container):
     return validate_metrics(result.stdout.strip())
 
 
-def execute(backup_root, source_container, restore_container):
+def execute(backup_root, source_container, restore_container, fallback_image=None):
     validate_container_name(source_container, 'source')
     validate_container_name(restore_container, 'restore')
     backup_module = load_database_backup()
     backup, checksum = select_latest_backup(backup_root, backup_module)
-    image_id = source_image_id(source_container)
+    image_id, used_fallback = select_restore_image(source_container, fallback_image)
+    if used_fallback:
+        print(
+            'Exact live PostgreSQL image metadata is unavailable; using verified '
+            f'fallback {fallback_image} ({image_id}).',
+            flush=True,
+        )
 
     with disposable_restore_container(restore_container, image_id):
         wait_for_database(restore_container)
@@ -393,11 +495,23 @@ def main():
     parser.add_argument('--backup-root', type=Path, default=DEFAULT_BACKUP_ROOT)
     parser.add_argument('--source-container', default=DEFAULT_SOURCE_CONTAINER)
     parser.add_argument('--restore-container', default=DEFAULT_RESTORE_CONTAINER)
+    parser.add_argument(
+        '--fallback-image',
+        help=(
+            'Reviewed local image used only when the exact live image metadata is '
+            'unavailable; its runtime metadata and PostgreSQL major version are checked.'
+        ),
+    )
     args = parser.parse_args()
     signal.signal(signal.SIGINT, interrupted)
     signal.signal(signal.SIGTERM, interrupted)
     try:
-        execute(args.backup_root, args.source_container, args.restore_container)
+        execute(
+            args.backup_root,
+            args.source_container,
+            args.restore_container,
+            args.fallback_image,
+        )
     except (RestoreCheckError, OSError, ValueError) as error:
         parser.exit(1, f'Database restore check failed: {error}\n')
 
