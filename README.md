@@ -136,7 +136,7 @@ pcep-runner.micutu.com → static bridge + Pyodide only (no API/auth/SPA fallbac
 ```bash
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
-pip install --require-hashes --only-binary=:all: -r requirements-dev.lock
+pip install --require-hashes --only-binary=:all: -r requirements-dev.txt
 
 # Point Django at a local Postgres and seed the bank
 export DJANGO_SECRET_KEY=dev DJANGO_DEBUG=True
@@ -246,11 +246,13 @@ provenance attestations for the resolved dependency tree.
 The frontend pins Workbox's deprecated `glob@11` transitive dependency to
 `glob@13.0.6`; Workbox uses only the retained `globSync` library API. Keep this
 override exact and remove it when Workbox supports the current major directly.
-Dependabot checks GitHub Actions every Monday and frontend npm dependencies every
-Tuesday. Normal version updates wait seven days after release and group compatible
-minor/patch changes; the cooldown does not apply to security-update PRs when that
-repository feature is enabled. Every proposal triggers the full CI suite and awaits
-human review—nothing is auto-merged by this configuration.
+Dependabot checks GitHub Actions every Monday, frontend npm dependencies every
+Tuesday and backend Python dependencies every Wednesday. Python's conventional
+`.in` manifests and SHA-256 `.txt` locks are regenerated and checked together.
+Normal version updates wait seven days after release and group compatible
+minor/patch changes; the cooldown does not apply to security-update PRs. Dependabot
+security updates are enabled, but every proposal still triggers the full CI suite
+and awaits human review—nothing is auto-merged by this configuration.
 The repository dependency graph and Dependabot alerts are enabled, and the project
 includes a required PR-only GitHub dependency review workflow. It fails on newly
 added or upgraded dependencies with

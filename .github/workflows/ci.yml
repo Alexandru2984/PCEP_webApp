@@ -58,20 +58,25 @@ jobs:
           python-version: "3.12.14"
           cache: pip
           cache-dependency-path: |
+            backend/requirements.in
+            backend/requirements-dev.in
             backend/requirements.txt
             backend/requirements-dev.txt
-            backend/requirements.lock
-            backend/requirements-dev.lock
 
       - name: Install dependencies
         run: >-
           pip install --require-hashes --only-binary=:all:
-          -r requirements-dev.lock
+          -r requirements-dev.txt
+
+      - name: Verify reproducible dependency locks
+        run: |
+          make -C .. lock-backend LOCK_COMPILER=pip-compile
+          git diff --exit-code -- requirements.txt requirements-dev.txt
 
       - name: Audit Python dependencies
         run: |
-          python -m pip_audit -r requirements.lock
-          python -m pip_audit -r requirements-dev.lock
+          python -m pip_audit -r requirements.txt
+          python -m pip_audit -r requirements-dev.txt
 
       - name: Audit question bank
         env:

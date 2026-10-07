@@ -18,6 +18,7 @@ media/
 .pytest_cache/
 .coverage
 pytest.ini
+requirements*.in
 requirements-dev.txt
 pcep_project/test_settings.py
 quiz/tests/
