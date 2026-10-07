@@ -2508,7 +2508,7 @@ The fail-closed preflight now applies its bounded safe-segment grammar to the ba
 path wrapped by the crypt remote as well as to the requested destination. Absolute
 paths, trailing or repeated separators, traversal, unsafe backend names and a crypt
 remote that wraps itself are rejected before backend feature checks or any transfer.
-Thirty-one focused tests cover the offsite control. Independent credentials,
+Forty-four focused tests cover the offsite control. Independent credentials,
 provider versioning/object lock, an offline recovery key, a tested alert and vendor
 review are still absent, so the CISO verdict remains **BLOCK activation**.
 
@@ -2530,6 +2530,22 @@ requirements. No bucket, token, lock, upload, credential, systemd unit or produc
 service was changed. DPA/subprocessor review, offline key custody, independent alert
 testing and an incident tabletop remain open; the verdict remains **BLOCK
 activation**.
+
+### Cloudflare R2 profile enforcement — 2026-10-07
+
+The offsite preflight now binds execution to the reviewed `cloudflare-r2-eu` profile
+instead of accepting an arbitrary encrypted backend. The redacted configuration must
+contain exactly the crypt wrapper and its backend. It rejects a non-Cloudflare
+provider, a non-EU or malformed endpoint, non-auto region, ambient credentials,
+session tokens, enabled bucket-creation checks, missing static credentials, extra
+backend/crypt options and any physical path other than
+`bucket-name/encrypted`. Forty-four focused tests pass.
+
+This is deliberately not presented as provider attestation: the local file cannot
+prove Cloudflare token scope, actual bucket jurisdiction, private-access state or the
+Bucket Lock rule. Those activation gates still require independently reviewed
+control-plane evidence. No remote API mutation, upload, secret, systemd installation
+or production restart occurred; the CISO verdict remains **BLOCK activation**.
 
 ## 15. Breaking changes
 
