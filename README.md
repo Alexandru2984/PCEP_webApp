@@ -290,8 +290,10 @@ Encrypted offsite replication has a fail-closed implementation and security runb
 but remains deliberately inactive until a dedicated crypt remote, independent alert,
 provider controls and offline recovery key satisfy the documented activation gates.
 
-Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md);
-offsite gates and incident response live in
+Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
+The general [security incident response runbook](docs/SECURITY_INCIDENT_RESPONSE.md)
+covers control-plane, host, database and browser-origin compromise. Offsite-specific
+activation gates and response steps live in
 [docs/OFFSITE_BACKUP_RUNBOOK.md](docs/OFFSITE_BACKUP_RUNBOOK.md).
 
 ## API reference
