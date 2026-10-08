@@ -32,6 +32,12 @@ updates:
       default-days: 7
     open-pull-requests-limit: 3
     versioning-strategy: "increase"
+    # Major framework migrations are planned and tested separately. Dependabot's
+    # update-types filter applies only to version updates, not security updates.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     groups:
       production-minor-patch:
         dependency-type: "production"
@@ -60,6 +66,13 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 3
+    # Keep the supported major line patched without allowing a speculative major
+    # upgrade to occupy the dependency's only open version-update pull request.
+    # Security updates remain eligible regardless of this version-update filter.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     groups:
       production-minor-patch:
         dependency-type: "production"
