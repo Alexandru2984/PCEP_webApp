@@ -443,6 +443,10 @@ The API has three workers, 30-second request/graceful timeouts, a 45-second
 container shutdown grace period, and a bounded 60-second database startup probe
 (`DB_STARTUP_TIMEOUT_SECONDS`, 1..300). A failed one-shot migration stops the
 deployment before backend replacement.
+Gunicorn runs the explicit synchronous worker contract over HTTP/1 only. Cleartext
+HTTP/2 is disabled, ambiguous underscore-containing headers are dropped, and the
+unused administrative control socket is disabled rather than created inside the
+read-only container filesystem.
 The non-root backend filesystem is read-only except the existing static/media
 volumes and a 64 MB temporary filesystem. Capabilities are dropped, privilege
 escalation is disabled, and the backend is capped at 512 MB and 128 processes.
