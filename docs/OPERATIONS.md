@@ -117,6 +117,13 @@ alias. Python jobs pin 3.12.14, matching the backend image and local review
 environment. Upgrade either runner or interpreter only as a reviewed change after
 the complete CI suite passes on the candidate combination.
 
+Repository Actions policy enforces full-length commit SHA references and permits
+only actions owned by GitHub (`actions/*` and `github/*`). Do not weaken the remote
+policy to admit a new publisher. A genuinely required third-party action needs a
+separate supply-chain review, an explicit narrow allowlist entry and an immutable
+commit reference before its workflow can merge. Workflow tokens default to read-only
+and cannot approve pull requests.
+
 Run `make check-workflows` after changing `.github/workflows/`. It downloads the
 Linux/amd64 `actionlint` 1.7.12 and `zizmor` 1.30.1 archives over HTTPS, verifies
 each release's pinned SHA-256 before extraction, and validates every workflow.
@@ -366,6 +373,14 @@ would otherwise return success, fails the command. Push/pull-request CI runs thi
 check on Ubuntu 24.04 as well.
 
 ## Backend Deploy
+
+Production deployment is deliberately operator-triggered after the required checks
+pass. Keep the repository webhook targeting `https://hooks.micutu.com/hooks/pcep`
+disabled. The host's generic webhook path performs an in-place `git pull` followed by
+plain `docker compose pull/up`; that conflicts with active worktrees and omits the
+PCEP backup, immutable-image scan, migration, rollback and release-verification
+gates documented below. It is not an acceptable PCEP release path. Do not re-enable
+it as a shortcut; use the reviewed backend and frontend commands in this runbook.
 
 ```bash
 make deploy-backend
