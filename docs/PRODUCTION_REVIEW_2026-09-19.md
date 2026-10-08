@@ -2554,6 +2554,39 @@ Bucket Lock rule. Those activation gates still require independently reviewed
 control-plane evidence. No remote API mutation, upload, secret, systemd installation
 or production restart occurred; the CISO verdict remains **BLOCK activation**.
 
+### Production verification credential exposure — 2026-10-08
+
+At approximately 16:52 UTC, a post-deployment verification command rendered the
+backend container's complete environment into the private operator transcript. This
+exposed the Django signing key and the `pcep_user` application-database password.
+The database administrator credential was not present in the backend environment
+and was not exposed. Detection was immediate, and the transcript was treated as an
+untrusted disclosure channel rather than relying on later deletion.
+
+The affected database role has no superuser, database-creation, role-creation,
+replication, row-security-bypass or object-ownership capability; its table grants
+remain limited to application DML. Production contained zero Django users and zero
+Django sessions at containment time, and the learner API has no authentication
+surface. This bounds the known credential scope but does not prove that the rendered
+values were never observed outside the host.
+
+Both exposed values were rotated. The backend was stopped while the application
+role password and the two mode-0600 environment files were updated, then only the
+backend was recreated from the already-scanned release image. The first revocation
+probe incorrectly used PostgreSQL loopback, which is covered by a local `trust`
+rule; that attempt rolled back automatically. The completed rotation used a
+disposable client on the Compose network, matching the backend's SCRAM-authenticated
+TCP path. It proved that the replacement credential succeeds and the disclosed
+credential is rejected. At 16:54:17 UTC the backend was healthy with synchronized
+replacement values, and public smoke testing passed for release `e17371c6d416` with
+308 questions, the admin route disabled and the browser runner isolated. Repository
+and reachable-history scanning plus GitHub secret, dependency and code-scanning
+alerts remained clean.
+
+Future environment verification must parse inspection JSON and assert selected
+properties without printing the environment array, values, hashes or other
+secret-derived material.
+
 ## 15. Breaking changes
 
 None.
