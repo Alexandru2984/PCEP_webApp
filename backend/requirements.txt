@@ -4,34 +4,33 @@
 #
 #    make lock-backend
 #
---only-binary :all:
-
 asgiref==3.12.1 \
     --hash=sha256:59dcb51c272ad209d59bed5708a64a333083e86017d7fcdd67498eeab7784340 \
     --hash=sha256:fe386d1c2bff7259ea95929266d12a8cf9a8b5a1c2598402967d8792e7a7c094
     # via
     #   django
     #   django-cors-headers
-django==5.2.18 \
-    --hash=sha256:92ed81d500be6408ecd704d7bd1366c534f30427bffcc63c5fefb129561aec7c
+django==6.1.1 \
+    --hash=sha256:585fb82bf15053c42cf52e67c2f1b54a032dca384759315fd6678ab1870d1d72 \
+    --hash=sha256:7ab93536d8e677aa14554c56426290c69480bf2ee68d7513d4a22f57d6bfeb84
     # via
-    #   -r backend/requirements.in
+    #   -r requirements.in
     #   django-cors-headers
     #   djangorestframework
 django-cors-headers==4.9.0 \
     --hash=sha256:15c7f20727f90044dcee2216a9fd7303741a864865f0c3657e28b7056f61b449 \
     --hash=sha256:fe5d7cb59fdc2c8c646ce84b727ac2bca8912a247e6e68e1fb507372178e59e8
-    # via -r backend/requirements.in
+    # via -r requirements.in
 django-environ==0.14.0 \
     --hash=sha256:8dbe8a57f0a540ab8abd6f54f230de5e99e3a2c9d797cb9caecb037bca3d47d8
-    # via -r backend/requirements.in
+    # via -r requirements.in
 djangorestframework==3.18.1 \
     --hash=sha256:605d79fa2ec2f02905492e5ea13d903c2d842d0b4c915a57f7bf02ab9f3c91dd \
     --hash=sha256:f1409d698967aaf82d5d98d76b549c8fba8bd92ebd0d83d24454508f72168dc2
-    # via -r backend/requirements.in
+    # via -r requirements.in
 gunicorn==26.2.0 \
     --hash=sha256:bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3
-    # via -r backend/requirements.in
+    # via -r requirements.in
 psycopg2-binary==2.9.13 \
     --hash=sha256:0405dd4d97720e7ab177aa02e493f524907c4cb3c445ac173e2627948d3d0528 \
     --hash=sha256:0463c00f946517f3e69192a59e6601e023ff9de45ad0a875eda3d6b1bebeb7ce \
@@ -100,7 +99,7 @@ psycopg2-binary==2.9.13 \
     --hash=sha256:f4cdfe41149dcc5583a3b7a2f0ad433f75bb3afd1c7a7332e63df89b05e34666 \
     --hash=sha256:f818161d2302b3b3e9c75d5a1d0a5c5679e92e45cfec6432b9d5432dde5ff1f1 \
     --hash=sha256:feb7b1856f6ca805cc0e08739858f6cdfed8ce903390126af30343c62899a389
-    # via -r backend/requirements.in
+    # via -r requirements.in
 sqlparse==0.6.0 \
     --hash=sha256:113c35c75365ab9cc9c7231d68c6428fb11c085fc8e9eb1ad659b7ddbf6cd2b9 \
     --hash=sha256:b861c0288ce2fa56209a9a6412d2e066ac664b3873b89c26c9d8415e8e32996f
