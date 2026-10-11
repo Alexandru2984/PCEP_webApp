@@ -27,7 +27,7 @@ DATABASE_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PRODUCTION_URL ?= https://pcep.micutu.com
 PYTHON_RUNNER_ORIGIN ?= https://pcep-runner.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -56,6 +56,7 @@ help:
 		'  seed-reset       Reset and seed production DB in backend container' \
 		'  deploy-frontend  Backup and publish frontend/dist to FRONTEND_ROOT' \
 		'  release-retention Preview old release snapshots; never deletes' \
+		'  backend-image-retention Preview obsolete PCEP rollback image tags' \
 		'  status           Show git and docker compose status'
 
 install: install-backend install-frontend
@@ -166,6 +167,9 @@ deploy-frontend: build-frontend
 
 release-retention:
 	"$(PYTHON_BIN)" scripts/release_retention.py "$(FRONTEND_ROOT)" --backup-root "$(BACKUP_ROOT)" --keep "$(RELEASE_KEEP)"
+
+backend-image-retention:
+	"$(PYTHON_BIN)" scripts/backend_image_retention.py --keep "$(RELEASE_KEEP)"
 
 status:
 	git status --short --branch

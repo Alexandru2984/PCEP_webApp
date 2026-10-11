@@ -641,7 +641,26 @@ Backend rollback uses the retained image: tag the chosen
 `pcep-backend-rollback:<timestamp>` as `pcep_webapp-backend:latest`, then
 `docker compose up -d --no-deps --no-build backend` and verify readiness/public
 API. The 2026-09-18 pre-change image is `pcep-backend-rollback:20260918`.
-It contains old vulnerable dependencies, so use only for an emergency rollback.
+It contains old vulnerable dependencies and predates the current release metadata
+contract, so it is not a valid recovery image and should be retired by the bounded
+retention process.
+Preview bounded backend-image retention with `make backend-image-retention`.
+The dry run considers only the exact `pcep-backend-rollback` repository, validates
+the generated tag against the embedded `PCEP_RELEASE` and OCI revision, requires
+`appuser`, rejects embedded runtime-secret names and refuses to select an image
+used by any container. Invalid legacy images do not consume the minimum floor of
+two contract-valid rollbacks. Before applying retention, vulnerability-scan the
+retained image IDs and test the selected rollback procedure. After reviewing every
+exact tag and immutable image ID, apply with:
+
+```bash
+backend/.venv/bin/python scripts/backend_image_retention.py --keep 5 --apply
+```
+
+The apply path rechecks tag identity and container use before each ordinary
+`docker image rm`; it never invokes host-wide prune or force removal. Images in
+other repositories, PostgreSQL images, build cache and other applications are
+outside its allowlist.
 Question-content migrations 0003 through 0006 update existing rows in place,
 preserve question/choice IDs and are reversible; they need no database restore
 for an application rollback. Database restoration is a separate planned
