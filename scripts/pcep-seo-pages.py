@@ -24,15 +24,33 @@ newly added questions appear without anyone remembering to regenerate.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+import ctypes
+from datetime import date
+import fcntl
 import html
 import json
+import os
 import pathlib
+import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 
 OUT_ROOT = pathlib.Path("/var/www/pcep/seo")
 SITE = "https://pcep.micutu.com"
 CONTAINER = "pcep_backend"
+DOCKER = "/usr/bin/docker"
+MIN_QUESTIONS = 50
+MAX_QUESTIONS = 2_000
+FORBIDDEN_ANSWER_FIELDS = {
+    "answer",
+    "correct",
+    "correct_choice",
+    "explanation",
+    "is_correct",
+}
 
 # Slugs carry the words people actually search for, not "module3".
 MODULES: list[tuple[str, str, str, str]] = [
@@ -105,6 +123,10 @@ font-size:.9rem;color:var(--muted)}
 E = html.escape
 
 
+class SeoPublishError(RuntimeError):
+    """Refuse unsafe extraction or publication without changing the live tree."""
+
+
 def page(title: str, description: str, canonical: str, body: str) -> str:
     return f"""<!doctype html>
 <html lang="en">
@@ -151,32 +173,134 @@ def render_question(n: int, q: dict) -> str:
     return "\n".join(parts)
 
 
-def main() -> int:
-    raw = subprocess.run(
-        ["docker", "exec", "-i", CONTAINER, "python", "manage.py", "shell", "-c", EXTRACT],
-        capture_output=True, text=True, timeout=180,
-    )
+def extract_questions(runner=subprocess.run) -> list[dict]:
+    try:
+        raw = runner(
+            [
+                DOCKER,
+                "exec",
+                "--interactive",
+                "--user",
+                "appuser",
+                CONTAINER,
+                "python",
+                "manage.py",
+                "shell",
+                "-c",
+                EXTRACT,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise SeoPublishError(f"docker lipseste: {DOCKER}") from error
+    except subprocess.TimeoutExpired as error:
+        raise SeoPublishError("extragerea intrebarilor a depasit 180 de secunde") from error
     if raw.returncode != 0:
-        print(f"[pcep-seo] extragere esuata: {raw.stderr[:400]}", file=sys.stderr)
-        return 1
+        detail = raw.stderr.strip()[-400:] or raw.stdout.strip()[-400:]
+        raise SeoPublishError(f"extragere esuata: {detail}")
     if "---JSON-START---" not in raw.stdout:
-        print("[pcep-seo] marcatorul JSON lipseste din iesire", file=sys.stderr)
-        return 1
+        raise SeoPublishError("marcatorul JSON lipseste din iesire")
 
-    questions = json.loads(raw.stdout.split("---JSON-START---", 1)[1].strip())
-    if len(questions) < 50:
-        # A partial read would silently publish a thin page, which is worse for
-        # ranking than publishing nothing. Fail instead.
-        print(f"[pcep-seo] doar {len(questions)} intrebari - refuz sa scriu", file=sys.stderr)
-        return 1
+    try:
+        questions = json.loads(raw.stdout.split("---JSON-START---", 1)[1].strip())
+    except json.JSONDecodeError as error:
+        raise SeoPublishError("extragerea a returnat JSON invalid") from error
+    validate_questions(questions)
+    return questions
+
+
+def validate_questions(questions) -> None:
+    if not isinstance(questions, list):
+        raise SeoPublishError("setul de intrebari nu este o lista")
+    if not MIN_QUESTIONS <= len(questions) <= MAX_QUESTIONS:
+        raise SeoPublishError(
+            f"numar de intrebari in afara limitelor: {len(questions)} "
+            f"(asteptat {MIN_QUESTIONS}-{MAX_QUESTIONS})"
+        )
+
+    module_names = {key for key, *_ in MODULES}
+    seen_ids = set()
+    seen_modules = set()
+    for position, question in enumerate(questions, 1):
+        if not isinstance(question, dict):
+            raise SeoPublishError(f"intrebarea {position} nu este un obiect")
+        forbidden = FORBIDDEN_ANSWER_FIELDS.intersection(question)
+        if forbidden:
+            raise SeoPublishError(
+                f"intrebarea {position} contine campuri de raspuns interzise"
+            )
+
+        identifier = question.get("id")
+        if type(identifier) is not int or identifier <= 0 or identifier in seen_ids:
+            raise SeoPublishError(f"intrebarea {position} are un ID invalid sau duplicat")
+        seen_ids.add(identifier)
+
+        module = question.get("module")
+        if module not in module_names:
+            raise SeoPublishError(f"intrebarea {identifier} are un modul invalid")
+        seen_modules.add(module)
+        if question.get("difficulty") not in {"easy", "medium", "hard"}:
+            raise SeoPublishError(f"intrebarea {identifier} are dificultate invalida")
+
+        text = question.get("text")
+        if not isinstance(text, str) or not text or len(text) > 10_000:
+            raise SeoPublishError(f"intrebarea {identifier} are text invalid")
+        code = question.get("code")
+        if not isinstance(code, str) or len(code) > 50_000:
+            raise SeoPublishError(f"intrebarea {identifier} are cod invalid")
+        objective = question.get("objective")
+        if objective is not None and (
+            not isinstance(objective, str) or len(objective) > 32
+        ):
+            raise SeoPublishError(f"intrebarea {identifier} are obiectiv invalid")
+        updated = question.get("updated")
+        if not isinstance(updated, str):
+            raise SeoPublishError(f"intrebarea {identifier} nu are data actualizarii")
+        try:
+            date.fromisoformat(updated)
+        except ValueError as error:
+            raise SeoPublishError(
+                f"intrebarea {identifier} are data actualizarii invalida"
+            ) from error
+
+        choices = question.get("choices")
+        if not isinstance(choices, list) or len(choices) != 4:
+            raise SeoPublishError(f"intrebarea {identifier} nu are exact patru optiuni")
+        choice_ids = set()
+        for choice in choices:
+            if not isinstance(choice, dict):
+                raise SeoPublishError(f"intrebarea {identifier} are o optiune invalida")
+            if FORBIDDEN_ANSWER_FIELDS.intersection(choice):
+                raise SeoPublishError(
+                    f"intrebarea {identifier} contine metadate de raspuns interzise"
+                )
+            choice_id = choice.get("id")
+            if type(choice_id) is not int or choice_id <= 0 or choice_id in choice_ids:
+                raise SeoPublishError(
+                    f"intrebarea {identifier} are un ID de optiune invalid sau duplicat"
+                )
+            choice_ids.add(choice_id)
+            choice_text = choice.get("text")
+            if not isinstance(choice_text, str) or not choice_text or len(choice_text) > 10_000:
+                raise SeoPublishError(f"intrebarea {identifier} are text de optiune invalid")
+
+    if seen_modules != module_names:
+        raise SeoPublishError("setul de intrebari nu acopera toate cele patru module")
+
+
+def render_release(output_root: pathlib.Path, questions: list[dict]) -> int:
+    validate_questions(questions)
 
     by_module: dict[str, list[dict]] = {}
     for q in questions:
         by_module.setdefault(q["module"], []).append(q)
 
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
-    (OUT_ROOT / "practice").mkdir(exist_ok=True)
-    (OUT_ROOT / "practice" / "style.css").write_text(CSS, encoding="utf-8")
+    output_root.mkdir(parents=True, exist_ok=True)
+    (output_root / "practice").mkdir(exist_ok=True)
+    (output_root / "practice" / "style.css").write_text(CSS, encoding="utf-8")
 
     urls = [f"{SITE}/practice/"]
 
@@ -199,7 +323,7 @@ def main() -> int:
             '<p style="margin-top:28px"><a class="cta" href="/">Practice interactively '
             "— instant feedback and a built-in Python runner</a></p>"
         )
-        out = OUT_ROOT / "practice" / slug
+        out = output_root / "practice" / slug
         out.mkdir(exist_ok=True)
         (out / "index.html").write_text(
             page(
@@ -268,7 +392,7 @@ def main() -> int:
         "runner so you can change a snippet and see what happens instead of "
         "taking the explanation on trust.</p>",
     ]
-    (OUT_ROOT / "practice" / "index.html").write_text(
+    (output_root / "practice" / "index.html").write_text(
         page(
             "PCEP Practice Questions — all four modules",
             f"{total} free PCEP practice questions with interactive feedback, "
@@ -300,17 +424,157 @@ def main() -> int:
         f"  <url><loc>{u}</loc><lastmod>{lastmods[u]}</lastmod></url>"
         for u in [f"{SITE}/"] + urls
     )
-    (OUT_ROOT / "sitemap.xml").write_text(
+    (output_root / "sitemap.xml").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         f"{entries}\n</urlset>\n",
         encoding="utf-8",
     )
-    (OUT_ROOT / "robots.txt").write_text(
+    (output_root / "robots.txt").write_text(
         "User-agent: *\nAllow: /\n\n" f"Sitemap: {SITE}/sitemap.xml\n", encoding="utf-8"
     )
+    return total
 
-    print(f"[pcep-seo] scris {total} intrebari in {len(urls)} pagini + sitemap")
+
+def validate_release(root: pathlib.Path) -> None:
+    expected = {
+        pathlib.Path("robots.txt"),
+        pathlib.Path("sitemap.xml"),
+        pathlib.Path("practice/index.html"),
+        pathlib.Path("practice/style.css"),
+        *(
+            pathlib.Path("practice") / slug / "index.html"
+            for _key, slug, _label, _blurb in MODULES
+        ),
+    }
+    actual = set()
+    for entry in root.rglob("*"):
+        if entry.is_symlink():
+            raise SeoPublishError("release-ul SEO nu poate contine legaturi simbolice")
+        if entry.is_file():
+            if not entry.stat().st_size:
+                raise SeoPublishError(f"fisier SEO gol: {entry.relative_to(root)}")
+            actual.add(entry.relative_to(root))
+        elif not entry.is_dir():
+            raise SeoPublishError(f"intrare SEO nesuportata: {entry.relative_to(root)}")
+    if actual != expected:
+        raise SeoPublishError("release-ul SEO nu contine exact fisierele asteptate")
+
+
+def publication_target(target: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path]:
+    target = pathlib.Path(os.path.abspath(target))
+    parent = target.parent
+    if parent.is_symlink() or not parent.is_dir() or parent.resolve() != parent:
+        raise SeoPublishError("parintele directorului SEO trebuie sa fie un director real")
+    parent_stat = parent.stat()
+    if parent_stat.st_uid != os.geteuid() or parent_stat.st_mode & 0o022:
+        raise SeoPublishError(
+            "parintele directorului SEO trebuie sa apartina utilizatorului curent "
+            "si sa nu fie editabil de grup sau alti utilizatori"
+        )
+    if target.is_symlink() or (target.exists() and not target.is_dir()):
+        raise SeoPublishError("directorul SEO live trebuie sa fie un director real")
+    return target, parent
+
+
+@contextmanager
+def publication_lock(parent: pathlib.Path):
+    lock_path = parent / ".seo-publish.lock"
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as error:
+        raise SeoPublishError("nu pot deschide blocarea publicarii SEO") from error
+    try:
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_mode & 0o077
+        ):
+            raise SeoPublishError("fisierul de blocare SEO are proprietati nesigure")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise SeoPublishError("o alta publicare SEO este deja activa") from error
+        yield
+    finally:
+        os.close(descriptor)
+
+
+def exchange_directories(first: pathlib.Path, second: pathlib.Path) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    rename = getattr(libc, "renameat2", None)
+    if rename is None:
+        raise SeoPublishError("schimbul atomic de directoare nu este disponibil")
+    rename.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    rename.restype = ctypes.c_int
+    if rename(-100, os.fsencode(first), -100, os.fsencode(second), 2):
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code))
+
+
+def normalize_public_modes(root: pathlib.Path) -> None:
+    root.chmod(0o755)
+    for entry in root.rglob("*"):
+        entry.chmod(0o755 if entry.is_dir() else 0o644)
+
+
+def fsync_directory(path: pathlib.Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def publish_questions(questions: list[dict], target: pathlib.Path = OUT_ROOT) -> int:
+    target, parent = publication_target(target)
+    with publication_lock(parent):
+        stage = pathlib.Path(tempfile.mkdtemp(prefix=f".{target.name}.release-", dir=parent))
+        published = False
+        try:
+            total = render_release(stage, questions)
+            normalize_public_modes(stage)
+            validate_release(stage)
+            if target.exists():
+                exchange_directories(stage, target)
+            else:
+                os.replace(stage, target)
+            published = True
+            fsync_directory(parent)
+            try:
+                shutil.rmtree(stage)
+            except OSError as error:
+                print(
+                    f"[pcep-seo] avertisment: versiunea precedenta ramane la {stage}: {error}",
+                    file=sys.stderr,
+                )
+            return total
+        finally:
+            if not published and stage.exists():
+                shutil.rmtree(stage)
+
+
+def main() -> int:
+    try:
+        questions = extract_questions()
+        total = publish_questions(questions)
+    except (OSError, SeoPublishError) as error:
+        print(f"[pcep-seo] publicare refuzata: {error}", file=sys.stderr)
+        return 1
+
+    print(
+        f"[pcep-seo] scris {total} intrebari in {len(MODULES) + 1} pagini + sitemap"
+    )
     return 0
 
 

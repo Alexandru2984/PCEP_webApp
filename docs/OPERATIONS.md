@@ -675,9 +675,36 @@ recreate only `backend`. Rotating the administrator password updates the
 `pcep-seo-pages.timer` regenerates the host pages weekly. It extracts questions
 through the public API serializer: static pages must never contain correct-answer
 flags, answer IDs or per-option explanations. Answers are obtained only after
-interactive submission. Validate with `pytest quiz/tests/test_seo_pages.py`.
-Deploy with `sudo install -m 755 scripts/pcep-seo-pages.py /usr/local/sbin/pcep-seo-pages`
-and `sudo /usr/local/sbin/pcep-seo-pages`. No service restart is necessary.
+interactive submission. The generator validates that contract, builds a complete
+release beside the live tree and uses an atomic directory exchange; extraction,
+validation or rendering failures leave the prior release untouched. Concurrent
+publishers are rejected by a private lock.
+
+Validate and deploy the non-root, filesystem- and network-sandboxed service with:
+
+```bash
+pytest backend/quiz/tests/test_seo_pages.py
+make check-systemd
+sudo test -d /var/www/pcep/seo
+sudo test ! -L /var/www/pcep/seo
+sudo chown -R --no-dereference micu:micu /var/www/pcep/seo
+sudo install -o root -g root -m 0755 scripts/pcep-seo-pages.py /usr/local/sbin/pcep-seo-pages
+sudo install -o root -g root -m 0644 ops/systemd/pcep-seo-pages.service /etc/systemd/system/
+sudo install -o root -g root -m 0644 ops/systemd/pcep-seo-pages.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pcep-seo-pages.timer
+sudo systemctl start pcep-seo-pages.service
+sudo systemctl status pcep-seo-pages.service pcep-seo-pages.timer --no-pager
+```
+
+The one-time ownership change aligns the live directory with `User=micu`; its
+parent is already owned by that account and is not writable by group or others.
+The service has no IP networking and can write only below `/var/www/pcep`; it
+reaches Docker only through the local Unix socket. That socket still grants broad
+Docker-daemon authority, so the installed generator and unit must remain
+root-owned and non-writable by `micu`. Back up the prior script, units and SEO
+tree before deployment. Roll back by restoring all four together, reloading
+systemd and regenerating the pages.
 The 2026-09-18 security remediation backed up the previous generator and pages
 under `/home/micu/backups/pcep/security-20260918`. Do not restore the vulnerable
 pages. Search engines or third-party caches may retain historical answer content.
