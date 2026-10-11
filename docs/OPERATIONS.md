@@ -550,9 +550,13 @@ required; the script refuses to fall back to delete-then-copy.
 No automatic snapshot deletion is performed. Preview bounded retention with
 `make release-retention` (five newest rollback roots and five newest backup
 copies by default). The preview recognizes only exact `frontend`/`static`
-release names and reports allocated space without following symlinks. It cannot
-select database dumps, `security-*` directories or other backup files. After
-reviewing every listed path, apply the exact plan explicitly with:
+release names, validates every candidate against the current release contract
+and reports allocated space without following symlinks. Invalid or obsolete
+snapshots are selected for removal rather than consuming the rollback floor; the
+command refuses all pruning unless at least two valid snapshots remain in each
+location. It cannot select database dumps, `security-*` directories or other
+backup files. After reviewing every listed path, apply the exact plan explicitly
+with:
 
 ```bash
 backend/.venv/bin/python scripts/release_retention.py \
