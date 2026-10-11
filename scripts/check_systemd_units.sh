@@ -82,11 +82,16 @@ stage_units="$stage/etc/systemd/system"
 install -d -m 0755 \
     "$stage_units" \
     "$stage/home/micu/PCEP_webApp/backend/.venv/bin" \
+    "$stage/usr/local/sbin" \
+    "$stage/var/run" \
     "$stage/usr/bin"
 cp -a "$unit_root/." "$stage_units/"
 install -m 0755 /dev/null \
     "$stage/home/micu/PCEP_webApp/backend/.venv/bin/python"
+install -m 0755 /dev/null "$stage/usr/local/sbin/pcep-seo-pages"
 install -m 0755 /dev/null "$stage/usr/bin/install"
+install -m 0755 /dev/null "$stage/usr/bin/python3"
+install -m 0600 /dev/null "$stage/var/run/docker.sock"
 
 # Repository units legitimately depend on these host-provided units. Minimal
 # fixtures make dependency resolution deterministic without importing a runner's

@@ -1,0 +1,11 @@
+[Unit]
+Description=Regenerate PCEP public study pages weekly
+
+[Timer]
+OnCalendar=Mon 05:15
+Persistent=true
+RandomizedDelaySec=10m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target
