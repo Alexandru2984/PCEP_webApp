@@ -26,8 +26,36 @@ printf 'location ~ /\\. { deny all; }\n' > "$stage/snippets/block-dotfiles.conf"
 # Shared variables/includes are provided by the actual production host.
 sed -e '/include \/etc\/letsencrypt\/options-ssl-nginx.conf;/d' -e '/ssl_dhparam \/etc\/letsencrypt\/ssl-dhparams.pem;/d' "$root/nginx/pcep.micutu.com.conf" > "$stage/pcep.conf"
 sed -e '/include \/etc\/letsencrypt\/options-ssl-nginx.conf;/d' -e '/ssl_dhparam \/etc\/letsencrypt\/ssl-dhparams.pem;/d' "$root/nginx/pcep-runner.micutu.com.conf" > "$stage/pcep-runner.conf"
-# shellcheck disable=SC2016 # Nginx variable must remain literal.
-printf 'geo $from_cloudflare_origin { default 1; }\n' > "$stage/shared.conf"
+# shellcheck disable=SC2016 # Nginx variables must remain literal.
+printf '%s\n' \
+    'geo $from_cloudflare_origin { default 1; }' \
+    'server {' \
+    '    listen 127.0.0.1:3010;' \
+    '    server_name analytics-fixture;' \
+    '    if ($http_cookie != "") { return 418; }' \
+    '    if ($http_authorization != "") { return 418; }' \
+    '    if ($http_proxy_authorization != "") { return 418; }' \
+    '    if ($http_x_csrftoken != "") { return 418; }' \
+    '    if ($http_x_xsrf_token != "") { return 418; }' \
+    '    location = /script.js {' \
+    '        default_type application/javascript;' \
+    '        add_header Set-Cookie "tracker=bad; Path=/" always;' \
+    '        add_header WWW-Authenticate "Basic realm=bad" always;' \
+    '        add_header Location "https://attacker.invalid/" always;' \
+    '        add_header Content-Security-Policy "script-src *" always;' \
+    '        add_header X-Accel-Redirect "/should-not-run" always;' \
+    '        add_header X-Accel-Limit-Rate "1" always;' \
+    '        return 200 "window.fixtureAnalytics=true;";' \
+    '    }' \
+    '    location = /api/send {' \
+    '        add_header Set-Cookie "tracker=bad; Path=/" always;' \
+    '        add_header WWW-Authenticate "Basic realm=bad" always;' \
+    '        add_header Location "https://attacker.invalid/" always;' \
+    '        add_header Content-Security-Policy "script-src *" always;' \
+    '        add_header X-Accel-Redirect "/should-not-run" always;' \
+    '        return 204;' \
+    '    }' \
+    '}' > "$stage/shared.conf"
 mounts=(
     # Match sites-enabled ordering: pcep-runner sorts before pcep.micutu.com.
     -v "$stage/pcep.conf:/etc/nginx/conf.d/pcep.micutu.com.conf:ro"
@@ -38,6 +66,21 @@ mounts=(
     -v "$stage/frontend:/var/www/pcep/frontend:ro"
 )
 docker run --rm --network none "${mounts[@]}" "$nginx_image" nginx -t
+
+analytics_snippet="$root/nginx/snippets/pcep-analytics-proxy.conf"
+[[ $(grep -Fc 'include snippets/pcep-analytics-proxy.conf;' \
+    "$root/nginx/pcep.micutu.com.conf") -eq 2 ]]
+for analytics_boundary in \
+    'proxy_set_header Cookie "";' \
+    'proxy_set_header Authorization "";' \
+    'proxy_hide_header Set-Cookie;' \
+    'proxy_hide_header WWW-Authenticate;' \
+    'proxy_hide_header Location;' \
+    'proxy_hide_header Content-Security-Policy;' \
+    'proxy_ignore_headers X-Accel-Redirect X-Accel-Expires X-Accel-Limit-Rate X-Accel-Buffering X-Accel-Charset Set-Cookie;'
+do
+    grep -Fqx "$analytics_boundary" "$analytics_snippet"
+done
 
 # Exercise responses generated inside Nginx. A syntax check cannot detect header
 # inheritance drift in named error locations.
@@ -78,6 +121,57 @@ status=$(curl --http1.1 --insecure --silent --show-error \
 tr -d '\r' < "$stage/shell.headers" > "$stage/shell.headers.clean"
 grep -Fqi "script-src 'self'; connect-src 'self'" "$stage/shell.headers.clean"
 ! grep -Fqi 'cloudflareinsights.com' "$stage/shell.headers.clean"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --header 'Cookie: learner=secret' \
+    --header 'Authorization: Bearer secret' \
+    --header 'Proxy-Authorization: Basic secret' \
+    --header 'X-CSRFToken: secret' \
+    --header 'X-XSRF-TOKEN: secret' \
+    --dump-header "$stage/analytics-script.headers" \
+    --output "$stage/analytics-script.body" \
+    --write-out '%{http_code}' "$base_url/u/script.js")
+[[ "$status" == 200 ]]
+tr -d '\r' < "$stage/analytics-script.headers" \
+    > "$stage/analytics-script.headers.clean"
+grep -Fqi 'Content-Type: application/javascript' \
+    "$stage/analytics-script.headers.clean"
+grep -Fqi "script-src 'self'; connect-src 'self'" \
+    "$stage/analytics-script.headers.clean"
+! grep -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
+    "$stage/analytics-script.headers.clean"
+grep -Fqx 'window.fixtureAnalytics=true;' "$stage/analytics-script.body"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --dump-header "$stage/analytics.headers" --output "$stage/analytics.body" \
+    --write-out '%{http_code}' "$base_url/u/api/send")
+[[ "$status" == 403 ]]
+tr -d '\r' < "$stage/analytics.headers" > "$stage/analytics.headers.clean"
+grep -Fqi 'Cache-Control: no-store' "$stage/analytics.headers.clean"
+grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
+    "$stage/analytics.headers.clean"
+! grep -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
+    "$stage/analytics.headers.clean"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --header 'Content-Type: application/json' \
+    --header 'Cookie: learner=secret' \
+    --header 'Authorization: Bearer secret' \
+    --header 'X-CSRFToken: secret' \
+    --request POST --data '{}' \
+    --dump-header "$stage/analytics-post.headers" \
+    --output "$stage/analytics-post.body" \
+    --write-out '%{http_code}' "$base_url/u/api/send")
+[[ "$status" == 204 ]]
+tr -d '\r' < "$stage/analytics-post.headers" > "$stage/analytics-post.headers.clean"
+grep -Fqi 'Cache-Control: no-store' "$stage/analytics-post.headers.clean"
+grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
+    "$stage/analytics-post.headers.clean"
+! grep -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
+    "$stage/analytics-post.headers.clean"
 
 for runner_path in /runner-bridge.js /py-worker.js /pyodide/VERSION; do
     runner_label=${runner_path//\//_}

@@ -1144,7 +1144,18 @@ preserving an older runtime on failure. No answer database is downloaded for
 offline use.
 Existing Umami tracking respects Do Not Track and excludes URL query/hash data
 ([tracker configuration](https://docs.umami.is/docs/tracker-configuration));
-no new analytics service or user identifier was added.
+no new analytics service or user identifier was added. Its same-origin script is
+pinned with SHA-384 SRI, and the production smoke hashes the served bytes before
+declaring the site healthy. The analytics proxy strips request credentials and
+response cookies, authentication challenges, redirects and upstream CSP, and it
+ignores all response-controlled `X-Accel-*` behavior. Collection responses are
+always `no-store` with a deny-all document CSP.
+
+An Umami upgrade is therefore fail-closed: changed tracker bytes stop analytics
+but cannot execute. Fetch the candidate directly from loopback and through the
+public proxy, prove the bytes match, review the script diff, then update the single
+`integrity` value in `frontend/index.html` in a normal reviewed frontend release.
+Never bypass this gate by removing SRI or weakening the learner CSP.
 
 ## Static assets and CI
 

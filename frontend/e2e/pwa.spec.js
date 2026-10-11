@@ -2,6 +2,21 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { mockApi } from './fixtures'
 
+test('analytics fails closed when the proxied script does not match SRI', async ({
+  page,
+}) => {
+  await mockApi(page)
+  await page.route('**/u/script.js', (route) =>
+    route.fulfill({
+      contentType: 'application/javascript',
+      body: 'window.pcepTamperedAnalyticsExecuted = true',
+    })
+  )
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  expect(await page.evaluate(() => window.pcepTamperedAnalyticsExecuted)).toBeUndefined()
+})
+
 test('install suggestion is actionable, accessible and honest about offline use', async ({
   page,
 }) => {
