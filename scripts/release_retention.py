@@ -2,6 +2,7 @@
 """Report or remove old atomic frontend/static release snapshots safely."""
 
 import argparse
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -10,6 +11,17 @@ import shutil
 
 RELEASE_KINDS = {'frontend', 'static'}
 SUFFIX_PATTERN = r'(?P<stamp>\d{8}T\d{6}Z)-(?P<identifier>[0-9a-f]{8})'
+MINIMUM_VALID_SNAPSHOTS = 2
+
+
+def load_publish_release():
+    path = Path(__file__).with_name('publish_release.py')
+    spec = importlib.util.spec_from_file_location('pcep_publish_release', path)
+    if spec is None or spec.loader is None:
+        raise ValueError('Cannot load the release validator.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def keep_count(value):
@@ -43,7 +55,20 @@ def discover(parent, pattern):
     return sorted(found, key=lambda path: path.name, reverse=True)
 
 
-def retention_plan(target, backup_root, keep=5):
+def validate_snapshots(paths, kind, validator):
+    valid = []
+    invalid = {}
+    for path in paths:
+        try:
+            validator(path, kind)
+        except (OSError, ValueError) as error:
+            invalid[path] = str(error)
+        else:
+            valid.append(path)
+    return valid, invalid
+
+
+def retention_plan(target, backup_root, keep=5, validator=None):
     target = Path(target).absolute()
     backup_root = Path(backup_root).absolute()
     if target.name not in RELEASE_KINDS:
@@ -54,12 +79,35 @@ def retention_plan(target, backup_root, keep=5):
         raise ValueError('Backup root must be outside the live release target.')
     keep = keep_count(keep)
 
+    if validator is None:
+        validator = load_publish_release().validate_release
+    try:
+        validator(target, target.name)
+    except (OSError, ValueError) as error:
+        raise ValueError(
+            f'Live {target.name} release is invalid; refusing retention: {error}'
+        ) from error
+
     previous = discover(target.parent, release_pattern(target.name, 'previous'))
     backups = discover(backup_root, release_pattern(target.name, 'backup'))
-    return {
-        'previous': {'keep': previous[:keep], 'remove': previous[keep:]},
-        'backup': {'keep': backups[:keep], 'remove': backups[keep:]},
-    }
+
+    plan = {}
+    for location, paths in (('previous', previous), ('backup', backups)):
+        valid, invalid = validate_snapshots(paths, target.name, validator)
+        if len(valid) < MINIMUM_VALID_SNAPSHOTS:
+            raise ValueError(
+                f'{location} has only {len(valid)} snapshot(s) valid under the '
+                f'current {target.name} release contract; at least '
+                f'{MINIMUM_VALID_SNAPSHOTS} are required before pruning.'
+            )
+        retained = valid[:keep]
+        retained_set = set(retained)
+        plan[location] = {
+            'keep': retained,
+            'remove': [path for path in paths if path not in retained_set],
+            'invalid': invalid,
+        }
+    return plan
 
 
 def allocated_bytes(paths):
@@ -109,14 +157,20 @@ def execute(target, backup_root, keep=5, apply=False):
     reclaimable = allocated_bytes(removals)
 
     print(
-        f'{"Applying" if apply else "Dry run:"} keep the newest {keep} complete '
+        f'{"Applying" if apply else "Dry run:"} keep up to the newest {keep} complete '
         f'{target.name} snapshots in each location.'
     )
     for location, label in (('previous', 'rollback roots'), ('backup', 'backup copies')):
         group = plan[location]
-        print(f'{label}: keep {len(group["keep"])}, remove {len(group["remove"])}')
+        print(
+            f'{label}: keep {len(group["keep"])} valid, '
+            f'remove {len(group["remove"])} '
+            f'({len(group["invalid"])} invalid under the current contract)'
+        )
         for path in group['remove']:
-            print(f'  REMOVE {path}')
+            reason = group['invalid'].get(path)
+            detail = f' [INVALID: {reason}]' if reason else ''
+            print(f'  REMOVE {path}{detail}')
     print(f'Unique allocated space selected: {human_bytes(reclaimable)}')
 
     if not apply:
