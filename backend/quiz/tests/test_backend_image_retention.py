@@ -132,6 +132,30 @@ def test_discovery_accepts_only_the_exact_repository_and_safe_ids():
         retention.discover_rollback_tags(lambda _command: json.dumps(changed))
 
 
+def test_container_inventory_tolerates_only_a_confirmed_disappearance():
+    disappearing = 'a' * 64
+    calls = 0
+
+    def runner(command):
+        nonlocal calls
+        if command[:4] == ['docker', 'container', 'ls', '--all']:
+            calls += 1
+            return disappearing if calls == 1 else ''
+        if command[:3] == ['docker', 'container', 'inspect']:
+            raise retention.ImageRetentionError('No such container')
+        raise AssertionError(command)
+
+    assert retention.container_image_ids(runner) == set()
+
+    def persistent_runner(command):
+        if command[:4] == ['docker', 'container', 'ls', '--all']:
+            return disappearing
+        raise retention.ImageRetentionError('inspect permission denied')
+
+    with pytest.raises(retention.ImageRetentionError, match='permission denied'):
+        retention.container_image_ids(persistent_runner)
+
+
 def test_apply_rechecks_tag_identity_before_removal():
     images = candidates(3)
     calls = []
