@@ -2674,6 +2674,40 @@ personal-data flow or regulatory scope is introduced, and no FAIR estimate is cl
 without business loss inputs. The CISO verdict is **SHIP** after hash verification,
 CI, configuration backup, syntax validation and public smoke pass.
 
+### Retired static and media publication paths — 2026-10-11
+
+System Nginx still published `/var/www/pcep/static/` and `/var/www/pcep/media/`
+after the backend's persistent mounts, `collectstatic`, Django admin and uploads had
+all been removed. Read-only inspection found 318 stale Django admin/DRF artifacts
+(6,430,340 bytes) and no media files; known admin and DRF CSS paths returned 200.
+No current learner feature references either prefix.
+
+Bare, directory and descendant `/static` and `/media` paths now return hardened
+404 responses with `no-store`, deny-all CSP, request IDs and no cookies. The host
+directories and all contents remain untouched for rollback evidence. Production
+smoke checks both bare/prefixed routes and known formerly reachable files, while
+the isolated Nginx test proves the same behavior without relying on empty fixtures.
+
+The edge cached the two known CSS probes as public 200 responses for 30 days.
+Origin deployment is therefore not sufficient: release is gated on a Cloudflare
+purge restricted to `pcep.micutu.com/static` and `pcep.micutu.com/media`, followed
+by public 404 verification. No cache-purge token is stored in the repository,
+shell, service environment or tunnel configuration; the tunnel connector secret
+does not grant this authority. A zone-wide purge would affect unrelated services
+and is outside this change's scope.
+
+The dominant STRIDE risks were accidental information disclosure from future media
+content and tampering/persistence through an obsolete publication directory. The
+current data set contains no learner data, so present confidentiality impact is
+limited; the preventive control matters before uploads or operator assets ever
+exist. Blast radius was all public clients requesting a planted path. Detection is
+provided by CI and six-hour public smoke, and rollback is the backed-up vhost plus
+syntax validation and reload. No files, credentials, vendors, personal-data flows
+or regulatory scope are added or removed. No FAIR estimate is claimed without
+business loss inputs. The CISO verdict is **CONDITIONAL SHIP** after CI, vhost
+backup, `nginx -t`, reload, scoped edge purge and public 404 verification pass;
+until purge authority is available, merge/deployment remains blocked.
+
 ## 15. Breaking changes
 
 None.

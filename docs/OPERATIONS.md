@@ -436,9 +436,9 @@ and the blocking image scan, and only then creates the timestamped rollback tag.
 The normal exact-image path remains unchanged.
 
 Never reset/reseed the live bank during routine deployment: question IDs are
-referenced by local progress. Backend startup waits for PostgreSQL and runs
-`collectstatic`, but deliberately never changes the schema. Migrations occur only
-through the reviewed one-shot path above.
+referenced by local progress. Backend startup waits for PostgreSQL but neither
+runs `collectstatic` nor changes the schema. Migrations occur only through the
+reviewed one-shot path above.
 The API has three workers, 30-second request/graceful timeouts, a 45-second
 container shutdown grace period, and a bounded 60-second database startup probe
 (`DB_STARTUP_TIMEOUT_SECONDS`, 1..300). A failed one-shot migration stops the
@@ -447,9 +447,10 @@ Gunicorn runs the explicit synchronous worker contract over HTTP/1 only. Clearte
 HTTP/2 is disabled, ambiguous underscore-containing headers are dropped, and the
 unused administrative control socket is disabled rather than created inside the
 read-only container filesystem.
-The non-root backend filesystem is read-only except the existing static/media
-volumes and a 64 MB temporary filesystem. Capabilities are dropped, privilege
-escalation is disabled, and the backend is capped at 512 MB and 128 processes.
+The non-root backend has no persistent mount: its root is read-only and only a
+64 MB `noexec,nosuid,nodev` temporary filesystem is writable. Capabilities are
+dropped, privilege escalation is disabled, and the backend is capped at 512 MB
+and 128 processes.
 PostgreSQL starts directly as its non-root user with a read-only root filesystem,
 all capabilities dropped, `no-new-privileges`, 512 MB/128-process limits and bounded
 noexec tmpfs mounts for `/tmp` and its Unix socket. Only the external PGDATA volume
@@ -1162,9 +1163,23 @@ Never bypass this gate by removing SRI or weakening the learner CSP.
 Production serves the Vite/SEO trees directly from their atomic host releases.
 The learner API has no Django templates, admin route, uploads or dynamic static
 assets, so the backend neither runs `collectstatic` nor receives static/media
-volumes. This keeps its read-only filesystem guarantee meaningful. The publisher
-still supports a separately reviewed static source if an operator surface is ever
-reintroduced; that surface must remain on an access-controlled origin.
+volumes. The retained host static/media directories are not routed publicly:
+bare, directory and descendant paths return the same no-store, deny-all 404.
+This keeps the backend's read-only filesystem guarantee meaningful and prevents
+rollback artifacts or future files from becoming an accidental publication path.
+A future operator static source requires a separately access-controlled origin.
+
+Retiring either prefix is an origin-and-edge change. Before merging a change that
+adds these checks to the scheduled production smoke, confirm access to the PCEP
+Cloudflare zone ID and a least-privilege API token scoped to `Cache Purge` for that
+zone. After backing up and reloading Nginx, purge only the two PCEP prefixes
+`pcep.micutu.com/static` and `pcep.micutu.com/media`; do not purge the whole zone.
+Then run `make production-smoke` and require the former artifact URLs to return the
+new 404 contract rather than a cached 200. A tunnel credentials JSON contains a
+connector secret, not a cache-purge API credential, and must never be reused or
+printed for this operation. If scoped purge access is unavailable, do not merge a
+smoke contract that production cannot yet satisfy.
+
 Do not run the destructive `seed-reset` target as deployment; it now requires
 explicit `ALLOW_QUESTION_RESET=yes`.
 CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright

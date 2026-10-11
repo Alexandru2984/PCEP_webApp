@@ -707,6 +707,18 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         isolated = public_get(origin, path, expected_status=404)
         check_public_404(isolated, f'Learner-origin runner path {path}')
 
+    for path in (
+        '/static',
+        '/static/',
+        '/static/admin/css/base.css',
+        '/static/rest_framework/css/bootstrap.min.css',
+        '/media',
+        '/media/',
+        '/media/probe.txt',
+    ):
+        retired = public_get(origin, path, expected_status=404)
+        check_public_404(retired, f'Retired public-content path {path}')
+
     check_runner_contract(runner_origin, origin)
 
     shell = public_get(origin, '/')

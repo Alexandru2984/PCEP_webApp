@@ -219,6 +219,32 @@ for admin_path in /admin /admin/login/; do
     ! grep -Eqi 'Django administration|admin login' "$stage/$admin_label.body"
 done
 
+for retired_path in \
+    /static \
+    /static/ \
+    /static/admin/css/base.css \
+    /static/rest_framework/css/bootstrap.min.css \
+    /media \
+    /media/ \
+    /media/probe.txt
+do
+    retired_label=${retired_path//\//_}
+    status=$(curl --http1.1 --insecure --silent --show-error \
+        --resolve "pcep.micutu.com:$port:127.0.0.1" \
+        --dump-header "$stage/$retired_label.headers" \
+        --output "$stage/$retired_label.body" \
+        --write-out '%{http_code}' "$base_url$retired_path")
+    [[ "$status" == 404 ]]
+    tr -d '\r' < "$stage/$retired_label.headers" \
+        > "$stage/$retired_label.headers.clean"
+    grep -Fqi 'Cache-Control: no-store' "$stage/$retired_label.headers.clean"
+    grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
+        "$stage/$retired_label.headers.clean"
+    grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' \
+        "$stage/$retired_label.headers.clean"
+    ! grep -Eqi '^Set-Cookie:' "$stage/$retired_label.headers.clean"
+done
+
 status=''
 for _ in $(seq 1 30); do
     status=$(curl --http1.1 --insecure --silent --show-error \
