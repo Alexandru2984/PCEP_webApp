@@ -12,6 +12,7 @@ spec = importlib.util.spec_from_file_location(
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 VERIFY_DATABASE_ROLES = release.verify_database_roles
+VERIFY_BACKEND_RUNTIME = release.verify_backend_runtime
 
 CANDIDATE_IMAGE = f'sha256:{"a" * 64}'
 FALLBACK_IMAGE = f'sha256:{"b" * 64}'
@@ -20,6 +21,7 @@ FALLBACK_IMAGE = f'sha256:{"b" * 64}'
 @pytest.fixture(autouse=True)
 def isolated_database_role_check(monkeypatch):
     monkeypatch.setattr(release, 'verify_database_roles', lambda *_args: {})
+    monkeypatch.setattr(release, 'verify_backend_runtime', lambda *_args: {})
     monkeypatch.setattr(release, 'database_admin_sql', lambda *_args: '')
 
 
@@ -112,6 +114,50 @@ def test_deploy_does_not_replace_backend_when_image_scan_fails(tmp_path, monkeyp
 
     assert ('make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}') in commands
     assert ('docker', 'compose', 'up', '-d', '--no-deps', 'backend') not in commands
+
+
+def runtime_inspection(image=CANDIDATE_IMAGE, mounts=None):
+    return json.dumps([
+        {
+            'Image': image,
+            'Config': {'User': 'appuser'},
+            'Mounts': [] if mounts is None else mounts,
+            'HostConfig': {
+                'ReadonlyRootfs': True,
+                'Privileged': False,
+                'CapDrop': ['ALL'],
+                'SecurityOpt': ['no-new-privileges:true'],
+                'PidsLimit': 128,
+                'Memory': 512 * 1024 * 1024,
+                'Tmpfs': {'/tmp': 'size=64m,mode=1777,noexec,nosuid,nodev'},
+                'PortBindings': {
+                    '8000/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '8001'}]
+                },
+                'RestartPolicy': {
+                    'Name': 'unless-stopped', 'MaximumRetryCount': 0
+                },
+            },
+        }
+    ])
+
+
+def test_runtime_verification_requires_no_persistent_mounts(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        release,
+        'capture_command',
+        lambda *_args, **_kwargs: runtime_inspection(),
+    )
+    assert all(VERIFY_BACKEND_RUNTIME(config(tmp_path), CANDIDATE_IMAGE).values())
+
+    monkeypatch.setattr(
+        release,
+        'capture_command',
+        lambda *_args, **_kwargs: runtime_inspection(
+            mounts=[{'Destination': '/app/media', 'RW': True}]
+        ),
+    )
+    with pytest.raises(release.ReleaseError, match='persistent_mounts_absent'):
+        VERIFY_BACKEND_RUNTIME(config(tmp_path), CANDIDATE_IMAGE)
 
 
 def test_reviewed_migrations_use_plan_instead_of_refusing_them(tmp_path, monkeypatch):

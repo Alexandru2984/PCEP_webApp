@@ -2587,6 +2587,34 @@ Future environment verification must parse inspection JSON and assert selected
 properties without printing the environment array, values, hashes or other
 secret-derived material.
 
+### Backend persistent write-surface removal — 2026-10-11
+
+The production API had a read-only root filesystem but still mounted persistent
+static and media volumes as writable. The API has no upload surface, production
+does not install or route Django admin, and system Nginx serves separate host
+directories rather than either Docker volume. Read-only inspection found 318
+generated static files and no media files, so the mounts provided no live feature.
+In a backend compromise they could instead preserve attacker content or consume
+unbounded host storage across container replacement.
+
+The backend no longer runs `collectstatic` at startup and receives no persistent
+filesystem mount; only its size-bounded, `noexec,nosuid,nodev` `/tmp` tmpfs remains
+writable. Previously created volumes and their contents are not deleted, preserving
+rollback evidence and avoiding a destructive migration. Deployment now parses
+container inspection JSON internally and fails unless the exact candidate image,
+unprivileged user, read-only root, dropped capabilities, no-new-privileges setting,
+process/memory limits, hardened tmpfs, loopback-only port, restart policy and zero
+persistent mounts all match the reviewed contract. It emits only boolean posture,
+never environment values.
+
+The dominant STRIDE risks were denial of service through disk exhaustion and
+tampering/persistence after an application compromise. No new vendor, credential,
+personal-data flow or regulatory scope is introduced. The incident runbook exists;
+the human tabletop remains outstanding, and no FAIR loss estimate is asserted
+without business-impact inputs. Because the legacy volumes remain recoverable and
+the prior image is retained by deployment, the CISO verdict is **SHIP** after the
+normal backup, candidate scan, CI and production smoke gates pass.
+
 ## 15. Breaking changes
 
 None.
