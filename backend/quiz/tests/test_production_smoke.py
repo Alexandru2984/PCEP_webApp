@@ -145,14 +145,17 @@ def test_api_headers_require_release_request_id_no_store_and_strict_csp():
         smoke.check_api_headers(invalid, set(), 'API')
 
 
-def test_shell_csp_delegates_python_to_the_isolated_runner_origin():
+def test_shell_csp_is_exact_and_delegates_python_to_the_isolated_runner_origin():
     headers = {
         **SHARED_HEADERS,
         'content-type': 'text/html',
         'cache-control': 'no-cache, no-store',
         'content-security-policy': (
-            "default-src 'self'; object-src 'none'; frame-ancestors 'none'; "
-            "frame-src https://pcep-runner.micutu.com; script-src 'self'"
+            "default-src 'self'; base-uri 'self'; object-src 'none'; "
+            "frame-ancestors 'none'; frame-src https://pcep-runner.micutu.com; "
+            "form-action 'self'; img-src 'self' data:; font-src 'self'; "
+            "manifest-src 'self'; worker-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
         ),
     }
     body = b'''<meta name="pcep-release" content="abc123def456">
@@ -164,21 +167,37 @@ def test_shell_csp_delegates_python_to_the_isolated_runner_origin():
         'abc123def456',
     )
 
-    for directive, message in [
-        ("'wasm-unsafe-eval'", 'WASM'),
-        ("'unsafe-eval'", 'unsafe-eval'),
+    for directive in [
+        "'wasm-unsafe-eval'",
+        "'unsafe-eval'",
+        'https://static.cloudflareinsights.com',
     ]:
         unsafe = response(
             {
                 **headers,
                 'content-security-policy': (
-                    headers['content-security-policy'] + f' {directive}'
+                    headers['content-security-policy'].replace(
+                        "script-src 'self'", f"script-src 'self' {directive}"
+                    )
                 ),
             },
             body,
         )
-        with pytest.raises(smoke.SmokeError, match=message):
+        with pytest.raises(smoke.SmokeError, match='exact policy'):
             smoke.check_shell(unsafe)
+
+    external_telemetry = response(
+        {
+            **headers,
+            'content-security-policy': headers['content-security-policy'].replace(
+                "connect-src 'self'",
+                "connect-src 'self' https://cloudflareinsights.com",
+            ),
+        },
+        body,
+    )
+    with pytest.raises(smoke.SmokeError, match='exact policy'):
+        smoke.check_shell(external_telemetry)
 
 
 def test_public_admin_must_be_a_strict_cookie_free_404():

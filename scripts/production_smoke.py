@@ -243,20 +243,22 @@ def check_shell(response, runner_origin=DEFAULT_RUNNER_ORIGIN):
     require('no-store' in response.headers.get('cache-control', ''), 'The shell is cacheable.')
     check_shared_security_headers(response, 'The application shell')
     directives = csp_directives(response.headers.get('content-security-policy', ''))
-    require("'self'" in directives.get('default-src', []), 'Shell CSP default-src drifted.')
-    require("'none'" in directives.get('object-src', []), 'Shell CSP permits objects.')
-    require("'none'" in directives.get('frame-ancestors', []), 'Shell CSP permits framing.')
-    require(
-        directives.get('frame-src') == [runner_origin],
-        'Shell CSP does not isolate the Python runner.',
-    )
-    scripts = directives.get('script-src', [])
-    require(
-        "'wasm-unsafe-eval'" not in scripts,
-        'Shell CSP still permits same-origin WASM compilation.',
-    )
-    require("'unsafe-eval'" not in scripts, 'Shell CSP permits unsafe-eval.')
-    require("'unsafe-inline'" not in scripts, 'Shell CSP permits inline scripts.')
+    expected_csp = {
+        'default-src': ["'self'"],
+        'base-uri': ["'self'"],
+        'object-src': ["'none'"],
+        'frame-ancestors': ["'none'"],
+        'frame-src': [runner_origin],
+        'form-action': ["'self'"],
+        'img-src': ["'self'", 'data:'],
+        'font-src': ["'self'"],
+        'manifest-src': ["'self'"],
+        'worker-src': ["'self'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'script-src': ["'self'"],
+        'connect-src': ["'self'"],
+    }
+    require(directives == expected_csp, 'Shell CSP drifted from the exact policy.')
     return shell_assets(response.body), shell_release(response.body)
 
 

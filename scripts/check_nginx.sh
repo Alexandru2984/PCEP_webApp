@@ -17,6 +17,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=pcep.micutu.com' -k
 cp "$root"/nginx/snippets/pcep-*.conf "$stage/snippets/"
 cp "$root/frontend/public/runner.html" "$root/frontend/public/runner-bridge.js" \
     "$root/frontend/public/py-worker.js" "$stage/frontend/"
+cp "$root/frontend/index.html" "$stage/frontend/index.html"
 # The Ops job intentionally does not download the 12 MB runtime. This fixture
 # exercises Nginx routing only; fetch/build and production smoke verify the real
 # pinned runtime independently.
@@ -68,6 +69,15 @@ grep -Fqi "script-src 'self'; worker-src 'self'; connect-src 'none'" "$stage/run
 ! grep -Eqi '^X-Frame-Options:' "$stage/runner.headers.clean"
 ! grep -Eqi '^Set-Cookie:' "$stage/runner.headers.clean"
 grep -Fq '<script src="/runner-bridge.js" defer></script>' "$stage/runner.body"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --dump-header "$stage/shell.headers" --output "$stage/shell.body" \
+    --write-out '%{http_code}' "$base_url/")
+[[ "$status" == 200 ]]
+tr -d '\r' < "$stage/shell.headers" > "$stage/shell.headers.clean"
+grep -Fqi "script-src 'self'; connect-src 'self'" "$stage/shell.headers.clean"
+! grep -Fqi 'cloudflareinsights.com' "$stage/shell.headers.clean"
 
 for runner_path in /runner-bridge.js /py-worker.js /pyodide/VERSION; do
     runner_label=${runner_path//\//_}

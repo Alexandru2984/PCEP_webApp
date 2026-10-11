@@ -2615,6 +2615,34 @@ without business-impact inputs. Because the legacy volumes remain recoverable an
 the prior image is retained by deployment, the CISO verdict is **SHIP** after the
 normal backup, candidate scan, CI and production smoke gates pass.
 
+### Learner-origin third-party script removal — 2026-10-11
+
+The learner CSP allowed Cloudflare's browser-insight script and telemetry endpoint.
+Cloudflare also injected the beacon into the public HTML, so this was an active
+third-party execution path rather than an unused allowlist. The application already
+uses Umami through same-origin `/u/` routes, making that extra supplier trust
+unnecessary.
+
+The policy now restricts both `script-src` and `connect-src` to the learner origin.
+Edge-injected inline code and third-party script delivery are deliberately blocked;
+same-origin application bundles, the service worker and proxied Umami analytics
+continue to work. `style-src 'unsafe-inline'` remains narrowly necessary for dynamic
+React layout dimensions and canvas animation, but script execution receives no
+equivalent exception. The production smoke test compares the complete learner CSP
+to its reviewed contract, and the isolated Nginx test rejects any reintroduced
+Cloudflare Insights origin.
+
+The dominant STRIDE risks were tampering through a compromised vendor asset and
+information disclosure from browser telemetry. Their blast radius covered every
+active learner session, although the current public application has no accounts,
+authentication cookies or private learner records. No vendor, credential, personal-
+data flow or regulatory scope is added. Detection is immediate in CI or production
+smoke; rollback is the backed-up Nginx snippet followed by syntax validation and a
+reload. Cloudflare account-side deactivation remains an operational cleanup because
+the edge may still add blocked markup. No FAIR loss estimate is asserted without
+business-impact inputs. The CISO verdict is **SHIP** after CI, configuration backup,
+`nginx -t`, reload and public CSP verification all pass.
+
 ## 15. Breaking changes
 
 None.
