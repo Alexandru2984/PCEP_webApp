@@ -19,14 +19,14 @@ once before the first start (the commands are idempotent):
 
 ```bash
 docker volume create pcep_webapp_postgres_data
-docker volume create pcep_webapp_static_volume
-docker volume create pcep_webapp_media_volume
 ```
 
-The defaults come from `.env.example`; create the matching names instead when
-`PCEP_POSTGRES_VOLUME`, `PCEP_STATIC_VOLUME` or `PCEP_MEDIA_VOLUME` is changed.
-Create `.env` from `.env.example` for Django and `.env.db` from `.env.db.example`
-for the database container. Both must be mode 0600. `PCEP_APP_DB`,
+The default comes from `.env.example`; create the matching name instead when
+`PCEP_POSTGRES_VOLUME` is changed. The API has no uploads, serves no files from
+its container, and receives no persistent filesystem mount. Previously created
+static/media volumes are deliberately left untouched for rollback but are no
+longer attached. Create `.env` from `.env.example` for Django and `.env.db` from
+`.env.db.example` for the database container. Both must be mode 0600. `PCEP_APP_DB`,
 `PCEP_APP_USER` and `PCEP_APP_PASSWORD` in `.env.db` must match the three
 `POSTGRES_*` application values in `.env`; the administrator password must differ.
 
@@ -1147,13 +1147,12 @@ no new analytics service or user identifier was added.
 
 ## Static assets and CI
 
-After upgrading Django, publish fresh collectstatic output to the host static
-root: Nginx serves a host copy, not the Docker volume directly. Copy the
-container's `/app/staticfiles/.` to a staging source, then run
-`python scripts/publish_release.py <source> /var/www/pcep/static --kind static --backup-root /home/micu/backups/pcep`.
-The publisher makes staged directories traversable and files readable by Nginx,
-even when a source created with `mktemp` starts at mode 0700. The same atomic
-swap keeps the old fingerprinted admin assets available for rollback.
+Production serves the Vite/SEO trees directly from their atomic host releases.
+The learner API has no Django templates, admin route, uploads or dynamic static
+assets, so the backend neither runs `collectstatic` nor receives static/media
+volumes. This keeps its read-only filesystem guarantee meaningful. The publisher
+still supports a separately reviewed static source if an operator surface is ever
+reintroduced; that surface must remain on an access-controlled origin.
 Do not run the destructive `seed-reset` target as deployment; it now requires
 explicit `ALLOW_QUESTION_RESET=yes`.
 CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright

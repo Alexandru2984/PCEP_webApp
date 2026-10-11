@@ -174,15 +174,14 @@ npm run dev             # Vite dev server, proxies /api to Django (see vite.conf
 cp .env.example .env          # Django and its least-privilege database role
 cp .env.db.example .env.db    # separate PostgreSQL administrator/bootstrap role
 docker volume create pcep_webapp_postgres_data
-docker volume create pcep_webapp_static_volume
-docker volume create pcep_webapp_media_volume
 docker compose up --build     # db + backend on 127.0.0.1:8001
 make compose-build-frontend       # build React through the pinned Node image
 ```
 
-The three named volumes are external by design: Compose uses them but cannot
-remove them during teardown. If you customize their names in `.env`, create the
-matching volumes before the first start.
+The database volume is external by design: Compose uses it but cannot remove it
+during teardown. If you customize its name in `.env`, create the matching volume
+before the first start. The production API has no upload or dynamic-static-file
+surface, so its read-only container has no persistent filesystem mount.
 
 ## Testing & quality
 

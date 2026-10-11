@@ -23,9 +23,7 @@ COPY requirements.txt .
 RUN pip install --require-hashes --no-index --find-links=/wheels \
     -r requirements.txt \
     && rm -rf /wheels \
-    && adduser --disabled-password --gecos "" appuser \
-    && mkdir -p /app/staticfiles /app/media \
-    && chown appuser:appuser /app /app/staticfiles /app/media
+    && adduser --disabled-password --gecos "" appuser
 COPY --chown=appuser:appuser . .
 RUN chmod +x /app/entrypoint.sh
 USER appuser
