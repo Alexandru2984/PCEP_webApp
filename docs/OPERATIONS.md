@@ -1090,15 +1090,16 @@ metadata.
 Cloudflare initially imposed its four-hour default TTL on plain no-cache
 JavaScript responses. Public GET/HEAD requests now report BYPASS with the stronger
 policy; verify both origin and public cache headers after each deployment. Common headers cover worker, SEO,
-API and errors. CSP retains WASM compilation and the already enabled
-Cloudflare beacon origins, removes the obsolete external Umami origin and
-never grants unsafe-eval. COEP is deliberately not added: runner operation does
+API and errors. The learner CSP permits scripts and telemetry only from the
+same origin; Umami remains available through `/u/`, while Cloudflare beacon
+origins are deliberately excluded. WASM compilation is limited to the separate
+runner origin and neither origin grants unsafe-eval. COEP is deliberately not added: runner operation does
 not require shared memory or cross-origin isolation.
-Cloudflare currently injects a dynamic inline JavaScript-detection challenge at
-the edge. The strict CSP blocks it and Chromium reports the expected violation;
-the origin response does not contain that script. Disable the corresponding
-Cloudflare bot/JavaScript-detection feature if it is unnecessary. Do not add
-`unsafe-inline` or per-response dynamic hashes to accommodate it.
+Cloudflare may inject beacon or JavaScript-detection markup at the edge. The
+strict CSP blocks both inline code and third-party script delivery, and Chromium
+can report the expected violations; the origin response does not contain that
+markup. Disable the corresponding Cloudflare features if they are unnecessary.
+Do not broaden `script-src` or add dynamic hashes to accommodate injected code.
 Structured PCEP Nginx logs at `/var/log/nginx/pcep_access.log` carry generated
 request IDs, path, status and timing, without client IPs, query strings,
 cookies or authorization headers. Existing Nginx log rotation covers them.
