@@ -16,6 +16,8 @@ VERIFY_BACKEND_RUNTIME = release.verify_backend_runtime
 
 CANDIDATE_IMAGE = f'sha256:{"a" * 64}'
 FALLBACK_IMAGE = f'sha256:{"b" * 64}'
+ROLLBACK_IMAGE = f'sha256:{"c" * 64}'
+ROLLBACK_TAG = 'pcep-backend-rollback:20261011T120000Z-release-previous1234'
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +33,15 @@ def candidate_capture(args):
     if args[:3] == ['docker', 'image', 'inspect']:
         return CANDIDATE_IMAGE
     return 'abc123def456'
+
+
+def rollback_inspection(**config_overrides):
+    image_config = {
+        'Env': ['PATH=/usr/local/bin', 'PCEP_RELEASE=previous1234'],
+        'Labels': {'org.opencontainers.image.revision': 'previous1234'},
+    }
+    image_config.update(config_overrides)
+    return json.dumps([{'Id': ROLLBACK_IMAGE, 'Config': image_config}])
 
 
 def config(tmp_path, **kwargs):
@@ -114,6 +125,153 @@ def test_deploy_does_not_replace_backend_when_image_scan_fails(tmp_path, monkeyp
 
     assert ('make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}') in commands
     assert ('docker', 'compose', 'up', '-d', '--no-deps', 'backend') not in commands
+
+
+def test_failed_unmigrated_cutover_restores_and_verifies_previous_backend(
+    tmp_path, monkeypatch
+):
+    events = []
+    wait_calls = 0
+
+    monkeypatch.setattr(
+        release,
+        'run_command',
+        lambda args, **_kwargs: events.append(('run', tuple(args))),
+    )
+
+    def capture(args, **_kwargs):
+        if args[:3] == ['docker', 'image', 'inspect'] and args[3] == ROLLBACK_TAG:
+            return rollback_inspection()
+        return candidate_capture(args)
+
+    monkeypatch.setattr(release, 'capture_command', capture)
+    monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: ROLLBACK_TAG)
+    monkeypatch.setattr(
+        release,
+        'backup_database',
+        lambda *_: (tmp_path / 'backup.sql.gz', 'digest'),
+    )
+
+    def wait(_config):
+        nonlocal wait_calls
+        wait_calls += 1
+        events.append(('wait', wait_calls))
+        if wait_calls == 1:
+            raise release.ReleaseError('candidate health failed')
+
+    monkeypatch.setattr(release, 'wait_for_backend', wait)
+    monkeypatch.setattr(
+        release,
+        'verify_backend_runtime',
+        lambda _config, image: events.append(('runtime', image)),
+    )
+    monkeypatch.setattr(
+        release,
+        'verify_public_release_version',
+        lambda _config, expected: events.append(('public', expected)),
+    )
+    monkeypatch.setattr(
+        release,
+        'verify_public_release',
+        lambda *_: pytest.fail('Failed candidate must not reach normal verification.'),
+    )
+
+    with pytest.raises(release.ReleaseError, match='previous1234 was restored and verified'):
+        release.deploy(config(tmp_path))
+
+    assert ('run', ('docker', 'tag', ROLLBACK_IMAGE, release.BACKEND_IMAGE)) in events
+    assert (
+        'run',
+        ('docker', 'compose', 'up', '-d', '--no-deps', '--no-build', 'backend'),
+    ) in events
+    assert ('runtime', ROLLBACK_IMAGE) in events
+    assert ('public', 'previous1234') in events
+    assert wait_calls == 2
+
+
+def test_failed_migrated_cutover_refuses_automatic_application_rollback(
+    tmp_path, monkeypatch
+):
+    commands = []
+    monkeypatch.setattr(
+        release,
+        'run_command',
+        lambda args, **_kwargs: commands.append(tuple(args)),
+    )
+    monkeypatch.setattr(release, 'capture_command', lambda args, **_: candidate_capture(args))
+    monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: ROLLBACK_TAG)
+    monkeypatch.setattr(
+        release,
+        'backup_database',
+        lambda *_: (tmp_path / 'backup.sql.gz', 'digest'),
+    )
+    monkeypatch.setattr(release, 'run_reviewed_migrations', lambda *_: None)
+    monkeypatch.setattr(
+        release,
+        'wait_for_backend',
+        lambda *_: (_ for _ in ()).throw(release.ReleaseError('candidate health failed')),
+    )
+
+    with pytest.raises(release.ReleaseError, match='Automatic application rollback is refused'):
+        release.deploy(config(tmp_path, allow_migrations=True))
+
+    assert ('docker', 'tag', ROLLBACK_IMAGE, release.BACKEND_IMAGE) not in commands
+    assert not any('--no-build' in command for command in commands)
+
+
+def test_failed_cutover_reports_candidate_and_rollback_failures(tmp_path, monkeypatch):
+    monkeypatch.setattr(release, 'run_command', lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(release, 'capture_command', lambda args, **_: candidate_capture(args))
+    monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: ROLLBACK_TAG)
+    monkeypatch.setattr(
+        release,
+        'backup_database',
+        lambda *_: (tmp_path / 'backup.sql.gz', 'digest'),
+    )
+    monkeypatch.setattr(
+        release,
+        'wait_for_backend',
+        lambda *_: (_ for _ in ()).throw(release.ReleaseError('candidate failed')),
+    )
+    monkeypatch.setattr(
+        release,
+        'restore_backend',
+        lambda *_: (_ for _ in ()).throw(release.ReleaseError('rollback failed')),
+    )
+
+    with pytest.raises(release.ReleaseError) as failure:
+        release.deploy(config(tmp_path))
+
+    message = str(failure.value)
+    assert 'Candidate failure: candidate failed' in message
+    assert 'rollback failure: rollback failed' in message
+    assert ROLLBACK_TAG in message
+    assert str(tmp_path / 'backup.sql.gz') in message
+
+
+def test_rollback_inspection_requires_consistent_image_metadata(tmp_path, monkeypatch):
+    payload = rollback_inspection()
+    monkeypatch.setattr(release, 'capture_command', lambda *_args, **_kwargs: payload)
+    assert release.inspect_rollback_image(config(tmp_path), ROLLBACK_TAG) == (
+        ROLLBACK_IMAGE,
+        'previous1234',
+    )
+
+    invalid_payloads = [
+        'not-json',
+        json.dumps([]),
+        json.dumps([{'Id': 'latest', 'Config': {'Env': [], 'Labels': {}}}]),
+        rollback_inspection(Env=['PCEP_RELEASE=../escape']),
+        rollback_inspection(Labels={'org.opencontainers.image.revision': 'other'}),
+    ]
+    for invalid in invalid_payloads:
+        monkeypatch.setattr(
+            release,
+            'capture_command',
+            lambda *_args, _payload=invalid, **_kwargs: _payload,
+        )
+        with pytest.raises(release.ReleaseError):
+            release.inspect_rollback_image(config(tmp_path), ROLLBACK_TAG)
 
 
 def runtime_inspection(image=CANDIDATE_IMAGE, mounts=None):

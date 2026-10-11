@@ -2674,6 +2674,35 @@ personal-data flow or regulatory scope is introduced, and no FAIR estimate is cl
 without business loss inputs. The CISO verdict is **SHIP** after hash verification,
 CI, configuration backup, syntax validation and public smoke pass.
 
+### Failed backend cutover recovery — 2026-10-11
+
+The backend deploy retained the exact old image and a verified database dump, but
+an error after `docker compose up` left the candidate container in place. A failed
+healthcheck, weakened runtime isolation, Django warning, unexpected migration state
+or question-bank audit could therefore extend an availability incident until a
+manual operator rollback, despite the correct recovery artifact already existing.
+
+For releases with no pending migration, those post-cutover checks now form one
+rollback boundary. Failure retags the retained image as the live backend image,
+recreates only that service with builds disabled, verifies its image/runtime and
+Django/migration posture, and requires the old `X-PCEP-Release` through the public
+endpoint. The deploy still returns failure so restoration cannot be mistaken for a
+successful release. It reports combined candidate and rollback diagnostics if the
+recovery itself fails. Final edge-only verification remains outside this automatic
+boundary because replacing a locally healthy backend cannot repair DNS, tunnel or
+edge policy.
+
+The dominant STRIDE risk is denial of service. Blast radius is the public API and
+every active learner needing new questions or grading; static shell availability
+does not make a failed API release acceptable. CI unit tests exercise both the
+successful recovery path and the migration gate. Automatic application rollback
+is refused after reviewed migrations because schema compatibility is not provable;
+the retained image and mode-0600 database backup instead anchor the existing manual
+runbook. No vendor, credential, personal-data flow or regulatory scope changes, and
+no FAIR estimate is claimed without business loss inputs. The CISO verdict is
+**SHIP** after CI and the next routine no-migration deployment exercises the normal
+success path without invoking recovery.
+
 ## 15. Breaking changes
 
 None.
