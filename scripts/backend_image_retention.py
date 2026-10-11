@@ -172,21 +172,34 @@ def validate_rollback_image(candidate, metadata):
     return expected_release
 
 
-def container_image_ids(runner=run_command):
+def container_ids(runner=run_command):
     output = runner(
         ['docker', 'container', 'ls', '--all', '--quiet', '--no-trunc']
     )
-    container_ids = [line for line in output.splitlines() if line]
-    if any(not CONTAINER_ID_PATTERN.fullmatch(identifier) for identifier in container_ids):
+    identifiers = [line for line in output.splitlines() if line]
+    if any(not CONTAINER_ID_PATTERN.fullmatch(identifier) for identifier in identifiers):
         raise ImageRetentionError('Docker returned an unsafe container ID.')
+    return identifiers
+
+
+def container_image_ids(runner=run_command):
+    identifiers = container_ids(runner)
     images = set()
-    for identifier in container_ids:
-        image_id = runner(
-            [
-                'docker', 'container', 'inspect', '--format', '{{.Image}}',
-                identifier,
-            ]
-        )
+    for identifier in identifiers:
+        try:
+            image_id = runner(
+                [
+                    'docker', 'container', 'inspect', '--format', '{{.Image}}',
+                    identifier,
+                ]
+            )
+        except ImageRetentionError:
+            # Shared-host maintenance containers can legitimately disappear
+            # between list and inspect. Ignore only a confirmed disappearance;
+            # a persistent container or unrelated inspect failure stays fatal.
+            if identifier not in container_ids(runner):
+                continue
+            raise
         if not IMAGE_ID_PATTERN.fullmatch(image_id):
             raise ImageRetentionError('Docker returned an unsafe container image ID.')
         images.add(image_id)
