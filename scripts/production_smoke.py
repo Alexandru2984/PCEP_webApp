@@ -2,8 +2,10 @@
 """Read-only public smoke checks for the deployed PCEP application."""
 
 import argparse
+import base64
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 from html.parser import HTMLParser
 import json
 import re
@@ -23,6 +25,7 @@ REQUEST_ID_PATTERN = re.compile(r'[0-9a-f]{32}')
 ASSET_PATH_PATTERN = re.compile(
     r'/assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\.(?:css|js)'
 )
+SRI_SHA384_PATTERN = re.compile(r'sha384-[A-Za-z0-9+/]{64}')
 FORBIDDEN_ANSWER_FIELDS = {
     'is_correct',
     'correct_choice',
@@ -50,6 +53,7 @@ class ShellAssetParser(HTMLParser):
         self.stylesheets = []
         self.modules = []
         self.releases = []
+        self.analytics = []
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
@@ -57,10 +61,12 @@ class ShellAssetParser(HTMLParser):
             href = attributes.get('href') or ''
             if href.startswith('/assets/'):
                 self.stylesheets.append(href)
-        elif tag == 'script' and attributes.get('type') == 'module':
+        elif tag == 'script':
             src = attributes.get('src') or ''
-            if src.startswith('/assets/'):
+            if attributes.get('type') == 'module' and src.startswith('/assets/'):
                 self.modules.append(src)
+            if src == '/u/script.js':
+                self.analytics.append(attributes)
         elif tag == 'meta' and attributes.get('name') == 'pcep-release':
             self.releases.append(attributes.get('content') or '')
 
@@ -220,6 +226,63 @@ def shell_release(body):
     return release
 
 
+def analytics_integrity(body):
+    scripts = parse_shell(body).analytics
+    require(len(scripts) == 1, 'The application shell must load one analytics script.')
+    attributes = scripts[0]
+    integrity = attributes.get('integrity', '')
+    require(
+        SRI_SHA384_PATTERN.fullmatch(integrity) is not None,
+        'The analytics script is not pinned with one SHA-384 integrity value.',
+    )
+    require(
+        'defer' in attributes
+        and attributes.get('crossorigin') == 'anonymous'
+        and attributes.get('data-do-not-track') == 'true'
+        and attributes.get('data-exclude-search') == 'true'
+        and attributes.get('data-exclude-hash') == 'true',
+        'The analytics script privacy or fetch contract drifted.',
+    )
+    return integrity
+
+
+def shell_csp(runner_origin):
+    return {
+        'default-src': ["'self'"],
+        'base-uri': ["'self'"],
+        'object-src': ["'none'"],
+        'frame-ancestors': ["'none'"],
+        'frame-src': [runner_origin],
+        'form-action': ["'self'"],
+        'img-src': ["'self'", 'data:'],
+        'font-src': ["'self'"],
+        'manifest-src': ["'self'"],
+        'worker-src': ["'self'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'script-src': ["'self'"],
+        'connect-src': ["'self'"],
+    }
+
+
+def check_analytics_script(response, integrity, runner_origin=DEFAULT_RUNNER_ORIGIN):
+    check_shared_security_headers(response, 'Analytics script')
+    require(
+        'javascript' in response.headers.get('content-type', '').lower(),
+        'The analytics script has an invalid media type.',
+    )
+    require('set-cookie' not in response.headers, 'The analytics script sets a cookie.')
+    require(
+        csp_directives(response.headers.get('content-security-policy', ''))
+        == shell_csp(runner_origin),
+        'The analytics script CSP drifted.',
+    )
+    digest = base64.b64encode(hashlib.sha384(response.body).digest()).decode('ascii')
+    require(
+        integrity == f'sha384-{digest}',
+        'The analytics script no longer matches its reviewed integrity value.',
+    )
+
+
 def check_asset(response, path):
     label = f'Entry asset {path}'
     check_shared_security_headers(response, label)
@@ -243,23 +306,15 @@ def check_shell(response, runner_origin=DEFAULT_RUNNER_ORIGIN):
     require('no-store' in response.headers.get('cache-control', ''), 'The shell is cacheable.')
     check_shared_security_headers(response, 'The application shell')
     directives = csp_directives(response.headers.get('content-security-policy', ''))
-    expected_csp = {
-        'default-src': ["'self'"],
-        'base-uri': ["'self'"],
-        'object-src': ["'none'"],
-        'frame-ancestors': ["'none'"],
-        'frame-src': [runner_origin],
-        'form-action': ["'self'"],
-        'img-src': ["'self'", 'data:'],
-        'font-src': ["'self'"],
-        'manifest-src': ["'self'"],
-        'worker-src': ["'self'"],
-        'style-src': ["'self'", "'unsafe-inline'"],
-        'script-src': ["'self'"],
-        'connect-src': ["'self'"],
-    }
-    require(directives == expected_csp, 'Shell CSP drifted from the exact policy.')
-    return shell_assets(response.body), shell_release(response.body)
+    require(
+        directives == shell_csp(runner_origin),
+        'Shell CSP drifted from the exact policy.',
+    )
+    return (
+        shell_assets(response.body),
+        shell_release(response.body),
+        analytics_integrity(response.body),
+    )
 
 
 def check_public_404(response, label, forbidden=()):
@@ -655,9 +710,10 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     check_runner_contract(runner_origin, origin)
 
     shell = public_get(origin, '/')
-    assets, frontend_release = check_shell(shell, runner_origin)
+    assets, frontend_release, integrity = check_shell(shell, runner_origin)
     for asset_path in assets:
         check_asset(public_get(origin, asset_path), asset_path)
+    check_analytics_script(public_get(origin, '/u/script.js'), integrity, runner_origin)
 
     live_response = public_get(origin, '/api/live/')
     check_api_headers(live_response, releases, 'Liveness')
@@ -744,6 +800,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         'assets': len(assets),
         'admin': 'disabled',
         'runner': 'isolated',
+        'analytics': 'integrity-pinned',
     }
 
 
@@ -775,6 +832,7 @@ def main(argv=None):
         f'assets={result["assets"]} '
         f'admin={result["admin"]} '
         f'runner={result["runner"]} '
+        f'analytics={result["analytics"]} '
         f'targeted_order={",".join(map(str, result["targeted_order"]))}'
     )
 

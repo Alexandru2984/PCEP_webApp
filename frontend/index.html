@@ -54,11 +54,13 @@
     <!-- Apply saved theme before paint (external so the CSP can forbid inline scripts) -->
     <script src="/theme-init.js"></script>
 
-    <!-- Existing analytics uses the same-origin proxy and respects Do Not Track. -->
+    <!-- Same-origin analytics respects DNT; SRI fails closed if its service changes. -->
     <script
       defer
       vite-ignore
       src="/u/script.js"
+      integrity="sha384-LTPPwaLbU0osA3KlbZu0gbKM+OX2/iNJYVcdtY6ZFUJfsuj7LJ+40McwiPCPpKad"
+      crossorigin="anonymous"
       data-do-not-track="true"
       data-exclude-search="true"
       data-exclude-hash="true"

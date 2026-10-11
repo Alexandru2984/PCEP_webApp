@@ -20,6 +20,14 @@ SHARED_HEADERS = {
     'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()',
     'cross-origin-opener-policy': 'same-origin',
 }
+SHELL_CSP = (
+    "default-src 'self'; base-uri 'self'; object-src 'none'; "
+    "frame-ancestors 'none'; frame-src https://pcep-runner.micutu.com; "
+    "form-action 'self'; img-src 'self' data:; font-src 'self'; "
+    "manifest-src 'self'; worker-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
+)
+ANALYTICS_INTEGRITY = f"sha384-{'A' * 64}"
 
 
 def response(headers=None, body=b'', status=200):
@@ -150,21 +158,20 @@ def test_shell_csp_is_exact_and_delegates_python_to_the_isolated_runner_origin()
         **SHARED_HEADERS,
         'content-type': 'text/html',
         'cache-control': 'no-cache, no-store',
-        'content-security-policy': (
-            "default-src 'self'; base-uri 'self'; object-src 'none'; "
-            "frame-ancestors 'none'; frame-src https://pcep-runner.micutu.com; "
-            "form-action 'self'; img-src 'self' data:; font-src 'self'; "
-            "manifest-src 'self'; worker-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'"
-        ),
+        'content-security-policy': SHELL_CSP,
     }
     body = b'''<meta name="pcep-release" content="abc123def456">
     <link rel="stylesheet" href="/assets/index-abc12345.css">
     <script type="module" src="/assets/index-abc12345.js"></script>
+    <script defer src="/u/script.js" crossorigin="anonymous"
+      integrity="sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      data-do-not-track="true" data-exclude-search="true"
+      data-exclude-hash="true"></script>
     <div id="root"></div>'''
     assert smoke.check_shell(response(headers, body)) == (
         ['/assets/index-abc12345.js', '/assets/index-abc12345.css'],
         'abc123def456',
+        ANALYTICS_INTEGRITY,
     )
 
     for directive in [
@@ -198,6 +205,39 @@ def test_shell_csp_is_exact_and_delegates_python_to_the_isolated_runner_origin()
     )
     with pytest.raises(smoke.SmokeError, match='exact policy'):
         smoke.check_shell(external_telemetry)
+
+
+def test_analytics_script_must_match_the_shell_integrity_and_set_no_cookie():
+    import base64
+    import hashlib
+
+    body = b'reviewed analytics bytes'
+    integrity = 'sha384-' + base64.b64encode(hashlib.sha384(body).digest()).decode()
+    headers = {
+        **SHARED_HEADERS,
+        'content-type': 'application/javascript; charset=UTF-8',
+        'content-security-policy': SHELL_CSP,
+    }
+    smoke.check_analytics_script(response(headers, body), integrity)
+
+    for invalid in [
+        response(headers, b'tampered analytics bytes'),
+        response({**headers, 'set-cookie': 'tracker=1'}, body),
+    ]:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_analytics_script(invalid, integrity)
+
+
+def test_analytics_tag_requires_sri_and_privacy_attributes():
+    valid = (
+        '<script defer src="/u/script.js" crossorigin="anonymous" '
+        f'integrity="{ANALYTICS_INTEGRITY}" data-do-not-track="true" '
+        'data-exclude-search="true" data-exclude-hash="true"></script>'
+    ).encode()
+    assert smoke.analytics_integrity(valid) == ANALYTICS_INTEGRITY
+
+    with pytest.raises(smoke.SmokeError):
+        smoke.analytics_integrity(valid.replace(b' crossorigin="anonymous"', b''))
 
 
 def test_public_admin_must_be_a_strict_cookie_free_404():

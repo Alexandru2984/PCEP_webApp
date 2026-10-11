@@ -2643,6 +2643,37 @@ the edge may still add blocked markup. No FAIR loss estimate is asserted without
 business-impact inputs. The CISO verdict is **SHIP** after CI, configuration backup,
 `nginx -t`, reload and public CSP verification all pass.
 
+### Analytics script integrity and credential boundary — 2026-10-11
+
+The Umami tracker was proxied from a loopback service and executed as a same-origin
+script. This avoided an external network origin but still trusted mutable analytics
+bytes with the learner page's JavaScript authority. The proxy also inherited browser
+request headers and accepted upstream response headers, so a future learner cookie or
+authorization token could cross into analytics and a compromised service could set a
+cookie, issue an authentication challenge or trigger Nginx `X-Accel-*` behavior.
+
+The reviewed 4,595-byte tracker is now pinned with SHA-384 Subresource Integrity.
+Browser E2E proves altered bytes do not execute, and the scheduled production smoke
+hashes the live `/u/script.js` response against the HTML metadata. The shared
+analytics proxy boundary clears cookies, authorization and common CSRF headers;
+suppresses cookies, challenges, redirects and upstream CSP; and disables processing
+of response-controlled accelerated redirects, rate, buffering, charset and cache
+signals. The collection response is forced to `no-store` with a deny-all document
+CSP. A tracker upgrade therefore fails closed until its diff and new digest are
+reviewed and released.
+
+The dominant STRIDE risks were supplier tampering, credential information disclosure
+and spoofing through same-origin response state. The current application has no
+public identity or authentication cookie, which bounds present impact, but the
+control prevents silent scope expansion if either is introduced. The blast radius of
+malicious tracker execution was every active learner tab; failed integrity now affects
+analytics only. CI, browser E2E and six-hour public smoke provide detection. Rollback
+uses the retained frontend release and backed-up Nginx vhost/snippet, though restoring
+an unpinned tracker is not the preferred recovery. No new vendor, credential,
+personal-data flow or regulatory scope is introduced, and no FAIR estimate is claimed
+without business loss inputs. The CISO verdict is **SHIP** after hash verification,
+CI, configuration backup, syntax validation and public smoke pass.
+
 ## 15. Breaking changes
 
 None.
