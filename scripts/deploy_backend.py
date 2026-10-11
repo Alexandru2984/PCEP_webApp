@@ -683,6 +683,50 @@ def wait_for_backend(config):
     raise ReleaseError('Backend did not become healthy before the deployment timeout.')
 
 
+def verify_backend_runtime(config, expected_image):
+    """Fail closed when Compose weakens the live backend isolation contract."""
+    payload = capture_command(
+        ['docker', 'inspect', config.backend_container],
+        cwd=config.project_root,
+    )
+    try:
+        containers = json.loads(payload)
+        if not isinstance(containers, list) or len(containers) != 1:
+            raise ValueError
+        container = containers[0]
+        host = container['HostConfig']
+        runtime = container['Config']
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ReleaseError('Backend runtime inspection returned invalid JSON.') from error
+
+    posture = {
+        'expected_image': container.get('Image') == expected_image,
+        'unprivileged_user': runtime.get('User') == 'appuser',
+        'read_only_root': host.get('ReadonlyRootfs') is True,
+        'not_privileged': host.get('Privileged') is False,
+        'all_capabilities_dropped': host.get('CapDrop') == ['ALL'],
+        'no_new_privileges': host.get('SecurityOpt') == ['no-new-privileges:true'],
+        'bounded_processes': host.get('PidsLimit') == 128,
+        'bounded_memory': host.get('Memory') == 512 * 1024 * 1024,
+        'ephemeral_hardened_tmp': host.get('Tmpfs') == {
+            '/tmp': 'size=64m,mode=1777,noexec,nosuid,nodev'
+        },
+        'loopback_only_port': host.get('PortBindings') == {
+            '8000/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '8001'}]
+        },
+        'persistent_mounts_absent': container.get('Mounts') == [],
+        'restart_policy': host.get('RestartPolicy') == {
+            'Name': 'unless-stopped', 'MaximumRetryCount': 0
+        },
+    }
+    if not all(posture.values()):
+        raise ReleaseError(
+            'Backend runtime is outside the reviewed isolation posture: '
+            + json.dumps(posture, sort_keys=True)
+        )
+    return posture
+
+
 def verify_public_release(config):
     request = Request(
         config.public_health_url,
@@ -774,6 +818,7 @@ def deploy(config):
         env=environment,
     )
     wait_for_backend(config)
+    verify_backend_runtime(config, candidate_image)
     run_command(
         [
             'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
