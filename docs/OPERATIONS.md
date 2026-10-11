@@ -398,6 +398,21 @@ audit the live question bank read-only and verify readiness plus `X-PCEP-Release
 through the public domain. The rollback tag and dump are printed as soon as they
 are safe.
 
+If a release without migrations fails during service recreation or any local
+health, runtime, Django, migration-state or question-bank check, the deploy
+automatically retags the exact retained image, recreates the service with
+`--no-build`, and verifies its original release through the public endpoint. The
+command still exits unsuccessfully and reports both the candidate failure and the
+restored release; investigate before retrying. If rollback verification also
+fails, both errors plus the retained tag and backup path are reported.
+
+Automatic application rollback is deliberately refused after `--allow-migrations`:
+an old image cannot be assumed compatible with a changed schema. In that case the
+error identifies the retained image and database dump for the reviewed recovery
+procedure below. A failure of the final public edge check after all local checks
+also does not trigger application rollback, because replacing healthy backend code
+cannot repair a tunnel, DNS or edge-policy failure.
+
 For a reviewed release that intentionally contains migrations, inspect them and
 run `make deploy-backend BACKEND_DEPLOY_FLAGS=--allow-migrations`. The deploy first
 records the plan and scans the exact candidate image. It then enables

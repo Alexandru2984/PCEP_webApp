@@ -728,6 +728,10 @@ def verify_backend_runtime(config, expected_image):
 
 
 def verify_public_release(config):
+    return verify_public_release_version(config, config.release)
+
+
+def verify_public_release_version(config, expected_release):
     request = Request(
         config.public_health_url,
         headers={'Accept-Encoding': 'identity', 'User-Agent': 'pcep-release-check/1'},
@@ -740,10 +744,106 @@ def verify_public_release(config):
         public_release = response.headers.get('X-PCEP-Release')
     if payload != {'status': 'ok', 'database': 'up'}:
         raise ReleaseError('Public readiness returned an unexpected response.')
-    if public_release != config.release:
+    if public_release != expected_release:
         raise ReleaseError(
-            f'Public release mismatch: expected {config.release}, received {public_release!r}.'
+            f'Public release mismatch: expected {expected_release}, '
+            f'received {public_release!r}.'
         )
+
+
+def verify_live_backend(config, environment, expected_image, *, audit_questions):
+    wait_for_backend(config)
+    verify_backend_runtime(config, expected_image)
+    run_command(
+        [
+            'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
+            'check', '--deploy', '--fail-level', 'WARNING',
+        ],
+        cwd=config.project_root,
+        env=environment,
+    )
+    run_command(
+        [
+            'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
+            'migrate', '--check',
+        ],
+        cwd=config.project_root,
+        env=environment,
+    )
+    if audit_questions:
+        run_command(
+            [
+                'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
+                'audit_questions', '--database', '--fail-on-warnings',
+            ],
+            cwd=config.project_root,
+            env=environment,
+        )
+
+
+def inspect_rollback_image(config, rollback_tag):
+    payload = capture_command(
+        ['docker', 'image', 'inspect', rollback_tag],
+        cwd=config.project_root,
+    )
+    try:
+        images = json.loads(payload)
+        if not isinstance(images, list) or len(images) != 1:
+            raise ValueError
+        metadata = images[0]
+        rollback_image = metadata['Id']
+        image_config = metadata['Config']
+        environment = image_config['Env']
+        labels = image_config['Labels']
+        if (
+            not isinstance(environment, list)
+            or not all(isinstance(value, str) for value in environment)
+            or not isinstance(labels, dict)
+        ):
+            raise ValueError
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ReleaseError('The retained rollback image has invalid metadata.') from error
+    if not IMAGE_ID_PATTERN.fullmatch(rollback_image):
+        raise ReleaseError('The retained rollback tag has an invalid image ID.')
+    releases = [
+        value.split('=', 1)[1]
+        for value in environment
+        if value.startswith('PCEP_RELEASE=')
+    ]
+    if (
+        len(releases) != 1
+        or not RELEASE_PATTERN.fullmatch(releases[0])
+        or labels.get('org.opencontainers.image.revision') != releases[0]
+    ):
+        raise ReleaseError(
+            'The retained rollback image has inconsistent release metadata.'
+        )
+    return rollback_image, releases[0]
+
+
+def restore_backend(config, environment, rollback_tag):
+    """Restore and verify the exact pre-deploy image after a safe cutover failure."""
+    rollback_image, expected_release = inspect_rollback_image(config, rollback_tag)
+
+    run_command(
+        ['docker', 'tag', rollback_image, BACKEND_IMAGE],
+        cwd=config.project_root,
+    )
+    run_command(
+        [
+            'docker', 'compose', 'up', '-d', '--no-deps', '--no-build', 'backend',
+        ],
+        cwd=config.project_root,
+        env=environment,
+    )
+    verify_live_backend(
+        config,
+        environment,
+        rollback_image,
+        audit_questions=False,
+    )
+    verify_public_release_version(config, expected_release)
+    return expected_release
 
 
 def deploy(config):
@@ -812,37 +912,41 @@ def deploy(config):
     if config.allow_migrations:
         run_reviewed_migrations(config, environment)
 
-    run_command(
-        ['docker', 'compose', 'up', '-d', '--no-deps', 'backend'],
-        cwd=root,
-        env=environment,
-    )
-    wait_for_backend(config)
-    verify_backend_runtime(config, candidate_image)
-    run_command(
-        [
-            'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
-            'check', '--deploy', '--fail-level', 'WARNING',
-        ],
-        cwd=root,
-        env=environment,
-    )
-    run_command(
-        [
-            'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
-            'migrate', '--check',
-        ],
-        cwd=root,
-        env=environment,
-    )
-    run_command(
-        [
-            'docker', 'compose', 'exec', '-T', 'backend', 'python', 'manage.py',
-            'audit_questions', '--database', '--fail-on-warnings',
-        ],
-        cwd=root,
-        env=environment,
-    )
+    try:
+        run_command(
+            ['docker', 'compose', 'up', '-d', '--no-deps', 'backend'],
+            cwd=root,
+            env=environment,
+        )
+        verify_live_backend(
+            config,
+            environment,
+            candidate_image,
+            audit_questions=True,
+        )
+    except (OSError, ReleaseError, subprocess.CalledProcessError) as error:
+        if config.allow_migrations:
+            raise ReleaseError(
+                'Candidate failed after a migrated cutover. Automatic application '
+                f'rollback is refused; review rollback image {rollback_tag} and '
+                f'database backup {backup_path} before recovery. Failure: {error}'
+            ) from error
+        try:
+            restored_release = restore_backend(
+                config,
+                environment,
+                rollback_tag,
+            )
+        except (OSError, ReleaseError, subprocess.CalledProcessError) as rollback_error:
+            raise ReleaseError(
+                'Candidate failed after cutover and automatic rollback also failed. '
+                f'Candidate failure: {error}; rollback failure: {rollback_error}; '
+                f'retained image: {rollback_tag}; database backup: {backup_path}'
+            ) from error
+        raise ReleaseError(
+            'Candidate failed after cutover; the previous backend release '
+            f'{restored_release} was restored and verified. Failure: {error}'
+        ) from error
     verify_public_release(config)
     return ReleaseResult(rollback_tag, backup_path, backup_sha256)
 
