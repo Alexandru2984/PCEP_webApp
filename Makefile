@@ -27,7 +27,7 @@ DATABASE_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PRODUCTION_URL ?= https://pcep.micutu.com
 PYTHON_RUNNER_ORIGIN ?= https://pcep-runner.micutu.com
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -41,6 +41,7 @@ help:
 		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
 		'  check-workflows  Validate GitHub Actions syntax, shell and security' \
 		'  check-systemd    Validate every operational systemd unit and drop-in' \
+		'  verify-nginx-installation Verify active PCEP vhosts and snippets' \
 		'  build            Build the frontend production bundle' \
 		'  compose-build-frontend Build frontend through the pinned container' \
 		'  django-check     Run Django production deploy checks' \
@@ -106,6 +107,9 @@ check-workflows:
 
 check-systemd:
 	bash scripts/check_systemd_units.sh
+
+verify-nginx-installation:
+	"$(PYTHON_BIN)" scripts/verify_nginx_installation.py
 
 build: build-frontend
 
