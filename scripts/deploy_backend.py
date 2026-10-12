@@ -696,12 +696,24 @@ def verify_backend_runtime(config, expected_image):
         container = containers[0]
         host = container['HostConfig']
         runtime = container['Config']
+        environment = runtime['Env']
+        if not isinstance(environment, list) or not all(
+            isinstance(entry, str) for entry in environment
+        ):
+            raise ValueError
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise ReleaseError('Backend runtime inspection returned invalid JSON.') from error
+
+    def exact_environment(name, value):
+        return environment.count(f'{name}={value}') == 1 and sum(
+            entry.startswith(f'{name}=') for entry in environment
+        ) == 1
 
     posture = {
         'expected_image': container.get('Image') == expected_image,
         'unprivileged_user': runtime.get('User') == 'appuser',
+        'production_mode_pinned': exact_environment('DJANGO_PRODUCTION', 'True'),
+        'debug_disabled': exact_environment('DJANGO_DEBUG', 'False'),
         'read_only_root': host.get('ReadonlyRootfs') is True,
         'not_privileged': host.get('Privileged') is False,
         'all_capabilities_dropped': host.get('CapDrop') == ['ALL'],

@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
+    DJANGO_PRODUCTION=(bool, False),
 )
 
 env_file = BASE_DIR / '.env'
@@ -15,6 +16,7 @@ if env_file.exists():
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-dev-only-CHANGE-IN-PRODUCTION')
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
+PRODUCTION = env.bool('DJANGO_PRODUCTION', default=False)
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['*'])
 PCEP_RELEASE = env('PCEP_RELEASE', default='development')
 
@@ -23,18 +25,23 @@ if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}', PCEP_RELEASE):
         'PCEP_RELEASE must contain 1-64 letters, digits, dots, underscores or hyphens.'
     )
 
-# In production (DEBUG=False) refuse to boot with insecure defaults.
-if not DEBUG:
+# Compose pins an independent production marker so changing only DJANGO_DEBUG
+# cannot silently expose debug tracebacks or the development admin.
+if PRODUCTION and DEBUG:
+    raise RuntimeError('DJANGO_DEBUG must be False when DJANGO_PRODUCTION=True.')
+
+# In production-like settings (DEBUG=False) refuse to boot with insecure defaults.
+if PRODUCTION or not DEBUG:
     if SECRET_KEY.startswith('django-insecure-'):
         raise RuntimeError(
-            'DJANGO_SECRET_KEY must be set to a non-default value when DEBUG=False.'
+            'DJANGO_SECRET_KEY must be set to a non-default value in production.'
         )
     if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
         raise RuntimeError(
-            'DJANGO_ALLOWED_HOSTS must be restricted (not "*") when DEBUG=False.'
+            'DJANGO_ALLOWED_HOSTS must be restricted (not "*") in production.'
         )
 
-DJANGO_ADMIN_ENABLED = DEBUG
+DJANGO_ADMIN_ENABLED = DEBUG and not PRODUCTION
 
 INSTALLED_APPS = [
     'django.contrib.auth',

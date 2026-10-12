@@ -19,6 +19,7 @@ def test_production_does_not_install_or_route_django_admin():
         {
             'DJANGO_SETTINGS_MODULE': 'pcep_project.settings',
             'DJANGO_DEBUG': 'False',
+            'DJANGO_PRODUCTION': 'True',
             'DJANGO_SECRET_KEY': 'production-shape-test-key-that-is-long-enough-for-checks',
             'DJANGO_ALLOWED_HOSTS': 'pcep.example.test',
         }
@@ -47,3 +48,28 @@ else:
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_production_marker_rejects_debug_even_with_otherwise_valid_settings():
+    environment = os.environ.copy()
+    environment.update(
+        {
+            'DJANGO_SETTINGS_MODULE': 'pcep_project.settings',
+            'DJANGO_DEBUG': 'True',
+            'DJANGO_PRODUCTION': 'True',
+            'DJANGO_SECRET_KEY': 'production-shape-test-key-that-is-long-enough-for-checks',
+            'DJANGO_ALLOWED_HOSTS': 'pcep.example.test',
+        }
+    )
+    result = subprocess.run(
+        [sys.executable, '-c', 'import django; django.setup()'],
+        cwd=Path(__file__).resolve().parents[2],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert 'DJANGO_DEBUG must be False when DJANGO_PRODUCTION=True.' in result.stderr
