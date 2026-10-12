@@ -23,6 +23,7 @@ import sys
 with open(sys.argv[1], encoding="utf-8") as config_file:
     services = json.load(config_file)["services"]
     service = services["db"]
+    backend = services["backend"]
     migrator = services["backend-migrate"]
 
 
@@ -78,6 +79,14 @@ require(
 require(
     migrator.get("image") == services["backend"].get("image"),
     "the migrator must use the exact candidate backend image",
+)
+require(
+    backend.get("environment", {}).get("DJANGO_PRODUCTION") == "True",
+    "the backend must pin Django production mode outside the env file",
+)
+require(
+    migrator.get("environment", {}).get("DJANGO_PRODUCTION") == "True",
+    "the migrator must pin Django production mode",
 )
 require(migrator.get("user") == "appuser", "the migrator must run as appuser")
 require(migrator.get("read_only") is True, "the migrator filesystem must be read-only")

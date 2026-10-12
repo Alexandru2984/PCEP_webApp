@@ -51,6 +51,9 @@ services:
       - path: .env
         required: false
     environment:
+      # Literal Compose policy, not an env-file value: DEBUG cannot turn a
+      # production container into a traceback/admin surface by itself.
+      DJANGO_PRODUCTION: "True"
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
     ports:
@@ -89,6 +92,7 @@ services:
       POSTGRES_CONN_MAX_AGE: 0
       DJANGO_SECRET_KEY: migration-only-container-does-not-serve-http
       DJANGO_DEBUG: "False"
+      DJANGO_PRODUCTION: "True"
       DJANGO_ALLOWED_HOSTS: migration.invalid
       CORS_ALLOWED_ORIGINS: https://migration.invalid
     entrypoint: ["python", "manage.py"]

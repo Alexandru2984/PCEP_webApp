@@ -274,11 +274,18 @@ def test_rollback_inspection_requires_consistent_image_metadata(tmp_path, monkey
             release.inspect_rollback_image(config(tmp_path), ROLLBACK_TAG)
 
 
-def runtime_inspection(image=CANDIDATE_IMAGE, mounts=None):
+def runtime_inspection(image=CANDIDATE_IMAGE, mounts=None, environment=None):
     return json.dumps([
         {
             'Image': image,
-            'Config': {'User': 'appuser'},
+            'Config': {
+                'User': 'appuser',
+                'Env': (
+                    environment
+                    if environment is not None
+                    else ['DJANGO_DEBUG=False', 'DJANGO_PRODUCTION=True']
+                ),
+            },
             'Mounts': [] if mounts is None else mounts,
             'HostConfig': {
                 'ReadonlyRootfs': True,
@@ -315,6 +322,35 @@ def test_runtime_verification_requires_no_persistent_mounts(tmp_path, monkeypatc
         ),
     )
     with pytest.raises(release.ReleaseError, match='persistent_mounts_absent'):
+        VERIFY_BACKEND_RUNTIME(config(tmp_path), CANDIDATE_IMAGE)
+
+
+@pytest.mark.parametrize(
+    'environment,failed_check',
+    [
+        ([], 'production_mode_pinned'),
+        (['DJANGO_DEBUG=False'], 'production_mode_pinned'),
+        (['DJANGO_DEBUG=True', 'DJANGO_PRODUCTION=True'], 'debug_disabled'),
+        (
+            [
+                'DJANGO_DEBUG=False',
+                'DJANGO_PRODUCTION=True',
+                'DJANGO_PRODUCTION=False',
+            ],
+            'production_mode_pinned',
+        ),
+    ],
+)
+def test_runtime_verification_requires_exact_production_environment(
+    tmp_path, monkeypatch, environment, failed_check
+):
+    monkeypatch.setattr(
+        release,
+        'capture_command',
+        lambda *_args, **_kwargs: runtime_inspection(environment=environment),
+    )
+
+    with pytest.raises(release.ReleaseError, match=failed_check):
         VERIFY_BACKEND_RUNTIME(config(tmp_path), CANDIDATE_IMAGE)
 
 

@@ -1137,8 +1137,11 @@ both PCEP vhosts. Back up outside sites-enabled, run `sudo nginx -t`, then use
 The public vhost deliberately returns 404 for both `/admin` and `/admin/`, and the
 production Django settings neither install the admin application nor register its
 URL route. The validated editor remains available only with `DEBUG=True` for local
-maintenance. Do not restore the Django admin proxy on the learner origin. A future
-operator interface requires a separate origin protected by Cloudflare Access (or
+maintenance. Compose pins `DJANGO_PRODUCTION=True` independently of the env file;
+production startup is refused if `DJANGO_DEBUG=True`, and the deployer rechecks both
+values on the live container after cutover. Do not restore the Django admin proxy
+on the learner origin. A future operator interface requires a separate origin
+protected by Cloudflare Access (or
 equivalent), phishing-resistant MFA, explicit operator enrollment and a tested
 emergency access procedure before its Nginx route is enabled.
 The API has a shared 3 requests/second IP limit with a burst of 30, 64 KB body
