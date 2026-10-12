@@ -142,6 +142,18 @@ grep -Fqi "script-src 'self'; connect-src 'self'" "$stage/shell.headers.clean"
 assert_absent 'Cloudflare browser-insights policy' \
     -Fqi 'cloudflareinsights.com' "$stage/shell.headers.clean"
 
+# SPA fallback must retain the original path for detection without logging the
+# query string (which can contain search terms or other user-supplied data).
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --output /dev/null --write-out '%{http_code}' \
+    "$base_url/audit/original-path?audit-query-canary=must-not-be-logged")
+[[ "$status" == 200 ]]
+docker exec "$container" cat /var/log/nginx/pcep_access.log > "$stage/pcep-access.log"
+grep -Fq '"path":"/audit/original-path"' "$stage/pcep-access.log"
+assert_absent 'Nginx access-log query string' \
+    -Fq 'audit-query-canary' "$stage/pcep-access.log"
+
 status=$(curl --http1.1 --insecure --silent --show-error \
     --resolve "pcep.micutu.com:$port:127.0.0.1" \
     --header 'Cookie: learner=secret' \
