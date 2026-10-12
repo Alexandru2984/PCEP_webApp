@@ -13,6 +13,7 @@ retention = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(retention)
 
 WEBSITE_ID = 'b37781f1-2c12-4d98-88f7-48cf10f000fd'
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class FakeCursor:
@@ -140,3 +141,15 @@ def test_missing_database_url_fails_without_connection(monkeypatch):
     monkeypatch.delenv('DATABASE_URL', raising=False)
     with pytest.raises(retention.AnalyticsRetentionError, match='required'):
         retention.database_connection()
+
+
+def test_systemd_sandbox_exposes_the_uv_runtime_behind_the_virtualenv_symlink():
+    service = (PROJECT_ROOT / 'ops/systemd/pcep-analytics-retention.service').read_text()
+
+    assert 'ProtectHome=tmpfs' in service
+    assert 'BindReadOnlyPaths=/home/micu/.local/share/uv/python\n' in service
+    assert 'BindReadOnlyPaths=/home/micu/PCEP_webApp/backend/.venv\n' in service
+    assert (
+        'ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python '
+        '/home/micu/PCEP_webApp/scripts/analytics_retention.py '
+    ) in service
