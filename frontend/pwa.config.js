@@ -13,7 +13,7 @@ export const pwaOptions = {
     clientsClaim: true,
     globPatterns: ['**/*.{js,css,html,svg,webmanifest}'],
     globIgnores: [
-      '**/pyodide/**',
+      '**/pyodide*/**',
       '**/py-worker.js',
       '**/runner.html',
       '**/runner-bridge.js',
@@ -28,7 +28,7 @@ export const pwaOptions = {
       /^\/media(?:\/|$)/,
       /^\/practice(?:\/|$)/,
       /^\/u(?:\/|$)/,
-      /^\/pyodide(?:\/|$)/,
+      /^\/pyodide/,
       /^\/(?:py-worker\.js|runner\.html|runner-bridge\.js)$/,
       /^\/assets(?:\/|$)/,
       /^\/(?:robots\.txt|sitemap\.xml)$/,
