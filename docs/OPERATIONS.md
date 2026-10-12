@@ -575,9 +575,14 @@ Node 24 LTS is used in CI and the non-root frontend builder because Node 20 is E
 ### In-browser Python runner (Pyodide)
 
 `make build-frontend` depends on `fetch-pyodide`, which downloads the self-hosted
-Pyodide runtime into `frontend/public/pyodide/` (git-ignored, ~12 MB) only when
-it is missing. `vite build` copies the reviewed bridge, worker and runtime into
-one release root, but Nginx exposes them only through `pcep-runner.micutu.com`.
+Pyodide runtime into `frontend/public/pyodide/` (git-ignored, ~12 MB) whenever it
+is missing or fails the pinned per-file SHA-256 inventory. Fresh downloads must
+also match the pinned npm archive SHA-512 before selected runtime files are
+extracted, and the staged runtime is rechecked before atomic replacement. This
+prevents an altered CI cache or persistent builder cache from being silently
+published merely because its version marker and filenames are present. `vite
+build` copies the reviewed bridge, worker and runtime into one release root, but
+Nginx exposes them only through `pcep-runner.micutu.com`.
 The learner vhost explicitly returns 404 for `/runner.html`, `/runner-bridge.js`,
 `/py-worker.js` and `/pyodide/*`.
 

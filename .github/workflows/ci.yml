@@ -141,6 +141,9 @@ jobs:
       - name: Fetch pinned Python runtime
         run: npm run fetch-pyodide
 
+      - name: Test Python runtime cache integrity
+        run: npm run test:pyodide-integrity
+
       - name: Build
         env:
           VITE_PCEP_RELEASE: ${{ github.sha }}

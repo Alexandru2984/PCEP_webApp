@@ -77,7 +77,7 @@ test-backend:
 	cd backend && "$(PYTHON_BIN)" -m pytest -q
 
 test-frontend: fetch-pyodide
-	cd frontend && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" $(NPM) run build
+	cd frontend && $(NPM) run test:pyodide-integrity && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" $(NPM) run build
 
 audit: audit-backend audit-frontend audit-secrets
 
@@ -118,7 +118,7 @@ compose-build-frontend:
 	$(COMPOSE) --profile build run --rm --user "$$(id -u):$$(id -g)" --env HOME=/tmp --env NPM_CONFIG_CACHE=/tmp/npm-cache --env VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" frontend-builder
 
 # Self-hosted Python runtime for the in-browser code runner (git-ignored, ~12 MB).
-# Fetched only when missing so repeat builds stay fast.
+# Reused only when every pinned runtime hash matches, so repeat builds stay fast.
 fetch-pyodide:
 	cd frontend && $(NPM) run fetch-pyodide
 
