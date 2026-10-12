@@ -26,8 +26,11 @@ describe('public-only service worker policy', () => {
   })
   it('never fetches or caches isolated Python runner files', () => {
     expect(workbox.runtimeCaching).toEqual([])
+    expect(workbox.globIgnores).toContain('**/pyodide*/**')
     for (const path of [
       '/pyodide/pyodide.js',
+      '/pyodide.previous.audit/pyodide.js',
+      '/pyodide-backup/python_stdlib.zip',
       '/py-worker.js',
       '/runner.html',
       '/runner-bridge.js',
