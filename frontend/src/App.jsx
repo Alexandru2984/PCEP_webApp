@@ -32,6 +32,8 @@ export default function App() {
         </header>
       )}
 
+      <AnalyticsConsent />
+
       {privacyPath ? (
         <PrivacyPage />
       ) : (
@@ -81,7 +83,6 @@ export default function App() {
           </span>
         </p>
       </footer>
-      <AnalyticsConsent />
     </div>
   )
 }

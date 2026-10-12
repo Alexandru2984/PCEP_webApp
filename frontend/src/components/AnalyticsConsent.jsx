@@ -41,7 +41,7 @@ export function AnalyticsPreferences() {
           onClick={() => choose('granted')}
           className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Allow analytics
+          Enable anonymous analytics
         </button>
         <button
           type="button"
@@ -73,7 +73,7 @@ export default function AnalyticsConsent() {
   return (
     <aside
       aria-label="Analytics choice"
-      className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-2xl rounded-xl border border-slate-300 bg-white p-4 shadow-2xl dark:border-slate-600 dark:bg-slate-900"
+      className="mx-auto mb-6 max-w-3xl rounded-xl border border-slate-300 bg-white p-4 shadow-sm dark:border-slate-600 dark:bg-slate-900"
     >
       <p className="font-semibold text-slate-900 dark:text-slate-100">
         Optional, anonymous analytics
@@ -93,7 +93,7 @@ export default function AnalyticsConsent() {
           onClick={() => choose('granted')}
           className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white"
         >
-          Allow analytics
+          Enable anonymous analytics
         </button>
         <button
           type="button"

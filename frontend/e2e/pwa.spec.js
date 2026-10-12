@@ -17,7 +17,7 @@ test('analytics fails closed when the proxied script does not match SRI', async 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
   expect(requests).toBe(0)
-  await page.getByRole('button', { name: 'Allow analytics' }).click()
+  await page.getByRole('button', { name: 'Enable anonymous analytics' }).click()
   await expect.poll(() => requests).toBe(1)
   expect(await page.evaluate(() => window.pcepTamperedAnalyticsExecuted)).toBeUndefined()
 })
