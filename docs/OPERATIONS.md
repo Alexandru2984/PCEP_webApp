@@ -1169,8 +1169,11 @@ can report the expected violations; the origin response does not contain that
 markup. Disable the corresponding Cloudflare features if they are unnecessary.
 Do not broaden `script-src` or add dynamic hashes to accommodate injected code.
 Structured PCEP Nginx logs at `/var/log/nginx/pcep_access.log` carry generated
-request IDs, path, status and timing, without client IPs, query strings,
-cookies or authorization headers. Existing Nginx log rotation covers them.
+request IDs, the original pre-SPA-fallback path, status and timing, without client
+IPs, query strings, cookies or authorization headers. The isolated Nginx contract
+proves that an unknown application path remains distinguishable from `/index.html`
+while a canary query value never reaches the log. Existing Nginx log rotation
+covers these files.
 
 ## Study interface and recovery
 
