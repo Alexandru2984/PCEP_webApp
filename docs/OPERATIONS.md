@@ -580,9 +580,14 @@ is missing or fails the pinned per-file SHA-256 inventory. Fresh downloads must
 also match the pinned npm archive SHA-512 before selected runtime files are
 extracted, and the staged runtime is rechecked before atomic replacement. This
 prevents an altered CI cache or persistent builder cache from being silently
-published merely because its version marker and filenames are present. `vite
-build` copies the reviewed bridge, worker and runtime into one release root, but
-Nginx exposes them only through `pcep-runner.micutu.com`.
+published merely because its version marker and filenames are present. A single
+tracked manifest supplies both the fetcher and release publisher; the publisher
+rechecks the final `dist/pyodide` bytes and refuses unexpected runtime/cache
+entries before touching the live root. During cache repair the invalid generation
+is moved outside `public/`, restored on replacement failure, and removed only
+after the verified generation is installed. `vite build` copies the reviewed
+bridge, worker and runtime into one release root, but Nginx exposes them only
+through `pcep-runner.micutu.com`.
 The learner vhost explicitly returns 404 for `/runner.html`, `/runner-bridge.js`,
 `/py-worker.js` and `/pyodide/*`.
 

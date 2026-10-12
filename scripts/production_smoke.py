@@ -703,6 +703,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         '/py-worker.js/probe',
         '/pyodide',
         '/pyodide/VERSION',
+        '/pyodide.previous.audit/pyodide.js',
     ):
         isolated = public_get(origin, path, expected_status=404)
         check_public_404(isolated, f'Learner-origin runner path {path}')

@@ -1,50 +1,60 @@
 #!/bin/bash
 # Fetch and verify the pinned npm release into a complete staging directory.
 set -euo pipefail
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 VERSION="0.29.4"
-VERSION_SHA256="9d2e9b905735be07ee35c3132a0d7a6d5e2766e6c7ade3aeb0770b9b40adfec9"
 TARBALL="https://registry.npmjs.org/pyodide/-/pyodide-${VERSION}.tgz"
 INTEGRITY="sha512-tCseTsqU3kSxZIjkue5zXxTMNEwrKZwOIIEQRBA/VzHxFN1hoCxe4w41phfCdHd9it9RcCNQb5K/Re0InqMgvA=="
-DEST="${PYODIDE_DEST:-$(cd "$(dirname "$0")/.." && pwd)/public/pyodide}"
-FILES=(pyodide.js pyodide.asm.js pyodide.asm.wasm pyodide-lock.json python_stdlib.zip)
-SHA256=(
-    7be9e63eddf6bd8786a5ab71c8689c35731d187e3415fe58d7cb95423b50421a
-    fe75e97ef2c7a10c41f23b96344c553c7c1c62821bb206080dbb24941c06d5f3
-    10090fe41e019ae669d512e1f747021a8db2aaab0f6dd6f85fa9368c55d681e3
-    14d2c2dba101277999e17135e653d8f15389ad1437f53eae213bf0c3cdff723d
-    92cb24faa546818f3ef4050fd5bd2b6487bd2042efed2113af141d035f30efb4
-)
+MANIFEST="$SCRIPT_DIR/pyodide.sha256"
+DEST="${PYODIDE_DEST:-$SCRIPT_DIR/../public/pyodide}"
+ARCHIVE_FILES=(pyodide.js pyodide.asm.js pyodide.asm.wasm pyodide-lock.json python_stdlib.zip)
+FILES=(VERSION "${ARCHIVE_FILES[@]}")
+declare -A SHA256=()
 
 die() {
     echo "$1" >&2
     exit 1
 }
 
+load_manifest() {
+    local expected file extra known candidate
+
+    [ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] || die 'Pyodide hash manifest is missing or unsafe.'
+    while read -r expected file extra; do
+        [ -n "$expected" ] && [ -n "$file" ] && [ -z "${extra:-}" ] || die 'Malformed Pyodide hash manifest.'
+        [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || die 'Malformed Pyodide hash manifest.'
+        known=false
+        for candidate in "${FILES[@]}"; do
+            if [ "$file" = "$candidate" ]; then known=true; break; fi
+        done
+        [ "$known" = true ] || die 'Unexpected file in Pyodide hash manifest.'
+        [ -z "${SHA256[$file]+present}" ] || die 'Duplicate file in Pyodide hash manifest.'
+        SHA256["$file"]="$expected"
+    done < "$MANIFEST"
+    [ "${#SHA256[@]}" -eq "${#FILES[@]}" ] || die 'Incomplete Pyodide hash manifest.'
+}
+
 runtime_is_verified() {
     local root="$1"
-    local actual file index
+    local actual file
     local -a entries
 
     [ -d "$root" ] && [ ! -L "$root" ] || return 1
-    [ -f "$root/VERSION" ] && [ ! -L "$root/VERSION" ] || return 1
-    [ "$(<"$root/VERSION")" = "$VERSION" ] || return 1
-    actual=$(sha256sum "$root/VERSION") || return 1
-    actual=${actual%% *}
-    [ "$actual" = "$VERSION_SHA256" ] || return 1
-
-    for index in "${!FILES[@]}"; do
-        file="${FILES[$index]}"
+    for file in "${FILES[@]}"; do
         [ -f "$root/$file" ] && [ ! -L "$root/$file" ] || return 1
         actual=$(sha256sum "$root/$file") || return 1
         actual=${actual%% *}
-        [ "$actual" = "${SHA256[$index]}" ] || return 1
+        [ "$actual" = "${SHA256[$file]}" ] || return 1
     done
+    [ "$(<"$root/VERSION")" = "$VERSION" ] || return 1
 
     shopt -s dotglob nullglob
     entries=("$root"/*)
     shopt -u dotglob nullglob
-    [ "${#entries[@]}" -eq "$((${#FILES[@]} + 1))" ] || return 1
+    [ "${#entries[@]}" -eq "${#FILES[@]}" ] || return 1
 }
+
+load_manifest
 
 if [[ "$DEST" != /* ]]; then
     die 'PYODIDE_DEST must be an absolute, non-root path.'
@@ -89,9 +99,9 @@ fi
 
 mkdir "$stage/package"
 members=()
-for file in "${FILES[@]}"; do members+=("package/$file"); done
+for file in "${ARCHIVE_FILES[@]}"; do members+=("package/$file"); done
 tar -xzf "$archive" -C "$stage/package" --strip-components=1 "${members[@]}"
-for file in "${FILES[@]}"; do
+for file in "${ARCHIVE_FILES[@]}"; do
     [ -f "$stage/package/$file" ] && [ ! -L "$stage/package/$file" ]
     mv "$stage/package/$file" "$stage/$file"
 done
@@ -101,11 +111,12 @@ runtime_is_verified "$stage" || die 'Extracted Pyodide runtime integrity check f
 
 if [ -e "$DEST" ] || [ -L "$DEST" ]; then
     previous_suffix=$(node -e "process.stdout.write(require('crypto').randomBytes(12).toString('hex'))")
-    previous="${DEST}.previous.${previous_suffix}"
+    previous="$SCRIPT_DIR/../.pyodide-quarantine.${previous_suffix}"
     [ ! -e "$previous" ] && [ ! -L "$previous" ] || die 'Refusing to overwrite a retained Pyodide runtime.'
     mv "$DEST" "$previous"
     if ! mv "$stage" "$DEST"; then mv "$previous" "$DEST"; exit 1; fi
-    echo "Previous runtime retained at $previous"
+    rm -rf -- "$previous"
+    echo 'Invalid cached runtime removed after verified replacement.'
 else
     mv "$stage" "$DEST"
 fi
