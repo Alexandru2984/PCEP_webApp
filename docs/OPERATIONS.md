@@ -1148,8 +1148,7 @@ serving stale security policy. Back up all replaced files outside
 `sites-enabled/`, run `bash scripts/check_nginx.sh` before installation, then run
 `sudo nginx -t`, `sudo systemctl reload nginx`, and
 `make verify-nginx-installation`. The verifier fails on content drift, regular
-enabled copies, wrong symlink targets, non-root ownership or modes other than
-0644. The 2026-09-18 vhost backup is in
+enabled copies, wrong symlink targets, non-root ownership or modes other than 0644. The 2026-09-18 vhost backup is in
 `/home/micu/backups/pcep/security-20260918/nginx.before`.
 
 The public vhost deliberately returns 404 for both `/admin` and `/admin/`, and the
@@ -1231,20 +1230,79 @@ shell. Active tabs are not automatically reloaded. The download script validates
 every pinned core file and stages downloads before replacing build inputs,
 preserving an older runtime on failure. No answer database is downloaded for
 offline use.
-Existing Umami tracking respects Do Not Track and excludes URL query/hash data
-([tracker configuration](https://docs.umami.is/docs/tracker-configuration));
-no new analytics service or user identifier was added. Its same-origin script is
-pinned with SHA-384 SRI, and the production smoke hashes the served bytes before
-declaring the site healthy. The analytics proxy strips request credentials and
-response cookies, authentication challenges, redirects and upstream CSP, and it
-ignores all response-controlled `X-Accel-*` behavior. Collection responses are
-always `no-store` with a deny-all document CSP.
+Umami is off by default. The shell contains inert tracker configuration and React
+creates the same-origin script only after an explicit opt-in. Refusal does not
+change quiz behavior, withdrawal records the choice and reloads the page to stop
+the tracker, and browser Do Not Track always wins. The tracker excludes URL
+query/hash data and is restricted to `pcep.micutu.com`
+([tracker configuration](https://docs.umami.is/docs/tracker-configuration)); no
+distinct ID, custom learner event or cookie is configured. Its script is pinned
+with SHA-384 SRI, and the production smoke hashes the served bytes before declaring
+the site healthy. The analytics proxy strips request credentials and response
+cookies, authentication challenges, redirects and upstream CSP, and it ignores all
+response-controlled `X-Accel-*` behavior. Collection responses are always
+`no-store` with a deny-all document CSP.
 
 An Umami upgrade is therefore fail-closed: changed tracker bytes stop analytics
 but cannot execute. Fetch the candidate directly from loopback and through the
 public proxy, prove the bytes match, review the script diff, then update the single
 `integrity` value in `frontend/index.html` in a normal reviewed frontend release.
 Never bypass this gate by removing SRI or weakening the learner CSP.
+
+## Privacy notice and analytics retention
+
+`/privacy/` is a first-class application route linked from every page. It documents
+the controller and contact address, browser-local learner state, transient grading,
+infrastructure logs, optional analytics, processors, retention, legal bases and data
+subject rights. Update and review it before introducing accounts, payments, sync,
+new telemetry or a provider. The contact address must remain monitored.
+
+Self-hosted Umami retains data indefinitely by default, so
+`scripts/analytics_retention.py` applies a separate 180-day limit to PCEP. It
+requires the canonical PCEP website UUID and expected domain to match the Umami
+database before deleting anything. It scopes every statement by website ID, removes
+dependent rows before sessions, preserves a session referenced by recent data,
+uses bounded lock/statement timeouts and rolls back unless `--apply` is explicit.
+Output contains only deletion counts and the cutoff, never events or session data.
+
+Preview the exact current effect through a transient systemd unit. Omitting
+`--apply` is intentional:
+
+```bash
+sudo systemd-run --quiet --wait --pipe --collect \
+  --unit=pcep-analytics-retention-preview \
+  --property=User=umami --property=Group=umami \
+  --property=EnvironmentFile=/etc/umami/umami.env \
+  /home/micu/PCEP_webApp/backend/.venv/bin/python \
+  /home/micu/PCEP_webApp/scripts/analytics_retention.py \
+  --website-id b37781f1-2c12-4d98-88f7-48cf10f000fd \
+  --expected-domain pcep.micutu.com --retention-days 180
+```
+
+After the preview identifies only PCEP and the expected counts, install and run the
+reviewed daily timer:
+
+```bash
+make check-systemd
+sudo install -o root -g root -m 0644 \
+  ops/systemd/pcep-analytics-retention.service /etc/systemd/system/
+sudo install -o root -g root -m 0644 \
+  ops/systemd/pcep-analytics-retention.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start pcep-analytics-retention.service
+sudo systemctl enable --now pcep-analytics-retention.timer
+systemctl status pcep-analytics-retention.service \
+  pcep-analytics-retention.timer --no-pager
+journalctl -u pcep-analytics-retention.service -n 20 --no-pager
+```
+
+The service runs as the existing unprivileged `umami` account, receives its database
+URL from the root-managed Umami environment file, can connect only to localhost and
+has no writable host path. Its private mount namespace hides the rest of every home
+directory and exposes only the exact retention script and Python environment
+read-only. Roll back by disabling the timer and removing these two units; if
+analytics continues, update the public notice with the replacement retention control
+rather than silently returning to indefinite storage.
 
 ## Static assets and CI
 

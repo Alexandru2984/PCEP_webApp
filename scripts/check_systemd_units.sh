@@ -82,12 +82,15 @@ stage_units="$stage/etc/systemd/system"
 install -d -m 0755 \
     "$stage_units" \
     "$stage/home/micu/PCEP_webApp/backend/.venv/bin" \
+    "$stage/home/micu/PCEP_webApp/scripts" \
     "$stage/usr/local/sbin" \
     "$stage/var/run" \
     "$stage/usr/bin"
 cp -a "$unit_root/." "$stage_units/"
 install -m 0755 /dev/null \
     "$stage/home/micu/PCEP_webApp/backend/.venv/bin/python"
+install -m 0644 /dev/null \
+    "$stage/home/micu/PCEP_webApp/scripts/analytics_retention.py"
 install -m 0755 /dev/null "$stage/usr/local/sbin/pcep-seo-pages"
 install -m 0755 /dev/null "$stage/usr/bin/install"
 install -m 0755 /dev/null "$stage/usr/bin/python3"
