@@ -1,0 +1,47 @@
+[Unit]
+Description=PCEP bounded Umami analytics retention
+Wants=network-online.target
+After=network-online.target
+ConditionPathIsDirectory=/home/micu/PCEP_webApp
+ConditionPathExists=/etc/umami/umami.env
+
+[Service]
+Type=oneshot
+User=umami
+Group=umami
+UMask=0077
+WorkingDirectory=/
+EnvironmentFile=/etc/umami/umami.env
+ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/analytics_retention.py --website-id b37781f1-2c12-4d98-88f7-48cf10f000fd --expected-domain pcep.micutu.com --retention-days 180 --apply
+
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/micu/PCEP_webApp/backend/.venv
+BindReadOnlyPaths=/home/micu/PCEP_webApp/scripts/analytics_retention.py
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProcSubset=pid
+RemoveIPC=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+SystemCallArchitectures=native
+KeyringMode=private
+MemoryMax=128M
+TasksMax=32
+TimeoutStartSec=2m

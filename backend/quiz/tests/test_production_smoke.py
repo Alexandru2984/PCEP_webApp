@@ -163,10 +163,11 @@ def test_shell_csp_is_exact_and_delegates_python_to_the_isolated_runner_origin()
     body = b'''<meta name="pcep-release" content="abc123def456">
     <link rel="stylesheet" href="/assets/index-abc12345.css">
     <script type="module" src="/assets/index-abc12345.js"></script>
-    <script defer src="/u/script.js" crossorigin="anonymous"
-      integrity="sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-      data-do-not-track="true" data-exclude-search="true"
-      data-exclude-hash="true"></script>
+    <template id="pcep-analytics-config" data-consent="required"
+      data-src="/u/script.js"
+      data-integrity="sha384-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      data-website-id="b37781f1-2c12-4d98-88f7-48cf10f000fd"
+      data-domains="pcep.micutu.com"></template>
     <div id="root"></div>'''
     assert smoke.check_shell(response(headers, body)) == (
         ['/assets/index-abc12345.js', '/assets/index-abc12345.css'],
@@ -230,14 +231,20 @@ def test_analytics_script_must_match_the_shell_integrity_and_set_no_cookie():
 
 def test_analytics_tag_requires_sri_and_privacy_attributes():
     valid = (
-        '<script defer src="/u/script.js" crossorigin="anonymous" '
-        f'integrity="{ANALYTICS_INTEGRITY}" data-do-not-track="true" '
-        'data-exclude-search="true" data-exclude-hash="true"></script>'
+        '<template id="pcep-analytics-config" data-consent="required" '
+        'data-src="/u/script.js" '
+        f'data-integrity="{ANALYTICS_INTEGRITY}" '
+        'data-website-id="b37781f1-2c12-4d98-88f7-48cf10f000fd" '
+        'data-domains="pcep.micutu.com"></template>'
     ).encode()
     assert smoke.analytics_integrity(valid) == ANALYTICS_INTEGRITY
 
     with pytest.raises(smoke.SmokeError):
-        smoke.analytics_integrity(valid.replace(b' crossorigin="anonymous"', b''))
+        smoke.analytics_integrity(valid.replace(b' data-consent="required"', b''))
+
+    executable = valid + b'<script src="/u/script.js"></script>'
+    with pytest.raises(smoke.SmokeError, match='before consent'):
+        smoke.analytics_integrity(executable)
 
 
 def test_public_admin_must_be_a_strict_cookie_free_404():

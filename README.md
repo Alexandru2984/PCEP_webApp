@@ -101,6 +101,10 @@ tells you _why_ each wrong answer is wrong — so you learn the concept, not jus
 - 🛡️ Rate-limited API, hardened production settings, separate process liveness
   and database readiness probes, plus scheduled read-only production contract
   monitoring without learner telemetry
+- 🔐 **Consent-gated analytics and transparent retention** — the quiz works fully
+  before any analytics choice; an accessible privacy page documents local progress,
+  transient grading, infrastructure logs and providers. Optional self-hosted Umami
+  analytics honors Do Not Track, uses no cookies and expires PCEP rows after 180 days.
 - 🛡️ Non-root, read-only application and PostgreSQL containers with dropped
   capabilities, bounded resources, digest-pinned bases and blocking image scans
 - 🔎 AST-backed question audits catch duplicates, malformed answer sets, short or
@@ -268,6 +272,10 @@ entry assets, separate frontend/backend release identities, liveness/readiness,
 security/cache headers,
 all aggregate matrices, answer secrecy across quiz, daily, detail and search
 responses, and ordered targeted drills.
+It also verifies that `/privacy/` serves the same reviewed frontend release and that
+the application shell contains only inert analytics configuration. The tracker is
+loaded by the application only after explicit consent and remains independently
+SRI-verified by the smoke check.
 
 Production builds identify themselves without analytics or an extra API call:
 the frontend revision is shown in the footer and a static shell metadata marker,
@@ -285,6 +293,9 @@ checksummed logical backup every day and retains 30 successful daily copies; use
 newest verified daily copy into a network-isolated, disposable database and checks
 its schema, ownership and question invariants; run the same drill with
 `make verify-database-restore`.
+A separate least-privilege timer enforces 180-day retention for only the verified
+`pcep.micutu.com` Umami website. It validates both the UUID and domain before a
+transaction can commit and records counts, never analytics payloads, in its journal.
 Encrypted offsite replication has a fail-closed implementation and security runbook,
 but remains deliberately inactive until a dedicated crypt remote, independent alert,
 provider controls and offline recovery key satisfy the documented activation gates.

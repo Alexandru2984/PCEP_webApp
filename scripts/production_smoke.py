@@ -26,6 +26,9 @@ ASSET_PATH_PATTERN = re.compile(
     r'/assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\.(?:css|js)'
 )
 SRI_SHA384_PATTERN = re.compile(r'sha384-[A-Za-z0-9+/]{64}')
+WEBSITE_ID_PATTERN = re.compile(
+    r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+)
 FORBIDDEN_ANSWER_FIELDS = {
     'is_correct',
     'correct_choice',
@@ -54,6 +57,7 @@ class ShellAssetParser(HTMLParser):
         self.modules = []
         self.releases = []
         self.analytics = []
+        self.analytics_configs = []
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
@@ -67,6 +71,8 @@ class ShellAssetParser(HTMLParser):
                 self.modules.append(src)
             if src == '/u/script.js':
                 self.analytics.append(attributes)
+        elif tag == 'template' and attributes.get('id') == 'pcep-analytics-config':
+            self.analytics_configs.append(attributes)
         elif tag == 'meta' and attributes.get('name') == 'pcep-release':
             self.releases.append(attributes.get('content') or '')
 
@@ -227,21 +233,28 @@ def shell_release(body):
 
 
 def analytics_integrity(body):
-    scripts = parse_shell(body).analytics
-    require(len(scripts) == 1, 'The application shell must load one analytics script.')
-    attributes = scripts[0]
-    integrity = attributes.get('integrity', '')
+    parsed = parse_shell(body)
+    require(
+        not parsed.analytics,
+        'The application shell must not load analytics before consent.',
+    )
+    require(
+        len(parsed.analytics_configs) == 1,
+        'The application shell must expose one inert analytics configuration.',
+    )
+    attributes = parsed.analytics_configs[0]
+    integrity = attributes.get('data-integrity', '')
     require(
         SRI_SHA384_PATTERN.fullmatch(integrity) is not None,
         'The analytics script is not pinned with one SHA-384 integrity value.',
     )
     require(
-        'defer' in attributes
-        and attributes.get('crossorigin') == 'anonymous'
-        and attributes.get('data-do-not-track') == 'true'
-        and attributes.get('data-exclude-search') == 'true'
-        and attributes.get('data-exclude-hash') == 'true',
-        'The analytics script privacy or fetch contract drifted.',
+        attributes.get('data-consent') == 'required'
+        and attributes.get('data-src') == '/u/script.js'
+        and WEBSITE_ID_PATTERN.fullmatch(attributes.get('data-website-id', ''))
+        is not None
+        and attributes.get('data-domains') == 'pcep.micutu.com',
+        'The analytics consent configuration drifted.',
     )
     return integrity
 
@@ -712,6 +725,16 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
 
     shell = public_get(origin, '/')
     assets, frontend_release, integrity = check_shell(shell, runner_origin)
+    privacy_shell = public_get(origin, '/privacy/')
+    privacy_assets, privacy_release, privacy_integrity = check_shell(
+        privacy_shell, runner_origin
+    )
+    require(
+        privacy_assets == assets
+        and privacy_release == frontend_release
+        and privacy_integrity == integrity,
+        'The privacy route does not serve the reviewed application release.',
+    )
     for asset_path in assets:
         check_asset(public_get(origin, asset_path), asset_path)
     check_analytics_script(public_get(origin, '/u/script.js'), integrity, runner_origin)
@@ -801,7 +824,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         'assets': len(assets),
         'admin': 'disabled',
         'runner': 'isolated',
-        'analytics': 'integrity-pinned',
+        'analytics': 'consent-gated-integrity-pinned',
     }
 
 

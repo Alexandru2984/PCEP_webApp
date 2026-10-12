@@ -6,15 +6,32 @@ test('analytics fails closed when the proxied script does not match SRI', async 
   page,
 }) => {
   await mockApi(page)
-  await page.route('**/u/script.js', (route) =>
-    route.fulfill({
+  let requests = 0
+  await page.route('**/u/script.js', async (route) => {
+    requests++
+    await route.fulfill({
       contentType: 'application/javascript',
       body: 'window.pcepTamperedAnalyticsExecuted = true',
     })
-  )
+  })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  expect(requests).toBe(0)
+  await page.getByRole('button', { name: 'Allow analytics' }).click()
+  await expect.poll(() => requests).toBe(1)
   expect(await page.evaluate(() => window.pcepTamperedAnalyticsExecuted)).toBeUndefined()
+})
+
+test('privacy page exposes a reversible analytics choice', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/privacy/')
+  await expect(page.getByRole('heading', { name: 'Privacy & data' })).toBeVisible()
+  await expect(page.getByText(/Dragne Alexandru Mihai/)).toBeVisible()
+  await page.getByRole('button', { name: 'No thanks' }).first().click()
+  await expect(page.getByText(/Anonymous analytics: denied/)).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Return to PCEP Quiz' })).toBeVisible()
+  const { violations } = await new AxeBuilder({ page }).analyze()
+  expect(violations).toEqual([])
 })
 
 test('install suggestion is actionable, accessible and honest about offline use', async ({

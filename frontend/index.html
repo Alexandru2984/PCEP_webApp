@@ -54,18 +54,19 @@
     <!-- Apply saved theme before paint (external so the CSP can forbid inline scripts) -->
     <script src="/theme-init.js"></script>
 
-    <!-- Same-origin analytics respects DNT; SRI fails closed if its service changes. -->
-    <script
-      defer
-      vite-ignore
-      src="/u/script.js"
-      integrity="sha384-LTPPwaLbU0osA3KlbZu0gbKM+OX2/iNJYVcdtY6ZFUJfsuj7LJ+40McwiPCPpKad"
-      crossorigin="anonymous"
-      data-do-not-track="true"
-      data-exclude-search="true"
-      data-exclude-hash="true"
+    <!--
+      Inert configuration only. The React consent control creates the analytics
+      script after an explicit opt-in; production smoke still verifies these
+      reviewed bytes through SRI before a learner can load them.
+    -->
+    <template
+      id="pcep-analytics-config"
+      data-consent="required"
+      data-src="/u/script.js"
+      data-integrity="sha384-LTPPwaLbU0osA3KlbZu0gbKM+OX2/iNJYVcdtY6ZFUJfsuj7LJ+40McwiPCPpKad"
       data-website-id="b37781f1-2c12-4d98-88f7-48cf10f000fd"
-    ></script>
+      data-domains="pcep.micutu.com"
+    ></template>
   </head>
   <body>
     <div id="root"></div>
