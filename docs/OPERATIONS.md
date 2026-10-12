@@ -1139,9 +1139,17 @@ restart only cloudflared and rerun the smoke. The restart reconnects the tunnel 
 can briefly return an edge 530; it does not require an Nginx, Docker or database
 restart.
 
-Install `nginx/snippets/pcep-*.conf` into `/etc/nginx/snippets/` before installing
-both PCEP vhosts. Back up outside sites-enabled, run `sudo nginx -t`, then use
-`sudo systemctl reload nginx` (graceful). The 2026-09-18 vhost backup is in
+Install `nginx/snippets/pcep-*.conf` as root-owned mode-0644 regular files under
+`/etc/nginx/snippets/`, and install each tracked PCEP vhost as its mode-0644
+regular file under `/etc/nginx/sites-available/`. Both entries under
+`sites-enabled/` must be root-owned symlinks to those exact files, never copied
+configurations; otherwise a deploy can update an inactive copy while Nginx keeps
+serving stale security policy. Back up all replaced files outside
+`sites-enabled/`, run `bash scripts/check_nginx.sh` before installation, then run
+`sudo nginx -t`, `sudo systemctl reload nginx`, and
+`make verify-nginx-installation`. The verifier fails on content drift, regular
+enabled copies, wrong symlink targets, non-root ownership or modes other than
+0644. The 2026-09-18 vhost backup is in
 `/home/micu/backups/pcep/security-20260918/nginx.before`.
 
 The public vhost deliberately returns 404 for both `/admin` and `/admin/`, and the
