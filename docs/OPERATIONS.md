@@ -1299,8 +1299,9 @@ journalctl -u pcep-analytics-retention.service -n 20 --no-pager
 The service runs as the existing unprivileged `umami` account, receives its database
 URL from the root-managed Umami environment file, can connect only to localhost and
 has no writable host path. Its private mount namespace hides the rest of every home
-directory and exposes only the exact retention script and Python environment
-read-only. Roll back by disabling the timer and removing these two units; if
+directory and exposes only the exact retention script, virtual environment and the
+read-only uv-managed Python runtime to which that environment's interpreter symlink
+resolves. Roll back by disabling the timer and removing these two units; if
 analytics continues, update the public notice with the replacement retention control
 rather than silently returning to indefinite storage.
 

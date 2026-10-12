@@ -19,6 +19,7 @@ PrivateDevices=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=tmpfs
+BindReadOnlyPaths=/home/micu/.local/share/uv/python
 BindReadOnlyPaths=/home/micu/PCEP_webApp/backend/.venv
 BindReadOnlyPaths=/home/micu/PCEP_webApp/scripts/analytics_retention.py
 ProtectClock=true
