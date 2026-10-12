@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import os
 from pathlib import Path
 import time
@@ -16,6 +17,32 @@ def static_release(root, marker):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(marker)
     return root
+
+
+def frontend_release(root, marker='public data'):
+    for name in [
+        'sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js',
+        'manifest.webmanifest', 'assets/new.js',
+    ]:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(marker)
+    runtime_content = {
+        'VERSION': b'0.29.4\n',
+        'pyodide.js': marker.encode(),
+        'pyodide.asm.js': marker.encode(),
+        'pyodide.asm.wasm': b'\x00asm\x01\x00\x00\x00',
+        'pyodide-lock.json': marker.encode(),
+        'python_stdlib.zip': marker.encode(),
+    }
+    hashes = {}
+    for name, content in runtime_content.items():
+        path = root / 'pyodide' / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+        hashes[name] = hashlib.sha256(content).hexdigest()
+    (root / 'index.html').write_text('<script src="/assets/new.js"></script>')
+    return root, hashes
 
 
 def test_publish_swaps_complete_directory_and_retains_previous(tmp_path):
@@ -63,14 +90,9 @@ def test_initial_publication_is_atomic_and_separate(tmp_path):
         release.publish(source, source, kind='static')
 
 
-def test_frontend_keeps_old_lazy_chunks_and_rejects_missing_new_asset(tmp_path):
-    source = tmp_path / 'source'
-    for name in ['sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js', 'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip', 'assets/new.js']:
-        path = source / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('public data')
-    (source / 'pyodide/pyodide.asm.wasm').write_bytes(b'\x00asm\x01\x00\x00\x00')
-    (source / 'index.html').write_text('<script src="/assets/new.js"></script>')
+def test_frontend_keeps_old_lazy_chunks_and_rejects_missing_new_asset(tmp_path, monkeypatch):
+    source, hashes = frontend_release(tmp_path / 'source')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
     target = tmp_path / 'live'
     (target / 'assets').mkdir(parents=True)
     (target / 'assets/old.js').write_text('old lazy chunk')
@@ -84,14 +106,9 @@ def test_frontend_keeps_old_lazy_chunks_and_rejects_missing_new_asset(tmp_path):
     assert (target / 'assets/new.js').exists()
 
 
-def test_frontend_bounds_old_chunks_and_keeps_the_previous_generation(tmp_path):
-    source = tmp_path / 'source'
-    for name in ['sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js', 'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip', 'assets/new.js']:
-        path = source / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text('new release')
-    (source / 'pyodide/pyodide.asm.wasm').write_bytes(b'\x00asm\x01\x00\x00\x00')
-    (source / 'index.html').write_text('<script src="/assets/new.js"></script>')
+def test_frontend_bounds_old_chunks_and_keeps_the_previous_generation(tmp_path, monkeypatch):
+    source, hashes = frontend_release(tmp_path / 'source', 'new release')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
 
     target = tmp_path / 'live'
     (target / 'assets').mkdir(parents=True)
@@ -122,3 +139,29 @@ def test_rejects_invalid_asset_retention_before_touching_live(tmp_path):
     with pytest.raises(ValueError, match='retention days'):
         release.publish(source, target, kind='static', asset_retention_days=0)
     assert (target / 'admin/css/base.css').read_text() == 'old'
+
+
+def test_frontend_rejects_changed_or_unexpected_runtime_content(tmp_path, monkeypatch):
+    source, hashes = frontend_release(tmp_path / 'source')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
+    target = tmp_path / 'live'
+
+    (source / 'pyodide/pyodide.js').write_text('changed after build')
+    with pytest.raises(ValueError, match='integrity check failed'):
+        release.publish(source, target)
+    assert not target.exists()
+
+    (source / 'pyodide/pyodide.js').write_text('public data')
+    (source / 'pyodide/unexpected.js').write_text('unexpected')
+    with pytest.raises(ValueError, match='Unexpected file'):
+        release.publish(source, target)
+    assert not target.exists()
+
+
+def test_frontend_rejects_exposed_cache_generation(tmp_path, monkeypatch):
+    source, hashes = frontend_release(tmp_path / 'source')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
+    (source / 'pyodide.previous.audit').mkdir()
+
+    with pytest.raises(ValueError, match='cache directory'):
+        release.publish(source, tmp_path / 'live')

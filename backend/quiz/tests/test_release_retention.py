@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,17 @@ spec = importlib.util.spec_from_file_location(
 )
 retention = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(retention)
+
+
+@pytest.fixture(autouse=True)
+def use_fixture_runtime_hashes(monkeypatch):
+    publisher = retention.load_publish_release()
+    hashes = {
+        name: hashlib.sha256(b'\x00asm' if name.endswith('.wasm') else b'complete').hexdigest()
+        for name in publisher.PYODIDE_FILE_NAMES
+    }
+    monkeypatch.setattr(publisher, 'PYODIDE_SHA256', hashes)
+    monkeypatch.setattr(retention, 'load_publish_release', lambda: publisher)
 
 
 def complete_frontend_release(root):

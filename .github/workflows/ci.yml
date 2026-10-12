@@ -136,7 +136,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: frontend/public/pyodide
-          key: pyodide-${{ hashFiles('frontend/scripts/fetch-pyodide.sh') }}
+          key: pyodide-${{ hashFiles('frontend/scripts/fetch-pyodide.sh', 'frontend/scripts/pyodide.sha256') }}
 
       - name: Fetch pinned Python runtime
         run: npm run fetch-pyodide
@@ -179,7 +179,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: frontend/public/pyodide
-          key: pyodide-${{ hashFiles('frontend/scripts/fetch-pyodide.sh') }}
+          key: pyodide-${{ hashFiles('frontend/scripts/fetch-pyodide.sh', 'frontend/scripts/pyodide.sha256') }}
 
       - name: Fetch pinned Python runtime
         run: npm run fetch-pyodide

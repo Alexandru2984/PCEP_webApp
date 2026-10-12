@@ -3,6 +3,7 @@
 import argparse
 import ctypes
 import errno
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -13,6 +14,40 @@ from html.parser import HTMLParser
 from urllib.parse import unquote, urlsplit
 
 ASSET_RETENTION_DAYS = 7
+PYODIDE_MANIFEST = Path(__file__).resolve().parents[1] / 'frontend/scripts/pyodide.sha256'
+PYODIDE_FILE_NAMES = frozenset({
+    'VERSION',
+    'pyodide.js',
+    'pyodide.asm.js',
+    'pyodide.asm.wasm',
+    'pyodide-lock.json',
+    'python_stdlib.zip',
+})
+
+
+def load_pyodide_hashes(path=PYODIDE_MANIFEST):
+    if not path.is_file() or path.is_symlink():
+        raise ValueError('Pyodide hash manifest is missing or unsafe.')
+    entries = {}
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            raise ValueError('Malformed Pyodide hash manifest.')
+        expected, name = parts
+        if (
+            len(expected) != 64
+            or any(character not in '0123456789abcdef' for character in expected)
+            or name not in PYODIDE_FILE_NAMES
+            or name in entries
+        ):
+            raise ValueError('Malformed Pyodide hash manifest.')
+        entries[name] = expected
+    if entries.keys() != PYODIDE_FILE_NAMES:
+        raise ValueError('Incomplete Pyodide hash manifest.')
+    return entries
+
+
+PYODIDE_SHA256 = load_pyodide_hashes()
 
 
 class AssetReferences(HTMLParser):
@@ -37,14 +72,27 @@ def validate_release(source, kind='frontend'):
     required = ['admin/css/base.css', 'admin/js/core.js'] if kind == 'static' else [
         'index.html', 'sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js',
         'manifest.webmanifest',
-        'pyodide/VERSION', 'pyodide/pyodide.js', 'pyodide/pyodide.asm.js',
-        'pyodide/pyodide.asm.wasm', 'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip',
+        *(f'pyodide/{name}' for name in sorted(PYODIDE_FILE_NAMES)),
     ]
     for name in required:
         path = source / name
         if not path.is_file() or not path.stat().st_size:
             raise ValueError(f'Release is incomplete: {name}')
     if kind == 'frontend':
+        runtime_root = source / 'pyodide'
+        runtime_entries = {path.name for path in runtime_root.iterdir()}
+        if runtime_entries != PYODIDE_FILE_NAMES:
+            raise ValueError('Unexpected file in Pyodide runtime.')
+        for name, expected in PYODIDE_SHA256.items():
+            with (runtime_root / name).open('rb') as runtime_file:
+                actual = hashlib.file_digest(runtime_file, 'sha256').hexdigest()
+            if actual != expected:
+                raise ValueError(f'Pyodide runtime integrity check failed: {name}')
+        if any(
+            path.name.startswith(('pyodide.', 'pyodide-'))
+            for path in source.iterdir()
+        ):
+            raise ValueError('Unexpected Pyodide cache directory in release.')
         parser = AssetReferences()
         parser.feed((source / 'index.html').read_text())
         for reference in parser.paths:

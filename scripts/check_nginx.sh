@@ -29,7 +29,8 @@ cleanup() {
 }
 trap cleanup EXIT
 nginx_image=${NGINX_TEST_IMAGE:-nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236}
-mkdir -p "$stage/certs" "$stage/snippets" "$stage/frontend/pyodide"
+mkdir -p "$stage/certs" "$stage/snippets" "$stage/frontend/pyodide" \
+    "$stage/frontend/pyodide.previous.audit"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=pcep.micutu.com' -keyout "$stage/certs/privkey.pem" -out "$stage/certs/fullchain.pem" 2>/dev/null
 cp "$root"/nginx/snippets/pcep-*.conf "$stage/snippets/"
 cp "$root/frontend/public/runner.html" "$root/frontend/public/runner-bridge.js" \
@@ -39,6 +40,8 @@ cp "$root/frontend/index.html" "$stage/frontend/index.html"
 # exercises Nginx routing only; fetch/build and production smoke verify the real
 # pinned runtime independently.
 printf '%s\n' '0.29.4' > "$stage/frontend/pyodide/VERSION"
+printf '%s\n' 'must never be published' \
+    > "$stage/frontend/pyodide.previous.audit/pyodide.js"
 printf 'location ~ /\\. { deny all; }\n' > "$stage/snippets/block-dotfiles.conf"
 # Shared variables/includes are provided by the actual production host.
 sed -e '/include \/etc\/letsencrypt\/options-ssl-nginx.conf;/d' -e '/ssl_dhparam \/etc\/letsencrypt\/ssl-dhparams.pem;/d' "$root/nginx/pcep.micutu.com.conf" > "$stage/pcep.conf"
@@ -230,7 +233,7 @@ status=$(curl --http1.1 --insecure --silent --show-error \
     --output /dev/null --write-out '%{http_code}' "$runner_url/api/live/")
 [[ "$status" == 404 ]]
 
-for isolated_path in /runner.html /runner.html/probe /runner-bridge.js /runner-bridge.js/probe /py-worker.js /py-worker.js/probe /pyodide /pyodide/VERSION; do
+for isolated_path in /runner.html /runner.html/probe /runner-bridge.js /runner-bridge.js/probe /py-worker.js /py-worker.js/probe /pyodide /pyodide/VERSION /pyodide.previous.audit/pyodide.js; do
     status=$(curl --http1.1 --insecure --silent --show-error \
         --resolve "pcep.micutu.com:$port:127.0.0.1" \
         --output /dev/null --write-out '%{http_code}' "$base_url$isolated_path")

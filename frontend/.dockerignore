@@ -11,6 +11,7 @@ Dockerfile
 .vscode
 .idea
 coverage
+.pyodide-quarantine.*
 .DS_Store
 playwright-report
 test-results

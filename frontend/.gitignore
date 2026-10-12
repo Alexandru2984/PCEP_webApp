@@ -1,6 +1,7 @@
 node_modules/
 dist/
 public/pyodide/
+.pyodide-quarantine.*
 playwright-report/
 test-results/
 coverage/
