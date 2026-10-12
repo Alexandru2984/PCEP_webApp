@@ -4,6 +4,23 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 stage=$(mktemp -d)
 container=''
+
+assert_absent() {
+    local label=$1
+    shift
+    local status
+
+    if grep "$@"; then
+        printf 'Nginx check failed: forbidden %s is present.\n' "$label" >&2
+        return 1
+    else
+        status=$?
+    fi
+    # grep returns 1 only for a clean "no match". Missing/unreadable fixtures
+    # and every other execution error must fail the security check as well.
+    [[ $status -eq 1 ]] || return "$status"
+}
+
 cleanup() {
     if [[ -n "$container" ]]; then
         docker rm -f "$container" >/dev/null 2>&1 || true
@@ -109,8 +126,10 @@ grep -Fqi 'Referrer-Policy: no-referrer' "$stage/runner.headers.clean"
 grep -Fqi 'Origin-Agent-Cluster: ?1' "$stage/runner.headers.clean"
 grep -Fqi "frame-ancestors https://pcep.micutu.com" "$stage/runner.headers.clean"
 grep -Fqi "script-src 'self'; worker-src 'self'; connect-src 'none'" "$stage/runner.headers.clean"
-! grep -Eqi '^X-Frame-Options:' "$stage/runner.headers.clean"
-! grep -Eqi '^Set-Cookie:' "$stage/runner.headers.clean"
+assert_absent 'runner X-Frame-Options header' \
+    -Eqi '^X-Frame-Options:' "$stage/runner.headers.clean"
+assert_absent 'runner Set-Cookie header' \
+    -Eqi '^Set-Cookie:' "$stage/runner.headers.clean"
 grep -Fq '<script src="/runner-bridge.js" defer></script>' "$stage/runner.body"
 
 status=$(curl --http1.1 --insecure --silent --show-error \
@@ -120,7 +139,8 @@ status=$(curl --http1.1 --insecure --silent --show-error \
 [[ "$status" == 200 ]]
 tr -d '\r' < "$stage/shell.headers" > "$stage/shell.headers.clean"
 grep -Fqi "script-src 'self'; connect-src 'self'" "$stage/shell.headers.clean"
-! grep -Fqi 'cloudflareinsights.com' "$stage/shell.headers.clean"
+assert_absent 'Cloudflare browser-insights policy' \
+    -Fqi 'cloudflareinsights.com' "$stage/shell.headers.clean"
 
 status=$(curl --http1.1 --insecure --silent --show-error \
     --resolve "pcep.micutu.com:$port:127.0.0.1" \
@@ -139,7 +159,8 @@ grep -Fqi 'Content-Type: application/javascript' \
     "$stage/analytics-script.headers.clean"
 grep -Fqi "script-src 'self'; connect-src 'self'" \
     "$stage/analytics-script.headers.clean"
-! grep -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
+assert_absent 'analytics-script credential or redirect response header' \
+    -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
     "$stage/analytics-script.headers.clean"
 grep -Fqx 'window.fixtureAnalytics=true;' "$stage/analytics-script.body"
 
@@ -152,7 +173,8 @@ tr -d '\r' < "$stage/analytics.headers" > "$stage/analytics.headers.clean"
 grep -Fqi 'Cache-Control: no-store' "$stage/analytics.headers.clean"
 grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
     "$stage/analytics.headers.clean"
-! grep -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
+assert_absent 'rejected analytics credential or redirect response header' \
+    -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
     "$stage/analytics.headers.clean"
 
 status=$(curl --http1.1 --insecure --silent --show-error \
@@ -170,7 +192,8 @@ tr -d '\r' < "$stage/analytics-post.headers" > "$stage/analytics-post.headers.cl
 grep -Fqi 'Cache-Control: no-store' "$stage/analytics-post.headers.clean"
 grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
     "$stage/analytics-post.headers.clean"
-! grep -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
+assert_absent 'analytics credential or redirect response header' \
+    -Eqi '^Set-Cookie:|^WWW-Authenticate:|^Location:' \
     "$stage/analytics-post.headers.clean"
 
 for runner_path in /runner-bridge.js /py-worker.js /pyodide/VERSION; do
@@ -184,7 +207,8 @@ for runner_path in /runner-bridge.js /py-worker.js /pyodide/VERSION; do
     tr -d '\r' < "$stage/$runner_label.headers" > "$stage/$runner_label.headers.clean"
     grep -Fqi 'Cache-Control: no-store' "$stage/$runner_label.headers.clean"
     grep -Fqi 'Cross-Origin-Resource-Policy: same-origin' "$stage/$runner_label.headers.clean"
-    ! grep -Eqi '^Set-Cookie:' "$stage/$runner_label.headers.clean"
+    assert_absent "runner asset $runner_path Set-Cookie header" \
+        -Eqi '^Set-Cookie:' "$stage/$runner_label.headers.clean"
 done
 grep -Fqi "script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'" \
     "$stage/_py-worker.js.headers.clean"
@@ -215,8 +239,10 @@ for admin_path in /admin /admin/login/; do
     grep -Fqi 'X-Content-Type-Options: nosniff' "$stage/$admin_label.headers.clean"
     grep -Fqi 'X-Frame-Options: DENY' "$stage/$admin_label.headers.clean"
     grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' "$stage/$admin_label.headers.clean"
-    ! grep -Eqi '^Set-Cookie:' "$stage/$admin_label.headers.clean"
-    ! grep -Eqi 'Django administration|admin login' "$stage/$admin_label.body"
+    assert_absent "admin route $admin_path Set-Cookie header" \
+        -Eqi '^Set-Cookie:' "$stage/$admin_label.headers.clean"
+    assert_absent "admin route $admin_path disclosure" \
+        -Eqi 'Django administration|admin login' "$stage/$admin_label.body"
 done
 
 status=''
