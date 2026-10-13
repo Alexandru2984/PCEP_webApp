@@ -334,9 +334,10 @@ its cost material.
 ## 10. Infrastructure
 
 - **Nginx:** tracked production vhost, centralized headers/CSP, verified proxy
-  headers, JSON request IDs/timing logs without IP/query/cookie/auth data, body
-  and rate limits, compression, strict route caching, correct manifest/WASM/JS
-  media types, missing-asset 404s and fail-closed retired static/media routes.
+  headers, JSON request IDs/timing access logs without IP/query/cookie/auth data,
+  privacy-suppressed rate-limit diagnostics, body and rate limits, compression,
+  strict route caching, correct manifest/WASM/JS media types, missing-asset 404s
+  and fail-closed retired static/media routes.
   Every reload followed `nginx -t`.
 - **Release retention:** a read-only-by-default utility reports only exact
   frontend/static rollback and backup snapshots, enforces at least two retained
@@ -2819,6 +2820,37 @@ personal-data flow or regulatory scope is added, and no FAIR loss estimate is cl
 without business-impact inputs. The CISO verdict is **SHIP** after PR validation,
 configuration backup, `nginx -t`, reload, installation verification and public smoke
 all pass.
+
+### Rate-limit log privacy — 2026-10-13
+
+A controlled loopback burst proved that Nginx's default `limit_req` diagnostic wrote
+both the real client context and complete request target into its error log: all 35
+generated `429` responses retained the harmless query canary. The structured access
+log was already query- and IP-free, but did not protect this separate fixed-format
+path. Search text can contain personal or sensitive content even though the product
+does not require it, so file permissions alone were not a sufficient minimization
+control.
+
+The learner vhost now emits routine rate-limit diagnostics at `notice`, below its
+`warn` error-log threshold. Each rejected request remains visible by request ID,
+method, redacted path, status and duration in the structured access log. The isolated
+Nginx regression test forces a query-bearing `429` and fails if that canary appears
+in the error log. API request-level upstream errors are likewise kept below the
+location's `crit` threshold while their 5xx status remains in the redacted access log
+and external monitoring. A separate forced upstream failure proves that boundary.
+Other unexpected Nginx failures outside the API can still carry request context; the
+mode-0640 logs remain restricted operational data and must not become public CI
+artifacts.
+
+The dominant STRIDE risk was information disclosure. The blast radius was every
+throttled learner whose query contained sensitive text, bounded to host operators and
+members of the local `adm` group rather than public users. Detection is immediate in
+CI for this known path; incident response is to restrict the log, assess its bounded
+retention and rotate it under the existing policy. The change adds no vendor,
+credential or data flow and reduces rather than expands potential GDPR personal-data
+retention. No FAIR estimate is claimed without loss inputs. The CISO verdict is
+**SHIP** after isolated regression, configuration backup, `nginx -t`, reload and a
+repeat of the exact live canary test all pass.
 
 ## 15. Breaking changes
 
