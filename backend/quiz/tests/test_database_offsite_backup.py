@@ -50,6 +50,25 @@ directory_name_encryption = true
 """
 
 
+def google_drive_config(name='pcep-drive-crypt'):
+    return f"""
+[pcep-drive]
+type = drive
+client_id = dedicated-client-id.apps.googleusercontent.com
+client_secret = XXX
+scope = drive.file
+token = XXX
+
+[{name}]
+type = crypt
+remote = pcep-drive:pcep-offsite/encrypted
+password = XXX
+password2 = XXX
+filename_encryption = standard
+directory_name_encryption = true
+"""
+
+
 @pytest.mark.parametrize(
     'value',
     ['', 'remote:', 'remote', 'remote:/root', 'remote:path/', 'remote:a//b', 'remote:a/../b', '-bad:path'],
@@ -211,6 +230,96 @@ def test_cloudflare_r2_eu_profile_rejects_extra_remote():
     with pytest.raises(offsite.OffsiteBackupError, match='only the crypt and backend'):
         offsite.validate_cloudflare_r2_eu_backend(
             changed, 'pcep-crypt', backend_name, backend_path
+        )
+
+
+def test_google_drive_profile_accepts_dedicated_drive_file_config():
+    backend_name, backend_path = offsite.parse_redacted_remote(
+        google_drive_config(), 'pcep-drive-crypt'
+    )
+
+    offsite.validate_google_drive_backend(
+        google_drive_config(), 'pcep-drive-crypt', backend_name, backend_path
+    )
+
+
+def test_google_drive_profile_dispatch_instantiates_the_encrypted_backend():
+    calls = []
+
+    def runner(_rclone, _config, arguments, **_kwargs):
+        calls.append(arguments)
+        if arguments == ['config', 'redacted']:
+            return SimpleNamespace(
+                stdout=google_drive_config(), stderr='', returncode=0
+            )
+        return SimpleNamespace(
+            stdout=json.dumps({'String': 'Encrypted drive root'}),
+            stderr='',
+            returncode=0,
+        )
+
+    offsite.validate_crypt_remote(
+        'pcep-drive-crypt',
+        'rclone',
+        Path('/config'),
+        runner,
+        backend_profile='google-drive',
+    )
+
+    assert calls == [
+        ['config', 'redacted'],
+        ['backend', 'features', 'pcep-drive-crypt:', '--json'],
+    ]
+
+
+@pytest.mark.parametrize(
+    'original,replacement,message',
+    [
+        ('type = drive', 'type = dropbox', 'Google Drive backend'),
+        ('client_id = dedicated-client-id.apps.googleusercontent.com', 'client_id =', 'OAuth client'),
+        ('client_secret = XXX', 'client_secret =', 'OAuth client'),
+        ('scope = drive.file', 'scope = drive', 'exactly drive.file'),
+        ('token = XXX', 'token =', 'interactive OAuth token'),
+        (
+            'remote = pcep-drive:pcep-offsite/encrypted',
+            'remote = pcep-drive:other/encrypted',
+            'pcep-offsite/encrypted',
+        ),
+        (
+            'scope = drive.file',
+            'scope = drive.file\nservice_account_file = /secret.json',
+            'outside the approved profile',
+        ),
+        (
+            'scope = drive.file',
+            'scope = drive.file\nroot_folder_id = shared-folder',
+            'outside the approved profile',
+        ),
+    ],
+)
+def test_google_drive_profile_rejects_broad_or_ambient_access(
+    original, replacement, message
+):
+    changed = google_drive_config().replace(original, replacement)
+    backend_name, backend_path = offsite.parse_redacted_remote(
+        changed, 'pcep-drive-crypt'
+    )
+
+    with pytest.raises(offsite.OffsiteBackupError, match=message):
+        offsite.validate_google_drive_backend(
+            changed, 'pcep-drive-crypt', backend_name, backend_path
+        )
+
+
+def test_google_drive_profile_rejects_an_extra_remote():
+    changed = f'{google_drive_config()}\n[shared]\ntype = drive\n'
+    backend_name, backend_path = offsite.parse_redacted_remote(
+        changed, 'pcep-drive-crypt'
+    )
+
+    with pytest.raises(offsite.OffsiteBackupError, match='only the crypt and backend'):
+        offsite.validate_google_drive_backend(
+            changed, 'pcep-drive-crypt', backend_name, backend_path
         )
 
 

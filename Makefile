@@ -15,6 +15,7 @@ DATABASE_RESTORE_CONTAINER ?= pcep_db_restore_check
 DATABASE_RESTORE_FALLBACK_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PCEP_OFFSITE_REMOTE ?=
 OFFSITE_RCLONE_CONFIG ?=
+OFFSITE_BACKEND_PROFILE ?= cloudflare-r2-eu
 OFFSITE_BACKUP_MAX_AGE_HOURS ?= 48
 RELEASE_KEEP ?= 5
 ASSET_RETENTION_DAYS ?= 7
@@ -151,12 +152,12 @@ separate-database-roles:
 offsite-backup-preflight:
 	@test -n "$(PCEP_OFFSITE_REMOTE)" || { printf '%s\n' 'PCEP_OFFSITE_REMOTE is required.'; exit 1; }
 	@test -n "$(OFFSITE_RCLONE_CONFIG)" || { printf '%s\n' 'OFFSITE_RCLONE_CONFIG is required.'; exit 1; }
-	"$(PYTHON_BIN)" scripts/database_offsite_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --remote "$(PCEP_OFFSITE_REMOTE)" --rclone-config "$(OFFSITE_RCLONE_CONFIG)" --max-age-hours "$(OFFSITE_BACKUP_MAX_AGE_HOURS)" --preflight-only
+	"$(PYTHON_BIN)" scripts/database_offsite_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --remote "$(PCEP_OFFSITE_REMOTE)" --rclone-config "$(OFFSITE_RCLONE_CONFIG)" --backend-profile "$(OFFSITE_BACKEND_PROFILE)" --max-age-hours "$(OFFSITE_BACKUP_MAX_AGE_HOURS)" --preflight-only
 
 offsite-backup:
 	@test -n "$(PCEP_OFFSITE_REMOTE)" || { printf '%s\n' 'PCEP_OFFSITE_REMOTE is required.'; exit 1; }
 	@test -n "$(OFFSITE_RCLONE_CONFIG)" || { printf '%s\n' 'OFFSITE_RCLONE_CONFIG is required.'; exit 1; }
-	"$(PYTHON_BIN)" scripts/database_offsite_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --remote "$(PCEP_OFFSITE_REMOTE)" --rclone-config "$(OFFSITE_RCLONE_CONFIG)" --max-age-hours "$(OFFSITE_BACKUP_MAX_AGE_HOURS)"
+	"$(PYTHON_BIN)" scripts/database_offsite_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --remote "$(PCEP_OFFSITE_REMOTE)" --rclone-config "$(OFFSITE_RCLONE_CONFIG)" --backend-profile "$(OFFSITE_BACKEND_PROFILE)" --max-age-hours "$(OFFSITE_BACKUP_MAX_AGE_HOURS)"
 
 compose-up:
 	$(COMPOSE) up -d

@@ -20,7 +20,7 @@ Environment=HOME=%t/pcep-db-offsite
 ExecStartPre=/usr/bin/install -m 0600 %d/rclone.conf %t/pcep-db-offsite/rclone.conf
 StateDirectory=pcep-db-offsite
 StateDirectoryMode=0755
-ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_offsite_backup.py --backup-root /home/micu/backups/pcep/daily --rclone-config %t/pcep-db-offsite/rclone.conf --max-age-hours 6 --status-file /var/lib/pcep-db-offsite/last-success
+ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_offsite_backup.py --backup-root /home/micu/backups/pcep/daily --rclone-config %t/pcep-db-offsite/rclone.conf --backend-profile ${PCEP_OFFSITE_BACKEND_PROFILE} --max-age-hours 6 --status-file /var/lib/pcep-db-offsite/last-success
 
 NoNewPrivileges=true
 PrivateDevices=true
