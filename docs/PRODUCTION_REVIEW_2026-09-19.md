@@ -2745,7 +2745,10 @@ the same external job after its two-hour freshness window. These are machine MTT
 claims only: guaranteed human MTTD remains unbounded until the repository owner
 confirms that an exercised issue reaches a human-controlled email/mobile channel.
 The synthetic failure did open issue #62 and the next healthy run closed it, proving
-the technical alert and recovery path but not human delivery.
+the technical alert and recovery path but not human delivery. The workflow now
+assigns and mentions the repository owner as the named responder and repairs that
+assignment on a deduplicated existing alert; the next exercise must verify this
+GitHub-side routing without claiming that user notification settings delivered it.
 
 The incident posture has more than paper evidence: the application credential was
 rotated after an accidental transcript disclosure, backup restoration was performed

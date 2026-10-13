@@ -261,15 +261,17 @@ frontend publication visible even when the backend is healthy.
 every hour and on manual dispatch. The smoke job has read-only repository
 permissions. A failure gives a separate two-minute job only `issues: write`; that
 job opens one deduplicated, sanitized issue containing the workflow-run URL but no
-response, learner, host or log data. The next completely successful run closes the
-matching issue. The push/pull-request CI remains independent of production
-availability, so a transient Internet or production outage cannot block code
-review.
+response, learner, host or log data. It assigns and mentions the repository owner as
+the named responder; a repeated failure also repairs a missing assignment on the
+existing issue. The next completely successful run closes the matching issue. The
+push/pull-request CI remains independent of production availability, so a transient
+Internet or production outage cannot block code review.
 
 The technical alert path was exercised on 2026-10-13: the real contract passed, a
 synthetic final step opened sanitized issue #62, and the next normal dispatch closed
 it after the complete contract passed. This proves issue creation, deduplication and
-recovery, but not delivery to a human-controlled email or mobile channel.
+recovery. Assignment and an explicit mention strengthen the GitHub-side notification
+path, but still do not prove delivery to a human-controlled email or mobile channel.
 
 Exercise the complete notification path after installation, then immediately run a
 normal dispatch to prove automatic recovery. Confirm that the repository owner's
