@@ -242,8 +242,10 @@ aggregate question counts,
 module/objective/difficulty matrices, security headers and API no-store behavior.
 It also requires the minimal recovery-operations attestation to report `ok` and to
 have been refreshed within two hours; a stale publisher therefore fails closed.
-It also requires `/admin/login/` to remain a non-redirecting, cookie-free 404 with
-a deny-all CSP, so a vhost regression cannot silently republish Django admin.
+It also requires `/admin/login/` and uncached canaries below both retired
+`/static/` and `/media/` to remain non-redirecting, cookie-free 404 responses with
+a deny-all CSP, so a vhost regression cannot silently republish Django admin or
+the retained rollback trees.
 The same contract requires every runner path to be 404 on the learner origin,
 then verifies the separate runner document, bridge, worker, pinned runtime version,
 cookie-free headers, exact CSPs and absence of an API route. It does not execute
@@ -267,11 +269,12 @@ existing issue. The next completely successful run closes the matching issue. Th
 push/pull-request CI remains independent of production availability, so a transient
 Internet or production outage cannot block code review.
 
-The technical alert path was exercised on 2026-10-13: the real contract passed, a
-synthetic final step opened sanitized issue #62, and the next normal dispatch closed
-it after the complete contract passed. This proves issue creation, deduplication and
-recovery. Assignment and an explicit mention strengthen the GitHub-side notification
-path, but still do not prove delivery to a human-controlled email or mobile channel.
+The technical alert path was exercised again after named-responder routing was
+installed on 2026-10-13: the real contract passed, a synthetic final step opened
+sanitized issue #68 assigned to and explicitly mentioning the repository owner, and
+the next normal dispatch closed it after the complete contract passed. This proves
+GitHub-side creation, assignment, mention and recovery. It still does not prove
+delivery through a human-controlled email or mobile channel.
 
 Exercise the complete notification path after installation, then immediately run a
 normal dispatch to prove automatic recovery. Confirm that the repository owner's
@@ -1417,6 +1420,23 @@ assets, so the backend neither runs `collectstatic` nor receives static/media
 volumes. This keeps its read-only filesystem guarantee meaningful. The publisher
 still supports a separately reviewed static source if an operator surface is ever
 reintroduced; that surface must remain on an access-controlled origin.
+
+The public learner origin retires both the bare and descendant `/static` and
+`/media` routes with a hardened `404`, `Cache-Control: no-store`, deny-all document
+CSP and the shared security/request-ID headers. The old host trees are retained only
+as rollback evidence and are not Nginx aliases. The isolated Nginx check mounts
+sentinel files at the old alias paths and proves that none is served. The external
+smoke uses previously nonexistent canary objects to verify the origin policy without
+being confused by a legacy Cloudflare cache entry.
+
+Cloudflare may continue serving a previously cached `200` for a legacy static URL
+until that object's original 30-day lifetime ends. The origin can no longer refill
+it, and a zone-wide purge is not justified. Treat 2026-11-12 as the cache-exhaustion
+deadline based on the last 2026-10-13 cache fill observed during review. On or after
+that date, add representative legacy object URLs to the strict public `404` contract
+before considering deletion of either retained host tree. A separately reviewed,
+hostname-and-prefix-scoped purge may close that phase earlier.
+
 Do not run the destructive `seed-reset` target as deployment; it now requires
 explicit `ALLOW_QUESTION_RESET=yes`.
 CI cancels obsolete runs, caches npm/Python/Pyodide downloads, bounds Playwright

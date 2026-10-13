@@ -18,6 +18,7 @@ SNIPPETS = (
     'pcep-base-headers.conf',
     'pcep-csp.conf',
     'pcep-proxy.conf',
+    'pcep-retired-content.conf',
     'pcep-runner-headers.conf',
 )
 

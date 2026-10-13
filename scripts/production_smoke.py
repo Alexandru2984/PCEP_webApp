@@ -761,6 +761,13 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     admin = public_get(origin, '/admin/login/', expected_status=404)
     check_admin_unavailable(admin)
 
+    for path in (
+        '/static/pcep-retired-origin-canary-20261013.txt',
+        '/media/pcep-retired-origin-canary-20261013.txt',
+    ):
+        retired = public_get(origin, path, expected_status=404)
+        check_public_404(retired, f'Retired learner-origin route {path}')
+
     operations = public_get(origin, '/.well-known/pcep-operations.json')
     check_operations_health(operations)
 
@@ -880,6 +887,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         'targeted_order': targeted_ids,
         'assets': len(assets),
         'admin': 'disabled',
+        'static_media': 'disabled',
         'runner': 'isolated',
         'analytics': 'consent-gated-integrity-pinned',
         'recovery': 'externally-monitored',
@@ -913,6 +921,7 @@ def main(argv=None):
         f'questions={result["questions"]} '
         f'assets={result["assets"]} '
         f'admin={result["admin"]} '
+        f'static_media={result["static_media"]} '
         f'runner={result["runner"]} '
         f'analytics={result["analytics"]} '
         f'recovery={result["recovery"]} '
