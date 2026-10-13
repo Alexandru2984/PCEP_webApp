@@ -55,6 +55,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       ALERT_TITLE: "[alert] PCEP production smoke failed"
+      ALERT_ASSIGNEE: ${{ github.repository_owner }}
 
     steps:
       - name: Open one deduplicated issue
@@ -67,15 +68,18 @@ jobs:
               | head -n 1
           )"
           if [[ -n "$issue_number" ]]; then
+            gh issue edit "$issue_number" \
+              --add-assignee "$ALERT_ASSIGNEE"
             echo "Production alert issue #$issue_number is already open."
             exit 0
           fi
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          body="The scheduled public production contract failed. Review the private workflow diagnostics and follow the incident-response runbook: $run_url"
+          body="@$ALERT_ASSIGNEE is the named responder. The scheduled public production contract failed. Review the private workflow diagnostics and follow the incident-response runbook: $run_url"
           body+=$'\n\nNo response body, learner data, host metadata, or workflow log is copied into this issue.'
           gh issue create \
             --title "$ALERT_TITLE" \
-            --body "$body"
+            --body "$body" \
+            --assignee "$ALERT_ASSIGNEE"
 
   recover:
     name: Close a recovered production alert
