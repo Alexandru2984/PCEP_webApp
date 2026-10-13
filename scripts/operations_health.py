@@ -2,7 +2,7 @@
 """Publish a minimal public attestation of PCEP backup and restore freshness."""
 
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import importlib.util
 import json
 import os
@@ -17,7 +17,10 @@ DEFAULT_OUTPUT = Path('/var/lib/pcep-operations-health/status.json')
 BACKUP_PATTERN = re.compile(r'^pcep_db_daily_(\d{8}T\d{6}Z)\.sql\.gz$')
 UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 MAX_STATUS_BYTES = 256
+MAX_OFFSITE_STATUS_BYTES = 512
 FUTURE_TOLERANCE = timedelta(minutes=5)
+OFFSITE_REMOTE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
+SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
 
 
 class OperationsHealthError(RuntimeError):
@@ -109,6 +112,39 @@ def verify_restore_freshness(path, max_age_hours, now):
     return moment
 
 
+def read_offsite_status(path):
+    if path is None:
+        raise OperationsHealthError('Offsite backup success status is unavailable.')
+    status = Path(path).absolute()
+    if status.is_symlink() or not status.is_file():
+        raise OperationsHealthError('Offsite backup success status is unavailable.')
+    details = status.stat()
+    if details.st_uid != os.getuid() or details.st_mode & 0o077:
+        raise OperationsHealthError('Offsite backup success status permissions are unsafe.')
+    if details.st_size > MAX_OFFSITE_STATUS_BYTES:
+        raise OperationsHealthError('Offsite backup success status is oversized.')
+    try:
+        lines = status.read_text().splitlines()
+        fields = dict(line.split('=', 1) for line in lines)
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        raise OperationsHealthError('Offsite backup success status is invalid.') from error
+    if len(lines) != 4 or set(fields) != {'timestamp', 'backup', 'remote', 'sha256'}:
+        raise OperationsHealthError('Offsite backup success status shape is invalid.')
+    if BACKUP_PATTERN.fullmatch(fields['backup']) is None:
+        raise OperationsHealthError('Offsite backup success status has an invalid backup.')
+    if OFFSITE_REMOTE_PATTERN.fullmatch(fields['remote']) is None:
+        raise OperationsHealthError('Offsite backup success status has an invalid remote.')
+    if SHA256_PATTERN.fullmatch(fields['sha256']) is None:
+        raise OperationsHealthError('Offsite backup success status has an invalid digest.')
+    return utc_moment(fields['timestamp'], 'Offsite backup success')
+
+
+def verify_offsite_freshness(path, max_age_hours, now):
+    moment = read_offsite_status(path)
+    require_fresh(moment, now, max_age_hours, 'Last verified offsite backup')
+    return moment
+
+
 def write_public_status(path, status, now):
     if status not in {'ok', 'degraded'}:
         raise OperationsHealthError('Public operations status is invalid.')
@@ -164,10 +200,16 @@ def execute(
     restore_max_age_hours=170,
     now=None,
     backup_module=None,
+    offsite_status=None,
+    offsite_required_after=None,
+    offsite_max_age_hours=24,
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
     restore_max_age_hours = bounded_hours(restore_max_age_hours)
+    offsite_max_age_hours = bounded_hours(offsite_max_age_hours)
+    if offsite_required_after is not None:
+        offsite_required_after = calendar_date(offsite_required_after)
     failures = []
     try:
         verify_backup_freshness(
@@ -175,6 +217,11 @@ def execute(
         )
     except OperationsHealthError as error:
         failures.append(str(error))
+    if offsite_required_after is not None and moment.date() >= offsite_required_after:
+        try:
+            verify_offsite_freshness(offsite_status, offsite_max_age_hours, moment)
+        except OperationsHealthError as error:
+            failures.append(str(error))
     try:
         verify_restore_freshness(restore_status, restore_max_age_hours, moment)
     except OperationsHealthError as error:
@@ -196,6 +243,22 @@ def bounded_hours(value):
     return hours
 
 
+def calendar_date(value):
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        raise argparse.ArgumentTypeError('deadline must be an ISO calendar date')
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            'deadline must be an ISO calendar date'
+        ) from error
+    if parsed.isoformat() != value:
+        raise argparse.ArgumentTypeError('deadline must be an ISO calendar date')
+    return parsed
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backup-root', type=Path, default=DEFAULT_BACKUP_ROOT)
@@ -205,6 +268,9 @@ def main():
     parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument('--backup-max-age-hours', type=bounded_hours, default=26)
     parser.add_argument('--restore-max-age-hours', type=bounded_hours, default=170)
+    parser.add_argument('--offsite-status', type=Path)
+    parser.add_argument('--offsite-required-after', type=calendar_date)
+    parser.add_argument('--offsite-max-age-hours', type=bounded_hours, default=24)
     args = parser.parse_args()
     try:
         payload = execute(
@@ -213,6 +279,9 @@ def main():
             args.output,
             args.backup_max_age_hours,
             args.restore_max_age_hours,
+            offsite_status=args.offsite_status,
+            offsite_required_after=args.offsite_required_after,
+            offsite_max_age_hours=args.offsite_max_age_hours,
         )
     except (OperationsHealthError, OSError, ValueError) as error:
         parser.exit(1, f'Operations health degraded: {error}\n')
