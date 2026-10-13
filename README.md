@@ -297,8 +297,11 @@ A separate least-privilege timer enforces 180-day retention for only the verifie
 `pcep.micutu.com` Umami website. It validates both the UUID and domain before a
 transaction can commit and records counts, never analytics payloads, in its journal.
 Encrypted offsite replication has a fail-closed implementation and security runbook,
-but remains deliberately inactive until a dedicated crypt remote, independent alert,
-provider controls and offline recovery key satisfy the documented activation gates.
+including strict candidate profiles for a dedicated EU Cloudflare R2 backend or a
+custom-client, `drive.file` Google Drive backend. It remains deliberately inactive
+until a dedicated crypt remote, independent alert, provider controls and offline
+recovery key satisfy the documented activation gates; Drive's lack of immutability
+is not treated as equivalent to Object Lock.
 
 Operational deploy and rollback notes live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 The general [security incident response runbook](docs/SECURITY_INCIDENT_RESPONSE.md)

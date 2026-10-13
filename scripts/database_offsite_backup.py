@@ -21,6 +21,11 @@ CLOUDFLARE_R2_EU_ENDPOINT_PATTERN = re.compile(
     r'^https://[0-9a-fA-F]{32}\.eu\.r2\.cloudflarestorage\.com$'
 )
 DEFAULT_BACKEND_PROFILE = 'cloudflare-r2-eu'
+GOOGLE_DRIVE_BACKEND_PROFILE = 'google-drive'
+SUPPORTED_BACKEND_PROFILES = (
+    DEFAULT_BACKEND_PROFILE,
+    GOOGLE_DRIVE_BACKEND_PROFILE,
+)
 BACKUP_STAMP_PATTERN = re.compile(
     r'^pcep_db_daily_(\d{8}T\d{6}Z)\.sql\.gz$'
 )
@@ -207,6 +212,52 @@ def validate_cloudflare_r2_eu_backend(
         )
 
 
+def validate_google_drive_backend(
+    config_text, crypt_remote_name, backend_name, backend_path
+):
+    parser = configparser.RawConfigParser(interpolation=None)
+    try:
+        parser.read_string(config_text)
+    except configparser.Error as error:
+        raise OffsiteBackupError('Cannot parse redacted rclone configuration.') from error
+
+    expected_remotes = {crypt_remote_name, backend_name}
+    if set(parser.sections()) != expected_remotes:
+        raise OffsiteBackupError(
+            'The PCEP rclone config must contain only the crypt and backend remotes.'
+        )
+    if not parser.has_section(backend_name):
+        raise OffsiteBackupError('The wrapped rclone backend is not configured.')
+
+    section = parser[backend_name]
+    allowed_options = {'type', 'client_id', 'client_secret', 'scope', 'token'}
+    if set(section) - allowed_options:
+        raise OffsiteBackupError(
+            'The Google Drive backend contains options outside the approved profile.'
+        )
+    if section.get('type') != 'drive':
+        raise OffsiteBackupError(
+            'The google-drive profile requires the Google Drive backend.'
+        )
+    if not section.get('client_id') or not section.get('client_secret'):
+        raise OffsiteBackupError(
+            'The Google Drive backend requires a dedicated OAuth client ID and secret.'
+        )
+    if section.get('scope') != 'drive.file':
+        raise OffsiteBackupError(
+            'The Google Drive OAuth scope must be exactly drive.file.'
+        )
+    if not section.get('token'):
+        raise OffsiteBackupError(
+            'The Google Drive backend requires an interactive OAuth token.'
+        )
+
+    if PurePosixPath(backend_path).parts != ('pcep-offsite', 'encrypted'):
+        raise OffsiteBackupError(
+            'The Google Drive backend path must be pcep-offsite/encrypted.'
+        )
+
+
 def validate_crypt_remote(
     remote_name,
     rclone,
@@ -224,6 +275,13 @@ def validate_crypt_remote(
     backend_name, backend_path = parse_redacted_remote(redacted.stdout, remote_name)
     if backend_profile == 'cloudflare-r2-eu':
         validate_cloudflare_r2_eu_backend(
+            redacted.stdout,
+            remote_name,
+            backend_name,
+            backend_path,
+        )
+    elif backend_profile == GOOGLE_DRIVE_BACKEND_PROFILE:
+        validate_google_drive_backend(
             redacted.stdout,
             remote_name,
             backend_name,
@@ -456,7 +514,7 @@ def main():
     parser.add_argument('--rclone', default='rclone')
     parser.add_argument(
         '--backend-profile',
-        choices=(DEFAULT_BACKEND_PROFILE,),
+        choices=SUPPORTED_BACKEND_PROFILES,
         default=DEFAULT_BACKEND_PROFILE,
     )
     parser.add_argument('--max-age-hours', type=bounded_hours, default=48)

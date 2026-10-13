@@ -4,7 +4,7 @@ Status: **BLOCKED FOR ACTIVATION**. The implementation is ready for review, but 
 offsite upload or automatic trigger is authorized until every activation gate below
 is complete.
 
-## CISO review — 2026-10-05, R2 profile reviewed 2026-10-07
+## CISO review — 2026-10-05, R2 profile reviewed 2026-10-07, Drive profile reviewed 2026-10-13
 
 ### Threat model
 
@@ -16,8 +16,8 @@ The top three STRIDE risks, ordered by likelihood multiplied by impact, are:
    later contain usernames, email addresses, password hashes and session data. Loss
    of the only crypt recovery copy would instead destroy off-host recoverability.
 2. **Denial of service — medium likelihood.** Expired/revoked credentials, provider
-   outage or the retiring shared Google Drive client ID can silently eliminate the
-   off-host recovery point unless failure reaches an operator.
+   outage or a Google Drive remote left on rclone's retiring shared OAuth client can
+   silently eliminate the off-host recovery point unless failure reaches an operator.
 3. **Tampering — high impact.** Compromised storage credentials could replace or
    delete remote objects. Client-side encryption protects confidentiality, not
    availability; provider versioning or object lock and independent alerts are
@@ -82,10 +82,13 @@ review. No claim of SOC 2, ISO 27001, HIPAA or payment-card scope is made.
 
 ### Vendor and supply chain
 
-No new vendor is approved by this change. Google Drive is blocked because the
-configured crypt remote depends on rclone's retiring shared OAuth client. The
-operator's current R2 remote is also blocked: it is shared, raw S3 storage with
-unknown credential scope and no dedicated PCEP crypt wrapper.
+No new vendor is approved by this change. The reviewed Google Drive candidate
+requires a dedicated OAuth client and the exact `drive.file` scope; rclone's shared
+client is being retired during 2026 and is rejected. Google Drive still lacks an
+Object-Lock-style immutability control for this design, so a credential able to
+write the backup can also remove it. The operator's current R2 remote is likewise
+blocked: it is shared, raw S3 storage with unknown credential scope and no dedicated
+PCEP crypt wrapper.
 
 Cloudflare's official controls make a **new**, PCEP-only R2 bucket a technically
 eligible candidate, but not an approved destination. It must be created in the
@@ -116,7 +119,9 @@ perform a manually observed first upload and restore before installing the autom
 - Store the crypt recovery material in an independently controlled offline secret
   store; losing it makes every remote backup unrecoverable.
 - Enable and verify provider versioning or object lock plus independently retained
-  access/audit logs.
+  access/audit logs. If Google Drive is chosen despite lacking an immutability gate,
+  record explicit availability-risk acceptance and keep another independently
+  controlled recovery copy; Drive alone does not satisfy this control.
 - Configure an independent failure/missed-success alert with a named responder and
   MTTD under 24 hours; run a real alert test.
 - Review the provider DPA, subprocessors and data region.
@@ -183,6 +188,75 @@ offline recovery copy. The environment destination remains below the wrapper:
 
 ```text
 PCEP_OFFSITE_REMOTE=pcep-r2-crypt:pcep/database/daily
+PCEP_OFFSITE_BACKEND_PROFILE=cloudflare-r2-eu
+```
+
+## Reviewed Google Drive candidate profile
+
+This profile makes a future Google Drive configuration fail closed but does not
+activate or approve it. Rclone's [Google Drive documentation](https://rclone.org/drive/)
+states that the shared client ID is being retired during 2026 and describes
+`drive.file` as access only to files and folders created by the application. Create
+a dedicated OAuth client in a dedicated Google Cloud project, enable only the Drive
+API, secure the Google account with phishing-resistant MFA and review its recovery
+methods. Do not reuse a broad operator rclone config, a service account, Shared
+Drive, pre-existing folder ID or full `drive` scope.
+
+Build the remote interactively so rclone creates and can refresh its OAuth token.
+The validator accepts exactly the five Drive fields below and rejects a blank custom
+client, any scope other than `drive.file`, missing token, extra remote or backend
+option, service-account material, Shared Drive behavior and `root_folder_id`. The
+physical `pcep-offsite/encrypted` folder must be created through this OAuth client;
+the destination below it is handled through the crypt wrapper.
+
+```ini
+[pcep-drive]
+type = drive
+client_id = <DEDICATED_OAUTH_CLIENT_ID>
+client_secret = <DEDICATED_OAUTH_CLIENT_SECRET>
+scope = drive.file
+token = <RCLONE_MANAGED_OAUTH_TOKEN>
+
+[pcep-drive-crypt]
+type = crypt
+remote = pcep-drive:pcep-offsite/encrypted
+password = <RCLONE_OBSCURED_STRONG_PASSWORD>
+password2 = <RCLONE_OBSCURED_DISTINCT_SECOND_SALT>
+filename_encryption = standard
+directory_name_encryption = true
+```
+
+Rclone's [crypt documentation](https://rclone.org/crypt/) explains that config
+password values are only lightly obscured, that the distinct second salt is
+recommended and that losing the password/salt loses recovery. Store a separately
+encrypted offline copy of the complete config and its encryption password outside
+both this host and Google Drive. The systemd credential protects the host copy at
+rest; it is not the independent recovery copy. The runtime config remains writable
+inside private tmpfs so rclone can refresh OAuth tokens, and is discarded after the
+job.
+
+Google receives ciphertext, encrypted names, object sizes/times and account/access
+metadata. Drive trash or version history is not immutable backup retention: the
+same OAuth identity can delete the files it created. Before activation, review the
+app's OAuth consent/testing status, Google terms/privacy and any applicable data
+processing requirements, record the account owner and recovery route, and either
+add an independently protected copy or explicitly accept this availability gap.
+
+Use this candidate only for manual preflight and a manually observed first
+round-trip until every activation gate is closed:
+
+```bash
+PCEP_OFFSITE_REMOTE=pcep-drive-crypt:pcep/database/daily \
+OFFSITE_BACKEND_PROFILE=google-drive \
+OFFSITE_RCLONE_CONFIG=/secure/staging/pcep-rclone.conf \
+  make offsite-backup-preflight
+```
+
+The eventual root-owned environment file must contain both non-secret selectors:
+
+```text
+PCEP_OFFSITE_REMOTE=pcep-drive-crypt:pcep/database/daily
+PCEP_OFFSITE_BACKEND_PROFILE=google-drive
 ```
 
 ## Safe configuration and operation
@@ -191,6 +265,7 @@ The environment file contains only the crypt remote path, not credentials:
 
 ```text
 PCEP_OFFSITE_REMOTE=pcep-r2-crypt:pcep/database/daily
+PCEP_OFFSITE_BACKEND_PROFILE=cloudflare-r2-eu
 ```
 
 Store it as root-owned mode `0600` at `/etc/pcep/offsite-backup.env`. Create a
@@ -208,10 +283,13 @@ allows exactly the crypt and backend remotes and rejects options outside the rev
 shape. It requires the Cloudflare S3 provider, a 32-hex-account EU jurisdiction
 endpoint, `region = auto`, `no_check_bucket = true`, static credentials, no ambient
 authentication or session token, and exactly `bucket-name/encrypted` as the physical
-backend path. The crypt remote must explicitly use standard filename encryption,
-directory encryption and both crypt secrets. Absolute paths, empty or repeated
-segments, traversal and self-wrapping crypt remotes are rejected. Any rclone
-diagnostic fails the run, including the shared-Google-client retirement notice.
+backend path. The `google-drive` profile instead requires exactly two remotes, a
+custom OAuth client, `drive.file`, an interactive token and the exact
+`pcep-offsite/encrypted` physical path, with no service-account, root-folder or
+Shared Drive options. Both profiles require standard filename encryption, directory
+encryption and both crypt secrets. Absolute paths, empty or repeated segments,
+traversal and self-wrapping crypt remotes are rejected. Any rclone diagnostic fails
+the run, including a shared-Google-client retirement notice.
 
 These local checks prove configuration shape, not Cloudflare control-plane state.
 They cannot prove that the token is bucket-scoped, the named bucket was created with
@@ -232,9 +310,11 @@ Only after all activation gates pass:
 
 ```bash
 PCEP_OFFSITE_REMOTE=pcep-r2-crypt:pcep/database/daily \
+OFFSITE_BACKEND_PROFILE=cloudflare-r2-eu \
 OFFSITE_RCLONE_CONFIG=/secure/staging/pcep-rclone.conf \
   make offsite-backup-preflight
 PCEP_OFFSITE_REMOTE=pcep-r2-crypt:pcep/database/daily \
+OFFSITE_BACKEND_PROFILE=cloudflare-r2-eu \
 OFFSITE_RCLONE_CONFIG=/secure/staging/pcep-rclone.conf make offsite-backup
 
 sudo install -d -m 0700 -o root -g root /etc/pcep

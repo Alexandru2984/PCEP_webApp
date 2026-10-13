@@ -383,9 +383,12 @@ The repository includes a fail-closed rclone upload and round-trip verification
 command, but its service and post-backup trigger are intentionally not installed.
 Follow [`OFFSITE_BACKUP_RUNBOOK.md`](OFFSITE_BACKUP_RUNBOOK.md) before activation. In
 particular, do not use a raw storage remote, the retiring shared Google Drive OAuth
-client or a crypt key stored only on this host. The runbook requires a dedicated
-crypt remote, provider immutability/versioning, offline recovery material and a
-tested independent alert.
+client or a crypt key stored only on this host. The reviewed `google-drive` profile
+requires a custom OAuth client, exact `drive.file` scope, interactive token and a
+dedicated encrypted path; its lack of Object Lock remains an explicit availability
+gap, so it is prepared but not activated. The runbook requires a dedicated crypt
+remote, offline recovery material and a tested independent alert, plus provider
+immutability or a documented risk acceptance with another protected recovery copy.
 
 The preflight validates both the requested destination and the backend path wrapped
 by the crypt remote. It rejects absolute, empty, repeated or traversal segments and
@@ -406,6 +409,12 @@ provider, the jurisdiction-specific EU endpoint, static non-ambient credentials,
 disabled bucket-creation checks and a `bucket-name/encrypted` backend path. This does
 not attest the token scope, bucket jurisdiction, public-access state or Bucket Lock;
 those remain provider-side activation evidence.
+
+The alternative Google Drive validator also permits exactly two remotes. It rejects
+rclone's empty/shared client, broad Drive scope, service accounts, Shared Drive or
+root-folder options and requires the exact physical path
+`pcep-offsite/encrypted`. It cannot prove Google account MFA/recovery, OAuth consent
+status, contractual controls or immutability; preserve that evidence separately.
 
 `make offsite-backup-preflight` performs no upload. `make offsite-backup` is allowed
 only for a manually reviewed first run after every activation gate passes. Neither
