@@ -1,5 +1,7 @@
 import importlib.util
 from copy import deepcopy
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 
 import pytest
@@ -263,6 +265,43 @@ def test_public_admin_must_be_a_strict_cookie_free_404():
     ]:
         with pytest.raises(smoke.SmokeError):
             smoke.check_admin_unavailable(invalid)
+
+
+def test_operations_health_requires_minimal_fresh_success_and_strict_headers():
+    headers = {
+        **SHARED_HEADERS,
+        'cache-control': 'no-store',
+        'content-type': 'application/json',
+        'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+        'x-request-id': 'a' * 32,
+    }
+    now = datetime(2026, 10, 13, 9, tzinfo=timezone.utc)
+    payload = {
+        'checked_at': '2026-10-13T08:00:00Z',
+        'schema': 1,
+        'status': 'ok',
+    }
+    assert smoke.check_operations_health(
+        response(headers, json.dumps(payload).encode()), now=now
+    ) == payload
+
+    invalid_payloads = [
+        {**payload, 'status': 'degraded'},
+        {**payload, 'backup': 'private-detail'},
+        {**payload, 'checked_at': '2026-10-13T06:59:59Z'},
+        {**payload, 'checked_at': '2026-10-13T09:05:01Z'},
+    ]
+    for invalid in invalid_payloads:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_operations_health(
+                response(headers, json.dumps(invalid).encode()), now=now
+            )
+
+    with pytest.raises(smoke.SmokeError, match='cacheable'):
+        smoke.check_operations_health(
+            response({**headers, 'cache-control': 'public'}, json.dumps(payload).encode()),
+            now=now,
+        )
 
 
 def test_runner_headers_forbid_credentials_and_cross_origin_resources():

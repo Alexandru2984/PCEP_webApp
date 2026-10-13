@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh public PCEP backup and restore health every hour
+
+[Timer]
+OnCalendar=*-*-* *:47:00
+Persistent=true
+RandomizedDelaySec=5m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target
