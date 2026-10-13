@@ -284,6 +284,48 @@ gh workflow run production-smoke.yml -f exercise_alert=false
 gh run watch --exit-status
 ```
 
+## Bounded Capacity Smoke
+
+Run the local-origin capacity smoke only during a controlled maintenance window:
+
+```bash
+make capacity-smoke
+# Explicit, still hard-bounded example:
+make capacity-smoke CAPACITY_DURATION=30 CAPACITY_RATE=15 CAPACITY_CONCURRENCY=6
+```
+
+The harness structurally accepts only an explicit-port loopback HTTP(S) origin. It
+has non-overridable ceilings of 60 seconds, 50 requests/second, 20 concurrent
+requests, a ten-second per-request timeout and a 2 MiB response limit. It issues
+only GET requests across a fixed mix of liveness, readiness, aggregate statistics
+and four-question quiz-set paths. It sends no cookies, credentials, learner state
+or write requests, never prints response bodies, avoids catch-up bursts when the
+scheduler falls behind, disables environment proxies, refuses redirects before they
+can leave loopback, and fails by default on any error, p95 above 750 ms or
+throughput below 90% of the requested rate. It cannot be pointed at the public
+Cloudflare hostname.
+
+On 2026-10-13, the live three-worker backend and PostgreSQL containers passed a
+baseline of 5 requests/second for 10 seconds (50/50 HTTP 200, p95 41.951 ms,
+maximum 76.370 ms) and a sustained 15 requests/second for 30 seconds (450/450 HTTP
+200, p95 13.777 ms, maximum 24.620 ms). During the sustained run the backend used
+about 127 MiB of its 512 MiB limit and PostgreSQL about 23 MiB of its 512 MiB
+limit; no 429, 5xx, worker timeout or unhealthy state followed.
+
+These are a controlled readiness floor, not an Internet-scale capacity claim. The
+probe bypasses Cloudflare and Nginx, uses a small anonymous read-only workload and
+does not model geographic latency, malicious distributed traffic, large exams or
+future database growth. Repeat it after material query, worker, database, host or
+container-limit changes and preserve the aggregate JSON result with the release
+record.
+
+The public Nginx per-source limit is 10 requests/second with a burst of 60. This is
+below the sustained backend rate proven above while allowing roughly one classroom
+behind a shared NAT to start a two-request flow together. Nginx still emits the
+reviewed no-store JSON 429 contract after the burst, and Django retains its
+independent anonymous throttles. Do not increase either limit without a new local
+capacity result, resource observation and abuse-risk review.
+
 ## Daily Database Backup
 
 `make deploy-backend` always creates a verified pre-deploy dump, but deploy cadence

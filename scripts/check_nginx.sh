@@ -91,6 +91,12 @@ mounts=(
 )
 docker run --rm --network none "${mounts[@]}" "$nginx_image" nginx -t
 
+# shellcheck disable=SC2016 # Nginx variable must remain literal.
+grep -Fqx 'limit_req_zone $binary_remote_addr zone=pcep_api:10m rate=10r/s;' \
+    "$root/nginx/pcep.micutu.com.conf"
+grep -Fqx '        limit_req zone=pcep_api burst=60 nodelay;' \
+    "$root/nginx/pcep.micutu.com.conf"
+
 analytics_snippet="$root/nginx/snippets/pcep-analytics-proxy.conf"
 [[ $(grep -Fc 'include snippets/pcep-analytics-proxy.conf;' \
     "$root/nginx/pcep.micutu.com.conf") -eq 2 ]]
@@ -305,7 +311,7 @@ grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' "$stage/413.headers.clean"
 grep -Fqx '{"detail":"Request body is too large."}' "$stage/413.body"
 
 status=''
-for _ in $(seq 1 60); do
+for _ in $(seq 1 120); do
     status=$(curl --http1.1 --insecure --silent --show-error \
         --resolve "pcep.micutu.com:$port:127.0.0.1" \
         --dump-header "$stage/429.headers" --output "$stage/429.body" \
