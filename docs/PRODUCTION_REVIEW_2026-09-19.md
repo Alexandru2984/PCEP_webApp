@@ -2703,6 +2703,91 @@ no FAIR estimate is claimed without business loss inputs. The CISO verdict is
 **SHIP** after CI and the next routine no-migration deployment exercises the normal
 success path without invoking recovery.
 
+### CISO go-live decision — 2026-10-13
+
+**Verdict: 🟡 SHIP WITH GUARDRAILS for a controlled real-learner launch.** This is
+not an assertion that the service is risk-free, highly available or ready for an
+unbounded promotion. The current product has no learner accounts, payment flow,
+server-side learner progress or public operator login. Quiz progress, bookmarks and
+notes stay in the learner's browser. Do not add accounts, server-side learner data,
+payments, an operator UI or an externally fetched URL without a new threat model and
+go-live review.
+
+The final 2026-10-13 gate passed 396 backend and 319 frontend tests, all browser E2E
+flows, lint, formatting, production build, Django deploy checks, Python/npm audits,
+registry-signature verification, tracked/history secret scanning, CodeQL,
+GitGuardian, dependency review, isolated Nginx contracts and the complete public
+production smoke. GitHub run `38424475501` then passed the same public contract from
+outside the host on `main` revision `ebd9328`. Dependabot and code-scanning reported
+zero open alerts. The only untracked worktree path was the operator-owned `.claude/`
+directory and it was never staged.
+
+The capacity floor is deliberately narrower than a load-test claim. A loopback-only,
+GET-only probe passed 50/50 responses at 5 requests/second and 450/450 at 15
+requests/second, with zero 429/5xx/timeout, p95 13.777 ms in the sustained run and
+stable container memory. The public per-source Nginx policy is now 10 requests/second
+with a 60-request burst, followed by the reviewed no-store JSON 429 response. This
+supports ordinary use and a shared-NAT classroom start below the measured floor; it
+does not model a distributed attack, large future data set or launch event.
+
+The top three remaining STRIDE risks, ordered by qualitative likelihood multiplied
+by impact, are:
+
+| Priority | Scenario and blast radius | Detection and response evidence | Residual decision |
+| --- | --- | --- | --- |
+| 1 — high | **Denial of service/data loss:** physical-host loss, distributed traffic or a shared-host incident can remove the API and every same-host backup. All active learners lose API access, but browser-local progress remains local and the reviewed question bank is reconstructible from source. | The public contract runs twice hourly and opens one sanitized issue. Backup health is published hourly and fails the public contract when degraded or stale. A real isolated restore recovered 308 questions, 1,232 choices and 29 migrations. | Accept only for controlled launch. Do not claim HA or durable offsite recovery. Activate the reviewed encrypted offsite path only after every gate in `OFFSITE_BACKUP_RUNBOOK.md` closes. |
+| 2 — high | **Tampering/information disclosure after host compromise:** root on the shared host can read application/database secrets, alter frontend/API bytes and forge the public recovery status. The current database blast radius is the question bank/schema rather than learner accounts; malicious frontend publication could affect every active learner tab. | Release hashes, SRI, request/release IDs, external smoke, CodeQL, secret scanning and least-privilege containers reduce or detect narrower failures. They do not independently attest a root-compromised host. Incident steps and credential rotation exist; the prior application credential exposure was contained and rotation-tested. | Accept only while the no-account/no-PII scope holds. Revisit before storing any learner identity or private server data, and move the attestation or audit evidence off-host before relying on it for compromise detection. |
+| 3 — medium | **Supply-chain/browser runtime tampering:** a compromised dependency, analytics byte stream or Python runtime could reach all active browser sessions. | Hashed Python locks, script-free npm installation, exact lifecycle allowlisting, registry signatures/attestations, pinned images/actions/runtime hashes, consent-gated analytics and tracker SRI fail closed in CI/E2E/public smoke. | Residual vendor compromise remains. Continue scheduled advisory scans and require full review for every pin/digest change. |
+
+Technical detection time for a failure covered by the public contract is at most
+about 30 minutes plus workflow execution. Recovery-status staleness is detected by
+the same external job after its two-hour freshness window. These are machine MTTD
+claims only: guaranteed human MTTD remains unbounded until the repository owner
+confirms that an exercised issue reaches a human-controlled email/mobile channel.
+The synthetic failure did open issue #62 and the next healthy run closed it, proving
+the technical alert and recovery path but not human delivery.
+
+The incident posture has more than paper evidence: the application credential was
+rotated after an accidental transcript disclosure, backup restoration was performed
+in a network-isolated disposable database, the alert path was exercised end to end
+through issue creation/recovery, and deployment retains tested rollback artifacts.
+The remaining human tabletop must cover loss of the host/provider credentials,
+alert ownership, decision authority, communications and restoration on replacement
+infrastructure. It is a launch guardrail, not evidence already completed.
+
+No defensible annual loss expectancy is available because the owner has supplied no
+revenue, downtime-cost, response-cost, contractual-penalty or incident-frequency
+inputs. Do not invent one. Current regulatory scope is deliberately small: no
+learner identity or progress is stored server-side, analytics is opt-in with a
+published notice and 180-day retention, and no payment or health data is processed.
+If personal data is later added, re-evaluate controller/processor obligations,
+retention, data-subject handling and the GDPR breach-notification analysis before
+deployment; this review is not a compliance certification.
+
+Cloudflare remains the edge/tunnel provider, GitHub Actions/issues provide external
+CI and technical monitoring, and Umami is a loopback analytics service. Google Drive
+and Cloudflare R2 are reviewed offsite candidates only; neither is active or approved
+by this decision. The Python runtime is shipped as pinned static browser assets on a
+separate origin. A supplier failure can still affect availability even where content
+integrity is pinned.
+
+Accepted risks require an owner and a revisit trigger:
+
+| Risk owner | Accepted residual | Revisit deadline or trigger | Acceptance rationale |
+| --- | --- | --- | --- |
+| Repository/production owner | No independently controlled off-host recovery copy | 2026-10-27, or before any non-reconstructible/server-side learner data is stored, whichever comes first | Current learner state is browser-local and the question bank is source-controlled; host-loss availability remains explicitly unprotected. |
+| Repository/production owner | Human alert delivery is unverified | Before public promotion, or 2026-10-20, whichever comes first | Twice-hourly issue creation is proven, but unattended operation is not acceptable without a named responder receiving the alert. |
+| Repository/Cloudflare owner | Retired `/static` and `/media` origin routes remain until a scoped cache purge is available | Before merging PR #46 or its replacement; re-evaluate by 2026-11-12 | The routes expose only generated Django assets and no media, while admin is a hardened 404. Origin retirement without cache purge would leave stale edge 200s and create false monitoring failures. |
+| Production owner | Runtime backend bridge still permits outbound connections | Before adding any server-side URL fetch, webhook, account data or higher-value secret | An isolated Docker fixture proved this engine drops the loopback published port on an `internal` network. A sidecar/Unix-socket redesign is not justified for a backend with no outbound request feature. |
+| Product/production owner | Capacity evidence covers only a small read-only workload | Before a marketing event, material database growth or a worker/query/container-limit change | The tested floor exceeds the current per-source limit and ordinary anonymous flows, but cannot establish fleet-wide concurrency or distributed-abuse capacity. |
+
+The controlled launch should stop and roll back if the public smoke fails, the
+operations status becomes degraded/stale, a HIGH/CRITICAL fixable runtime advisory
+opens, error/latency behavior exceeds the documented capacity gate, or the product
+scope crosses any boundary above. Until human notification and off-host recovery are
+proven, the owner must actively inspect GitHub production-smoke results and local
+timer health; this is the operational cost of accepting the 🟡 verdict.
+
 ## 15. Breaking changes
 
 None.
