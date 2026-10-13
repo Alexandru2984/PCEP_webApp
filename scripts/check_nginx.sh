@@ -30,6 +30,7 @@ cleanup() {
 trap cleanup EXIT
 nginx_image=${NGINX_TEST_IMAGE:-nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236}
 mkdir -p "$stage/certs" "$stage/snippets" "$stage/frontend/pyodide" \
+    "$stage/operations-health" \
     "$stage/frontend/pyodide.previous.audit"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=pcep.micutu.com' -keyout "$stage/certs/privkey.pem" -out "$stage/certs/fullchain.pem" 2>/dev/null
 cp "$root"/nginx/snippets/pcep-*.conf "$stage/snippets/"
@@ -40,6 +41,8 @@ cp "$root/frontend/index.html" "$stage/frontend/index.html"
 # exercises Nginx routing only; fetch/build and production smoke verify the real
 # pinned runtime independently.
 printf '%s\n' '0.29.4' > "$stage/frontend/pyodide/VERSION"
+printf '%s\n' '{"checked_at":"2026-10-13T09:00:00Z","schema":1,"status":"ok"}' \
+    > "$stage/operations-health/status.json"
 printf '%s\n' 'must never be published' \
     > "$stage/frontend/pyodide.previous.audit/pyodide.js"
 printf 'location ~ /\\. { deny all; }\n' > "$stage/snippets/block-dotfiles.conf"
@@ -84,6 +87,7 @@ mounts=(
     -v "$stage/snippets:/etc/nginx/snippets:ro"
     -v "$stage/certs:/etc/letsencrypt/live/pcep.micutu.com:ro"
     -v "$stage/frontend:/var/www/pcep/frontend:ro"
+    -v "$stage/operations-health/status.json:/var/lib/pcep-operations-health/status.json:ro"
 )
 docker run --rm --network none "${mounts[@]}" "$nginx_image" nginx -t
 
@@ -144,6 +148,27 @@ tr -d '\r' < "$stage/shell.headers" > "$stage/shell.headers.clean"
 grep -Fqi "script-src 'self'; connect-src 'self'" "$stage/shell.headers.clean"
 assert_absent 'Cloudflare browser-insights policy' \
     -Fqi 'cloudflareinsights.com' "$stage/shell.headers.clean"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --dump-header "$stage/operations.headers" \
+    --output "$stage/operations.body" \
+    --write-out '%{http_code}' "$base_url/.well-known/pcep-operations.json")
+[[ "$status" == 200 ]]
+tr -d '\r' < "$stage/operations.headers" > "$stage/operations.headers.clean"
+grep -Fqi 'Content-Type: application/json' "$stage/operations.headers.clean"
+grep -Fqi 'Cache-Control: no-store' "$stage/operations.headers.clean"
+grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
+    "$stage/operations.headers.clean"
+grep -Fqx \
+    '{"checked_at":"2026-10-13T09:00:00Z","schema":1,"status":"ok"}' \
+    "$stage/operations.body"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --request POST --output /dev/null --write-out '%{http_code}' \
+    "$base_url/.well-known/pcep-operations.json")
+[[ "$status" == 403 ]]
 
 # SPA fallback must retain the original path for detection without logging the
 # query string (which can contain search terms or other user-supplied data).

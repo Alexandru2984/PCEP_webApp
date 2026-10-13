@@ -1,6 +1,8 @@
 import hashlib
 import importlib.util
 import json
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -243,3 +245,34 @@ def test_validates_restored_schema_and_question_integrity():
 def test_rejects_unsafe_container_names(name):
     with pytest.raises(restore.RestoreCheckError, match='container name'):
         restore.validate_container_name(name, 'test')
+
+
+def test_success_status_is_atomic_private_and_contains_no_backup_metadata(tmp_path):
+    status = tmp_path / 'last-success.json'
+    moment = datetime(2026, 10, 13, 8, 30, tzinfo=timezone.utc)
+
+    restore.write_success_status(status, now=moment)
+
+    assert status.stat().st_mode & 0o777 == 0o600
+    assert json.loads(status.read_text()) == {
+        'completed_at': '2026-10-13T08:30:00Z',
+        'schema': 1,
+    }
+    assert list(tmp_path.glob('.*.partial-*')) == []
+
+
+def test_success_status_rejects_an_unsafe_parent_or_existing_symlink(tmp_path):
+    unsafe_parent = tmp_path / 'unsafe'
+    unsafe_parent.mkdir(mode=0o777)
+    unsafe_parent.chmod(0o777)
+    with pytest.raises(restore.RestoreCheckError, match='not writable'):
+        restore.write_success_status(unsafe_parent / 'status.json')
+
+    target = tmp_path / 'target'
+    target.write_text('preserve')
+    status = tmp_path / 'status.json'
+    status.symlink_to(target)
+    with pytest.raises(restore.RestoreCheckError, match='real file'):
+        restore.write_success_status(status)
+    assert target.read_text() == 'preserve'
+    assert os.path.islink(status)

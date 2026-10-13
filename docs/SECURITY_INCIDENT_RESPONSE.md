@@ -6,7 +6,7 @@ Owner: repository owner and production server operator. If one person holds both
 roles, keep a timestamped incident log and ask an independent trusted person to
 review containment and recovery decisions before restoring service.
 
-Last technical review: 2026-10-08. Last human tabletop: **not completed**. Review
+Last technical review: 2026-10-13. Last human tabletop: **not completed**. Review
 this runbook after every incident, material architecture or vendor change, and at
 least every six months.
 
@@ -69,16 +69,19 @@ person receives and acknowledges it.
 | --- | --- | --- |
 | Required PR checks, CodeQL and secret scanning | unsafe change, code weakness or committed credential | block merge; triage the same day |
 | Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
-| Six-hour production smoke | release mismatch, answer leak, broken isolation, headers or availability | under 6 hours plus notification latency |
-| Daily backup and weekly restore services | missing/corrupt local recovery point | investigate before the next scheduled backup |
+| Twice-hourly production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | technical alert normally under 1 hour |
+| Hourly external recovery attestation | missing/corrupt/stale local backup, missed restore or stopped publisher | technical alert normally under 3 hours after its freshness threshold |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
 
-GitHub notification delivery and an independent production/backup pager have not
-been end-to-end tested. Current guaranteed MTTD is therefore **unbounded** despite
-the scheduled checks. Before claiming an MTTD, configure a named responder, test a
-real failure notification and record the date, delivery path and acknowledgement
-time. The offsite path has additional blocked alert gates in
+The GitHub issue path was technically exercised on 2026-10-13: a real production
+contract passed before a synthetic failure opened issue #62, and a subsequent full
+success closed it. Delivery into the owner's human-controlled email or mobile
+channel and acknowledgement have not been confirmed, so guaranteed human MTTD
+remains **unbounded**. Before claiming a human MTTD, configure a named responder,
+confirm that delivery path and record the acknowledgement time. The public recovery
+attestation detects ordinary backup/restore/publisher failure but can be forged by a
+fully compromised host. The offsite path has additional blocked alert gates in
 `docs/OFFSITE_BACKUP_RUNBOOK.md`.
 
 Anyone who sees a SEV-1 signal starts this runbook immediately. For SEV-2/3, open a

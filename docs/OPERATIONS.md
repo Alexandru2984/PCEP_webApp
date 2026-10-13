@@ -240,6 +240,8 @@ JS/CSS entry assets, immutable asset caching, service-worker policy, liveness,
 database readiness, separate frontend and backend release markers, request IDs,
 aggregate question counts,
 module/objective/difficulty matrices, security headers and API no-store behavior.
+It also requires the minimal recovery-operations attestation to report `ok` and to
+have been refreshed within two hours; a stale publisher therefore fails closed.
 It also requires `/admin/login/` to remain a non-redirecting, cookie-free 404 with
 a deny-all CSP, so a vhost regression cannot silently republish Django admin.
 The same contract requires every runner path to be 404 on the learner origin,
@@ -263,6 +265,11 @@ response, learner, host or log data. The next completely successful run closes t
 matching issue. The push/pull-request CI remains independent of production
 availability, so a transient Internet or production outage cannot block code
 review.
+
+The technical alert path was exercised on 2026-10-13: the real contract passed, a
+synthetic final step opened sanitized issue #62, and the next normal dispatch closed
+it after the complete contract passed. This proves issue creation, deduplication and
+recovery, but not delivery to a human-controlled email or mobile channel.
 
 Exercise the complete notification path after installation, then immediately run a
 normal dispatch to prove automatic recovery. Confirm that the repository owner's
@@ -297,13 +304,18 @@ sudo install -m 0644 ops/systemd/pcep-db-backup.service /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-backup.timer /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-restore-check.service /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-restore-check.timer /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-operations-health.service /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-operations-health.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pcep-db-backup.timer
 sudo systemctl enable --now pcep-db-restore-check.timer
 sudo systemctl start pcep-db-backup.service
 sudo systemctl start pcep-db-restore-check.service
+sudo systemctl start pcep-operations-health.service
+sudo systemctl enable --now pcep-operations-health.timer
 systemctl status pcep-db-backup.timer pcep-db-backup.service \
-  pcep-db-restore-check.timer pcep-db-restore-check.service
+  pcep-db-restore-check.timer pcep-db-restore-check.service \
+  pcep-operations-health.timer pcep-operations-health.service
 ```
 
 The timer runs daily at 01:17 local time with up to 15 minutes of randomized delay
@@ -323,10 +335,29 @@ connects to the live database. It verifies the table owner expected by the live
 source (legacy `pcep_user` or separated `pcep_owner`), migrations, the
 one-correct-choice index and every question's
 four-choice/one-answer invariants,
-then verifies the source checksum again and removes the container. Inspect runs with
+then verifies the source checksum again, atomically records only the successful UTC
+completion time under `/var/lib/pcep-db-restore-check/`, and removes the container.
+Failed drills never replace that marker. Inspect runs with
 `journalctl -u pcep-db-restore-check.service`. Repeat the drill directly after
 backup-code, PostgreSQL or schema changes; never test a restore over the live
 database.
+
+`pcep-operations-health.timer` runs hourly after the scheduled backup/restore
+windows. Its networkless, unprivileged service verifies all retained local backup
+checksums, requires the newest verified backup to be at most 26 hours old and the
+last successful isolated restore to be at most 170 hours old. It atomically writes
+only `schema`, `status` and `checked_at` to a mode-0644 file in its systemd-managed
+state directory. On any validation failure it still publishes the generic state
+`degraded`, logs the private reason locally and exits nonzero. The public exact
+route `/.well-known/pcep-operations.json` is GET-only, no-store and deny-all CSP;
+it never exposes file names, counts, hashes, ages or error details.
+
+The external GitHub smoke checks both `status` and `checked_at`, so it detects a
+reported recovery failure and a publisher that stopped refreshing. The endpoint is
+not a signed or independent attestation: a fully compromised production host can
+forge `ok`. Its purpose is externally observed operational-failure detection, not
+compromise detection. Keep the private journals and the incident-response evidence
+path independent of this public signal.
 
 Docker can lose the metadata for an image while a container created from its
 layers continues to run. If the exact live ID is no longer runnable, the scheduled

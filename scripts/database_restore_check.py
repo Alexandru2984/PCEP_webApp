@@ -3,14 +3,17 @@
 
 import argparse
 from contextlib import contextmanager
+from datetime import datetime, timezone
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import signal
 import subprocess
 import sys
 import time
+import uuid
 
 
 DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
@@ -524,7 +527,59 @@ def validate_backup_in_isolation(backup, container, image_id, expected_owner):
         return validate_restored_database(container, expected_owner)
 
 
-def execute(backup_root, source_container, restore_container, fallback_image=None):
+def write_success_status(path, now=None):
+    if path is None:
+        return
+    status = Path(path).absolute()
+    parent = status.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise RestoreCheckError('Restore status directory must be a real directory.')
+    parent_stat = parent.stat()
+    if parent_stat.st_uid != os.getuid() or parent_stat.st_mode & 0o022:
+        raise RestoreCheckError(
+            'Restore status directory must be owned by the invoking user and not '
+            'writable by group or others.'
+        )
+    if status.exists() or status.is_symlink():
+        if status.is_symlink() or not status.is_file():
+            raise RestoreCheckError('Existing restore status must be a real file.')
+        if status.stat().st_uid != os.getuid():
+            raise RestoreCheckError('Existing restore status has the wrong owner.')
+
+    moment = now or datetime.now(timezone.utc)
+    payload = {
+        'completed_at': moment.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'schema': 1,
+    }
+    temporary = parent / f'.{status.name}.partial-{uuid.uuid4().hex}'
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(temporary, flags, 0o600)
+    try:
+        with os.fdopen(descriptor, 'w') as output:
+            json.dump(payload, output, separators=(',', ':'), sort_keys=True)
+            output.write('\n')
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, status)
+        status.chmod(0o600)
+        directory = os.open(parent, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def execute(
+    backup_root,
+    source_container,
+    restore_container,
+    fallback_image=None,
+    status_file=None,
+):
     validate_container_name(source_container, 'source')
     validate_container_name(restore_container, 'restore')
     backup_module = load_database_backup()
@@ -543,6 +598,7 @@ def execute(backup_root, source_container, restore_container, fallback_image=Non
     )
 
     backup_module.verify_checksum(backup, checksum)
+    write_success_status(status_file)
     print(f'Isolated database restore passed: {backup}')
     print(f'PostgreSQL image ID: {image_id}')
     print(
@@ -563,6 +619,11 @@ def main():
     parser.add_argument('--source-container', default=DEFAULT_SOURCE_CONTAINER)
     parser.add_argument('--restore-container', default=DEFAULT_RESTORE_CONTAINER)
     parser.add_argument(
+        '--status-file',
+        type=Path,
+        help='Atomically record a successful completed restore for external monitoring.',
+    )
+    parser.add_argument(
         '--fallback-image',
         help=(
             'Reviewed local image used only when the exact live image metadata is '
@@ -578,6 +639,7 @@ def main():
             args.source_container,
             args.restore_container,
             args.fallback_image,
+            args.status_file,
         )
     except (RestoreCheckError, OSError, ValueError) as error:
         parser.exit(1, f'Database restore check failed: {error}\n')

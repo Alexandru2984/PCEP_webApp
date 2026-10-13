@@ -91,6 +91,8 @@ install -m 0755 /dev/null \
     "$stage/home/micu/PCEP_webApp/backend/.venv/bin/python"
 install -m 0644 /dev/null \
     "$stage/home/micu/PCEP_webApp/scripts/analytics_retention.py"
+install -m 0644 /dev/null \
+    "$stage/home/micu/PCEP_webApp/scripts/operations_health.py"
 install -m 0755 /dev/null "$stage/usr/local/sbin/pcep-seo-pages"
 install -m 0755 /dev/null "$stage/usr/bin/install"
 install -m 0755 /dev/null "$stage/usr/bin/python3"

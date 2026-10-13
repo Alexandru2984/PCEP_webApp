@@ -4,7 +4,7 @@
 import argparse
 import base64
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -29,6 +29,9 @@ SRI_SHA384_PATTERN = re.compile(r'sha384-[A-Za-z0-9+/]{64}')
 WEBSITE_ID_PATTERN = re.compile(
     r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
 )
+UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
+OPERATIONS_STATUS_MAX_AGE = timedelta(hours=2)
+OPERATIONS_FUTURE_TOLERANCE = timedelta(minutes=5)
 FORBIDDEN_ANSWER_FIELDS = {
     'is_correct',
     'correct_choice',
@@ -360,6 +363,57 @@ def check_admin_unavailable(response):
         'Public admin route',
         forbidden=('Django administration', 'admin login'),
     )
+
+
+def check_operations_health(response, now=None):
+    label = 'Recovery operations health'
+    check_shared_security_headers(response, label)
+    require('no-store' in response.headers.get('cache-control', ''), f'{label} is cacheable.')
+    require(
+        response.headers.get('content-type', '').startswith('application/json'),
+        f'{label} did not return JSON.',
+    )
+    require('set-cookie' not in response.headers, f'{label} sets a cookie.')
+    require(
+        csp_directives(response.headers.get('content-security-policy', ''))
+        == {
+            'default-src': ["'none'"],
+            'frame-ancestors': ["'none'"],
+        },
+        f'{label} CSP drifted.',
+    )
+    require(
+        REQUEST_ID_PATTERN.fullmatch(response.headers.get('x-request-id', ''))
+        is not None,
+        f'{label} has an invalid request ID.',
+    )
+    payload = json_payload(response, label)
+    require(
+        isinstance(payload, dict)
+        and set(payload) == {'schema', 'status', 'checked_at'}
+        and payload.get('schema') == 1
+        and not isinstance(payload.get('schema'), bool)
+        and payload.get('status') == 'ok',
+        f'{label} is degraded or malformed.',
+    )
+    checked_at = payload.get('checked_at')
+    require(
+        isinstance(checked_at, str)
+        and UTC_TIMESTAMP_PATTERN.fullmatch(checked_at) is not None,
+        f'{label} has an invalid timestamp.',
+    )
+    try:
+        checked_moment = datetime.strptime(checked_at, '%Y-%m-%dT%H:%M:%SZ').replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as error:
+        raise SmokeError(f'{label} has an invalid timestamp.') from error
+    current = now or datetime.now(timezone.utc)
+    require(current.tzinfo is not None, 'Smoke-check time must include a timezone.')
+    age = current.astimezone(timezone.utc) - checked_moment
+    require(age >= -OPERATIONS_FUTURE_TOLERANCE, f'{label} is future-dated.')
+    require(age <= OPERATIONS_STATUS_MAX_AGE, f'{label} is stale.')
+    return payload
 
 
 def check_runner_headers(response, label):
@@ -707,6 +761,9 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     admin = public_get(origin, '/admin/login/', expected_status=404)
     check_admin_unavailable(admin)
 
+    operations = public_get(origin, '/.well-known/pcep-operations.json')
+    check_operations_health(operations)
+
     for path in (
         '/runner.html',
         '/runner.html/probe',
@@ -825,6 +882,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         'admin': 'disabled',
         'runner': 'isolated',
         'analytics': 'consent-gated-integrity-pinned',
+        'recovery': 'externally-monitored',
     }
 
 
@@ -857,6 +915,7 @@ def main(argv=None):
         f'admin={result["admin"]} '
         f'runner={result["runner"]} '
         f'analytics={result["analytics"]} '
+        f'recovery={result["recovery"]} '
         f'targeted_order={",".join(map(str, result["targeted_order"]))}'
     )
 

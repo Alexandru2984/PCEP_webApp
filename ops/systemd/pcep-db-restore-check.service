@@ -11,7 +11,9 @@ User=micu
 Group=micu
 UMask=0077
 WorkingDirectory=/home/micu/PCEP_webApp
-ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_restore_check.py --backup-root /home/micu/backups/pcep/daily --source-container pcep_db --restore-container pcep_db_restore_check --fallback-image pcep_webapp-postgres:16.15-alpine3.24
+StateDirectory=pcep-db-restore-check
+StateDirectoryMode=0755
+ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_restore_check.py --backup-root /home/micu/backups/pcep/daily --source-container pcep_db --restore-container pcep_db_restore_check --fallback-image pcep_webapp-postgres:16.15-alpine3.24 --status-file /var/lib/pcep-db-restore-check/last-success.json
 
 NoNewPrivileges=true
 PrivateDevices=true
