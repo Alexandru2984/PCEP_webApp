@@ -27,8 +27,13 @@ BACKEND_IMAGE ?= pcep_webapp-backend:latest
 DATABASE_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
 PRODUCTION_URL ?= https://pcep.micutu.com
 PYTHON_RUNNER_ORIGIN ?= https://pcep-runner.micutu.com
+CAPACITY_ORIGIN ?= http://127.0.0.1:8001
+CAPACITY_HOST_HEADER ?= pcep.micutu.com
+CAPACITY_DURATION ?= 20
+CAPACITY_RATE ?= 15
+CAPACITY_CONCURRENCY ?= 6
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -47,6 +52,7 @@ help:
 		'  compose-build-frontend Build frontend through the pinned container' \
 		'  django-check     Run Django production deploy checks' \
 		'  production-smoke Check the read-only public production contract' \
+		'  capacity-smoke   Run a bounded read-only test against local origin only' \
 		'  compose-build    Rebuild the backend image with its release revision' \
 		'  deploy-backend   Backup, validate and deploy one backend release' \
 		'  backup-database  Create and retain a verified daily-style DB backup' \
@@ -132,6 +138,9 @@ django-check:
 
 production-smoke:
 	"$(PYTHON_BIN)" scripts/production_smoke.py --base-url "$(PRODUCTION_URL)" --runner-url "$(PYTHON_RUNNER_ORIGIN)"
+
+capacity-smoke:
+	"$(PYTHON_BIN)" scripts/capacity_smoke.py --origin "$(CAPACITY_ORIGIN)" --host-header "$(CAPACITY_HOST_HEADER)" --duration "$(CAPACITY_DURATION)" --rate "$(CAPACITY_RATE)" --concurrency "$(CAPACITY_CONCURRENCY)"
 
 compose-build:
 	PCEP_RELEASE="$(RELEASE)" $(COMPOSE) build backend
