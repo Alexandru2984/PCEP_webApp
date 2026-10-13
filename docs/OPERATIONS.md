@@ -346,8 +346,10 @@ database.
 windows. Its networkless, unprivileged service verifies all retained local backup
 checksums, requires the newest verified backup to be at most 26 hours old and the
 last successful isolated restore to be at most 170 hours old. It atomically writes
-only `schema`, `status` and `checked_at` to a mode-0644 file in its systemd-managed
-state directory. On any validation failure it still publishes the generic state
+only `schema`, `status` and `checked_at` to a mode-0640 file in its systemd-managed
+mode-0750 state directory. The service runs as `micu:www-data`, so only the
+publisher can write it and Nginx's group can read it. On any validation failure it
+still publishes the generic state
 `degraded`, logs the private reason locally and exits nonzero. The public exact
 route `/.well-known/pcep-operations.json` is GET-only, no-store and deny-all CSP;
 it never exposes file names, counts, hashes, ages or error details.

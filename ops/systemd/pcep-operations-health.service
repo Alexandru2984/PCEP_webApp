@@ -7,11 +7,11 @@ ConditionPathIsDirectory=/home/micu/backups/pcep/daily
 [Service]
 Type=oneshot
 User=micu
-Group=micu
-UMask=0022
+Group=www-data
+UMask=0027
 WorkingDirectory=/home/micu/PCEP_webApp
 StateDirectory=pcep-operations-health
-StateDirectoryMode=0755
+StateDirectoryMode=0750
 ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/operations_health.py --backup-root /home/micu/backups/pcep/daily --restore-status /var/lib/pcep-db-restore-check/last-success.json --output /var/lib/pcep-operations-health/status.json --backup-max-age-hours 26 --restore-max-age-hours 170
 
 NoNewPrivileges=true

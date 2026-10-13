@@ -55,7 +55,7 @@ def test_healthy_recovery_attestation_is_minimal_atomic_and_publicly_readable(tm
         'status': 'ok',
     }
     assert json.loads(output.read_text()) == payload
-    assert output.stat().st_mode & 0o777 == 0o644
+    assert output.stat().st_mode & 0o777 == 0o640
     assert list(output.parent.glob('.*.partial-*')) == []
 
 
