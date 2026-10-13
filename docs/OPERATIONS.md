@@ -245,7 +245,7 @@ a deny-all CSP, so a vhost regression cannot silently republish Django admin.
 The same contract requires every runner path to be 404 on the learner origin,
 then verifies the separate runner document, bridge, worker, pinned runtime version,
 cookie-free headers, exact CSPs and absence of an API route. It does not execute
-arbitrary Python during the six-hourly read-only probe.
+arbitrary Python during the twice-hourly read-only probe.
 It validates strict answer-safe shapes for random, daily, detail and search
 responses, then verifies that a three-question targeted drill preserves the
 requested order. It never calls an answer, grade or other write endpoint and does
@@ -255,11 +255,27 @@ Successful output reports `frontend_release` from the static shell metadata and
 `backend_release` from the API response headers. This makes an incomplete or stale
 frontend publication visible even when the backend is healthy.
 
-`.github/workflows/production-smoke.yml` runs this contract every six hours and
-on manual dispatch with read-only repository permissions. Its failure appears in
-GitHub Actions and the README badge. The push/pull-request CI remains independent
-of production availability, so a transient Internet or production outage cannot
-block code review.
+`.github/workflows/production-smoke.yml` runs this contract at minutes 7 and 37 of
+every hour and on manual dispatch. The smoke job has read-only repository
+permissions. A failure gives a separate two-minute job only `issues: write`; that
+job opens one deduplicated, sanitized issue containing the workflow-run URL but no
+response, learner, host or log data. The next completely successful run closes the
+matching issue. The push/pull-request CI remains independent of production
+availability, so a transient Internet or production outage cannot block code
+review.
+
+Exercise the complete notification path after installation, then immediately run a
+normal dispatch to prove automatic recovery. Confirm that the repository owner's
+configured GitHub notification channel actually delivered the issue; issue creation
+alone is not evidence of human notification:
+
+```bash
+gh workflow run production-smoke.yml -f exercise_alert=true
+gh run watch --exit-status
+gh issue list --state open --search 'PCEP production smoke failed in:title'
+gh workflow run production-smoke.yml -f exercise_alert=false
+gh run watch --exit-status
+```
 
 ## Daily Database Backup
 

@@ -2,8 +2,14 @@ name: Production smoke
 
 on:
   schedule:
-    - cron: "23 */6 * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
+    inputs:
+      exercise_alert:
+        description: Open a synthetic alert after the real smoke check passes
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: production-smoke
@@ -29,3 +35,75 @@ jobs:
 
       - name: Check the public production contract
         run: python scripts/production_smoke.py
+
+      - name: Exercise the alert path
+        if: ${{ inputs.exercise_alert == true }}
+        run: |
+          echo 'Synthetic production alert exercise requested.' >&2
+          exit 1
+
+  alert:
+    name: Open a sanitized production alert
+    needs: smoke
+    if: ${{ always() && needs.smoke.result == 'failure' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write # Create the single sanitized incident issue; no repository writes.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      ALERT_TITLE: "[alert] PCEP production smoke failed"
+
+    steps:
+      - name: Open one deduplicated issue
+        run: |
+          issue_number="$(
+            gh issue list --state open --limit 100 \
+              --search 'PCEP production smoke failed in:title' \
+              --json number,title \
+              --jq '.[] | select(.title == "[alert] PCEP production smoke failed") | .number' \
+              | head -n 1
+          )"
+          if [[ -n "$issue_number" ]]; then
+            echo "Production alert issue #$issue_number is already open."
+            exit 0
+          fi
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          body="The scheduled public production contract failed. Review the private workflow diagnostics and follow the incident-response runbook: $run_url"
+          body+=$'\n\nNo response body, learner data, host metadata, or workflow log is copied into this issue.'
+          gh issue create \
+            --title "$ALERT_TITLE" \
+            --body "$body"
+
+  recover:
+    name: Close a recovered production alert
+    needs: smoke
+    if: ${{ always() && needs.smoke.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      issues: write # Close only the matching incident issue after verified recovery.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Close the matching open issue
+        run: |
+          issue_number="$(
+            gh issue list --state open --limit 100 \
+              --search 'PCEP production smoke failed in:title' \
+              --json number,title \
+              --jq '.[] | select(.title == "[alert] PCEP production smoke failed") | .number' \
+              | head -n 1
+          )"
+          if [[ -z "$issue_number" ]]; then
+            echo 'No open production alert issue needs recovery.'
+            exit 0
+          fi
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh issue close "$issue_number" \
+            --comment "The complete public production contract recovered: $run_url"
