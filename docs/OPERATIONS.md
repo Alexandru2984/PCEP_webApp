@@ -345,10 +345,12 @@ database.
 `pcep-operations-health.timer` runs hourly after the scheduled backup/restore
 windows. Its networkless, unprivileged service verifies all retained local backup
 checksums, requires the newest verified backup to be at most 26 hours old and the
-last successful isolated restore to be at most 170 hours old. It atomically writes
-only `schema`, `status` and `checked_at` to a mode-0640 file in its systemd-managed
-mode-0750 state directory. The service runs as `micu:www-data`, so only the
-publisher can write it and Nginx's group can read it. On any validation failure it
+last successful isolated restore to be at most 170 hours old. It atomically creates
+only `schema`, `status` and `checked_at` as mode 0600 in its systemd-managed
+mode-0750 state directory. After both successful and degraded publications,
+systemd grants only the named Nginx user the ACL `user:www-data:r--`; no general
+group or other read permission is granted. The service runs as `micu:www-data`, so
+only the publisher can write it and Nginx can read it. On any validation failure it
 still publishes the generic state
 `degraded`, logs the private reason locally and exits nonzero. The public exact
 route `/.well-known/pcep-operations.json` is GET-only, no-store and deny-all CSP;

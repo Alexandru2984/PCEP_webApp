@@ -96,6 +96,7 @@ install -m 0644 /dev/null \
 install -m 0755 /dev/null "$stage/usr/local/sbin/pcep-seo-pages"
 install -m 0755 /dev/null "$stage/usr/bin/install"
 install -m 0755 /dev/null "$stage/usr/bin/python3"
+install -m 0755 /dev/null "$stage/usr/bin/setfacl"
 install -m 0600 /dev/null "$stage/var/run/docker.sock"
 
 # Repository units legitimately depend on these host-provided units. Minimal

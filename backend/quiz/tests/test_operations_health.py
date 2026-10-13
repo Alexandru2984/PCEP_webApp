@@ -55,7 +55,7 @@ def test_healthy_recovery_attestation_is_minimal_atomic_and_publicly_readable(tm
         'status': 'ok',
     }
     assert json.loads(output.read_text()) == payload
-    assert output.stat().st_mode & 0o777 == 0o640
+    assert output.stat().st_mode & 0o777 == 0o600
     assert list(output.parent.glob('.*.partial-*')) == []
 
 
@@ -137,3 +137,20 @@ def test_public_status_refuses_an_existing_symlink(tmp_path):
 def test_freshness_windows_are_bounded(value):
     with pytest.raises(Exception, match='age'):
         health.bounded_hours(value)
+
+
+def test_systemd_grants_only_nginx_an_explicit_read_acl():
+    service = (
+        PROJECT_ROOT / 'ops/systemd/pcep-operations-health.service'
+    ).read_text()
+
+    assert 'StateDirectoryMode=0750' in service
+    assert 'Group=www-data' in service
+    assert (
+        'ExecStartPost=/usr/bin/setfacl --modify user:www-data:r-- '
+        '/var/lib/pcep-operations-health/status.json'
+    ) in service
+    assert (
+        'ExecStopPost=-/usr/bin/setfacl --modify user:www-data:r-- '
+        '/var/lib/pcep-operations-health/status.json'
+    ) in service

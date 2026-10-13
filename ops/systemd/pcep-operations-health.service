@@ -13,6 +13,8 @@ WorkingDirectory=/home/micu/PCEP_webApp
 StateDirectory=pcep-operations-health
 StateDirectoryMode=0750
 ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/operations_health.py --backup-root /home/micu/backups/pcep/daily --restore-status /var/lib/pcep-db-restore-check/last-success.json --output /var/lib/pcep-operations-health/status.json --backup-max-age-hours 26 --restore-max-age-hours 170
+ExecStartPost=/usr/bin/setfacl --modify user:www-data:r-- /var/lib/pcep-operations-health/status.json
+ExecStopPost=-/usr/bin/setfacl --modify user:www-data:r-- /var/lib/pcep-operations-health/status.json
 
 NoNewPrivileges=true
 PrivateDevices=true

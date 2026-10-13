@@ -137,7 +137,7 @@ def write_public_status(path, status, now):
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, 'O_NOFOLLOW'):
         flags |= os.O_NOFOLLOW
-    descriptor = os.open(temporary, flags, 0o640)
+    descriptor = os.open(temporary, flags, 0o600)
     try:
         with os.fdopen(descriptor, 'w') as output:
             json.dump(payload, output, separators=(',', ':'), sort_keys=True)
@@ -145,7 +145,7 @@ def write_public_status(path, status, now):
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, output_path)
-        output_path.chmod(0o640)
+        output_path.chmod(0o600)
         directory = os.open(parent, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
         try:
             os.fsync(directory)
