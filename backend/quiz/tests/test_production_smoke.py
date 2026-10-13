@@ -288,6 +288,24 @@ def test_retired_public_content_must_be_a_strict_cookie_free_404():
             smoke.check_public_404(invalid, 'Retired content')
 
 
+def test_legacy_static_cache_check_activates_at_the_documented_local_deadline():
+    before = smoke.retired_content_paths(
+        datetime(2026, 11, 11, 21, 59, tzinfo=timezone.utc)
+    )
+    at_deadline = smoke.retired_content_paths(
+        datetime(2026, 11, 11, 22, 0, tzinfo=timezone.utc)
+    )
+
+    assert before == list(smoke.RETIRED_CONTENT_CANARY_PATHS)
+    assert at_deadline == [
+        *smoke.RETIRED_CONTENT_CANARY_PATHS,
+        *smoke.RETIRED_CONTENT_LEGACY_PATHS,
+    ]
+
+    with pytest.raises(smoke.SmokeError, match='timezone'):
+        smoke.retired_content_paths(datetime(2026, 11, 12))
+
+
 def test_operations_health_requires_minimal_fresh_success_and_strict_headers():
     headers = {
         **SHARED_HEADERS,

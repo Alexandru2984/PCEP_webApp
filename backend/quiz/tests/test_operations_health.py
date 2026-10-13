@@ -2,7 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -34,6 +34,16 @@ def complete_backup(root, stamp):
 
 def restore_status(path, completed_at):
     path.write_text(json.dumps({'schema': 1, 'completed_at': completed_at}) + '\n')
+    path.chmod(0o600)
+
+
+def offsite_status(path, completed_at):
+    path.write_text(
+        f'timestamp={completed_at}\n'
+        'backup=pcep_db_daily_20261027T080000Z.sql.gz\n'
+        'remote=pcep-drive-crypt\n'
+        f'sha256={"a" * 64}\n'
+    )
     path.chmod(0o600)
 
 
@@ -133,6 +143,79 @@ def test_public_status_refuses_an_existing_symlink(tmp_path):
     assert os.path.islink(output)
 
 
+def test_offsite_deadline_fails_closed_until_a_fresh_success_exists(tmp_path):
+    backups = tmp_path / 'backups'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261026T080000Z')
+    marker = tmp_path / 'restore.json'
+    restore_status(marker, '2026-10-26T08:00:00Z')
+    output = tmp_path / 'public' / 'status.json'
+    output.parent.mkdir(mode=0o755)
+    offsite = tmp_path / 'offsite-success'
+    deadline = date(2026, 10, 27)
+
+    before = health.execute(
+        backups,
+        marker,
+        output,
+        now=datetime(2026, 10, 26, 9, tzinfo=timezone.utc),
+        backup_module=backup,
+        offsite_status=offsite,
+        offsite_required_after=deadline,
+    )
+    assert before['status'] == 'ok'
+
+    with pytest.raises(health.OperationsHealthError, match='Offsite backup'):
+        health.execute(
+            backups,
+            marker,
+            output,
+            now=datetime(2026, 10, 27, 9, tzinfo=timezone.utc),
+            backup_module=backup,
+            offsite_status=offsite,
+            offsite_required_after=deadline,
+        )
+    assert json.loads(output.read_text())['status'] == 'degraded'
+
+    offsite_status(offsite, '2026-10-27T08:00:00Z')
+    healthy = health.execute(
+        backups,
+        marker,
+        output,
+        now=datetime(2026, 10, 27, 9, tzinfo=timezone.utc),
+        backup_module=backup,
+        offsite_status=offsite,
+        offsite_required_after=deadline,
+    )
+    assert healthy['status'] == 'ok'
+
+    offsite_status(offsite, '2026-10-26T08:59:59Z')
+    with pytest.raises(health.OperationsHealthError, match='offsite backup.*stale'):
+        health.execute(
+            backups,
+            marker,
+            output,
+            now=datetime(2026, 10, 27, 9, tzinfo=timezone.utc),
+            backup_module=backup,
+            offsite_status=offsite,
+            offsite_required_after=deadline,
+        )
+
+
+def test_offsite_marker_rejects_extra_fields_and_public_permissions(tmp_path):
+    marker = tmp_path / 'offsite-success'
+    offsite_status(marker, '2026-10-27T08:00:00Z')
+    marker.write_text(marker.read_text() + 'extra=must-not-be-accepted\n')
+
+    with pytest.raises(health.OperationsHealthError, match='shape'):
+        health.read_offsite_status(marker)
+
+    offsite_status(marker, '2026-10-27T08:00:00Z')
+    marker.chmod(0o644)
+    with pytest.raises(health.OperationsHealthError, match='permissions'):
+        health.read_offsite_status(marker)
+
+
 @pytest.mark.parametrize('value', [0, 337, 'invalid'])
 def test_freshness_windows_are_bounded(value):
     with pytest.raises(Exception, match='age'):
@@ -154,3 +237,7 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
         'ExecStopPost=-/usr/bin/setfacl --modify user:www-data:r-- '
         '/var/lib/pcep-operations-health/status.json'
     ) in service
+    assert '--offsite-status /var/lib/pcep-db-offsite/last-success' in service
+    assert '--offsite-required-after 2026-10-27' in service
+    assert '--offsite-max-age-hours 24' in service
+    assert 'ReadOnlyPaths=-/var/lib/pcep-db-offsite' in service

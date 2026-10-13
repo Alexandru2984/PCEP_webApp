@@ -392,9 +392,16 @@ database.
 `pcep-operations-health.timer` runs hourly after the scheduled backup/restore
 windows. Its networkless, unprivileged service verifies all retained local backup
 checksums, requires the newest verified backup to be at most 26 hours old and the
-last successful isolated restore to be at most 170 hours old. It atomically creates
-only `schema`, `status` and `checked_at` as mode 0600 in its systemd-managed
-mode-0750 state directory. After both successful and degraded publications,
+last successful isolated restore to be at most 170 hours old. Beginning at
+`2026-10-27T00:00:00Z`, it also requires the private offsite success marker to have
+the exact reviewed shape, safe ownership/mode and an age of at most 24 hours. A
+missing, malformed or stale marker deliberately degrades health; this deadline does
+not upload a backup or weaken any activation gate in the offsite runbook. It prevents
+the accepted same-host-only recovery risk from expiring silently.
+
+The publisher atomically creates only `schema`, `status` and `checked_at` as mode
+0600 in its systemd-managed mode-0750 state directory. After both successful and
+degraded publications,
 systemd grants only the named Nginx user the ACL `user:www-data:r--`; no general
 group or other read permission is granted. The service runs as `micu:www-data`, so
 only the publisher can write it and Nginx can read it. On any validation failure it
@@ -1445,9 +1452,11 @@ Cloudflare may continue serving a previously cached `200` for a legacy static UR
 until that object's original 30-day lifetime ends. The origin can no longer refill
 it, and a zone-wide purge is not justified. Treat 2026-11-12 as the cache-exhaustion
 deadline based on the last 2026-10-13 cache fill observed during review. On or after
-that date, add representative legacy object URLs to the strict public `404` contract
-before considering deletion of either retained host tree. A separately reviewed,
-hostname-and-prefix-scoped purge may close that phase earlier.
+that date, the public smoke automatically adds the known legacy
+`/static/admin/css/base.css` object to its strict `404` contract. No code or operator
+action is needed to activate the deadline. A separately reviewed,
+hostname-and-prefix-scoped purge may close the phase earlier; keep the dated check in
+place as a regression guard before considering deletion of either retained host tree.
 
 Do not run the destructive `seed-reset` target as deployment; it now requires
 explicit `ALLOW_QUESTION_RESET=yes`.

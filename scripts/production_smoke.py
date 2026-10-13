@@ -4,7 +4,7 @@
 import argparse
 import base64
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 from html.parser import HTMLParser
 import json
@@ -32,6 +32,14 @@ WEBSITE_ID_PATTERN = re.compile(
 UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 OPERATIONS_STATUS_MAX_AGE = timedelta(hours=2)
 OPERATIONS_FUTURE_TOLERANCE = timedelta(minutes=5)
+RETIRED_CONTENT_CACHE_DEADLINE = date(2026, 11, 12)
+RETIRED_CONTENT_CANARY_PATHS = (
+    '/static/pcep-retired-origin-canary-20261013.txt',
+    '/media/pcep-retired-origin-canary-20261013.txt',
+)
+RETIRED_CONTENT_LEGACY_PATHS = (
+    '/static/admin/css/base.css',
+)
 FORBIDDEN_ANSWER_FIELDS = {
     'is_correct',
     'correct_choice',
@@ -83,6 +91,18 @@ class ShellAssetParser(HTMLParser):
 def require(condition, message):
     if not condition:
         raise SmokeError(message)
+
+
+def retired_content_paths(now=None):
+    moment = now or datetime.now(ZoneInfo('Europe/Bucharest'))
+    if moment.tzinfo is None:
+        raise SmokeError('Retired-content check time must include a timezone.')
+    paths = list(RETIRED_CONTENT_CANARY_PATHS)
+    if moment.astimezone(ZoneInfo('Europe/Bucharest')).date() >= (
+        RETIRED_CONTENT_CACHE_DEADLINE
+    ):
+        paths.extend(RETIRED_CONTENT_LEGACY_PATHS)
+    return paths
 
 
 def production_origin(value):
@@ -761,10 +781,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     admin = public_get(origin, '/admin/login/', expected_status=404)
     check_admin_unavailable(admin)
 
-    for path in (
-        '/static/pcep-retired-origin-canary-20261013.txt',
-        '/media/pcep-retired-origin-canary-20261013.txt',
-    ):
+    for path in retired_content_paths():
         retired = public_get(origin, path, expected_status=404)
         check_public_404(retired, f'Retired learner-origin route {path}')
 

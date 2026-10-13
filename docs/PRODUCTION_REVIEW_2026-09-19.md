@@ -2779,9 +2779,9 @@ Accepted risks require an owner and a revisit trigger:
 
 | Risk owner | Accepted residual | Revisit deadline or trigger | Acceptance rationale |
 | --- | --- | --- | --- |
-| Repository/production owner | No independently controlled off-host recovery copy | 2026-10-27, or before any non-reconstructible/server-side learner data is stored, whichever comes first | Current learner state is browser-local and the question bank is source-controlled; host-loss availability remains explicitly unprotected. |
+| Repository/production owner | No independently controlled off-host recovery copy | 2026-10-27, or before any non-reconstructible/server-side learner data is stored, whichever comes first | Current learner state is browser-local and the question bank is source-controlled; host-loss availability remains explicitly unprotected. From the deadline, missing/stale offsite success automatically degrades public health and opens the technical alert. |
 | Repository/production owner | Human alert delivery is unverified | Before public promotion, or 2026-10-20, whichever comes first | Twice-hourly issue creation is proven, but unattended operation is not acceptable without a named responder receiving the alert. |
-| Repository/Cloudflare owner | Previously cached `/static` objects can remain edge-visible after origin retirement | Re-evaluate by 2026-11-12, or earlier after a verified hostname-and-prefix-scoped purge | Both origin route families now fail closed and cannot refill the cache. The external contract uses new canaries until the original 30-day legacy TTL is exhausted; no media object was present. |
+| Repository/Cloudflare owner | Previously cached `/static` objects can remain edge-visible after origin retirement | Re-evaluate by 2026-11-12, or earlier after a verified hostname-and-prefix-scoped purge | Both origin route families now fail closed and cannot refill the cache. The external contract automatically adds the known legacy object at the deadline; no media object was present. |
 | Production owner | Runtime backend bridge still permits outbound connections | Before adding any server-side URL fetch, webhook, account data or higher-value secret | An isolated Docker fixture proved this engine drops the loopback published port on an `internal` network. A sidecar/Unix-socket redesign is not justified for a backend with no outbound request feature. |
 | Product/production owner | Capacity evidence covers only a small read-only workload | Before a marketing event, material database growth or a worker/query/container-limit change | The tested floor exceeds the current per-source limit and ordinary anonymous flows, but cannot establish fleet-wide concurrency or distributed-abuse capacity. |
 
@@ -2851,6 +2851,35 @@ credential or data flow and reduces rather than expands potential GDPR personal-
 retention. No FAIR estimate is claimed without loss inputs. The CISO verdict is
 **SHIP** after isolated regression, configuration backup, `nginx -t`, reload and a
 repeat of the exact live canary test all pass.
+
+### Accepted-risk deadline enforcement — 2026-10-13
+
+Two accepted risks had named dates but depended on an operator remembering to change
+monitoring later. The hourly recovery publisher now requires a strict, private and
+fresh offsite-success marker beginning at `2026-10-27T00:00:00Z`. Missing, malformed,
+unsafe or older-than-24-hour evidence publishes only generic `degraded` state and
+exits nonzero. The external smoke already fails on that state, so its deduplicated
+incident path activates without exposing remote names, backup names, hashes or error
+details. This does not configure rclone, upload data or waive the provider/OAuth,
+immutability, recovery-key, DPA and first-restore gates.
+
+The same external smoke always checks uncached static/media canaries and, beginning
+at Bucharest midnight on 2026-11-12, automatically requires the known legacy Django
+CSS URL to return the hardened 404 contract. A still-cached edge response therefore
+becomes an alert instead of a forgotten exception. Both transitions are unit-tested
+immediately before and at their boundary dates.
+
+The dominant STRIDE risks are denial of service/data loss after host failure and
+repudiation of an expired risk acceptance. The first can remove the API and all local
+backups; the second can leave obsolete edge content reachable. Enforcement reduces
+detection time to the hourly publisher plus the twice-hourly external poll, but it
+does not create offsite durability or prove human receipt. Response remains the
+reviewed offsite activation/restore runbook or a narrowly scoped cache purge, with
+rollback only for a defective checker—not to extend an expired acceptance silently.
+No new vendor, credential, personal-data flow or regulatory scope is introduced, and
+no FAIR estimate is claimed without loss inputs. The CISO verdict is **SHIP WITH
+GUARDRAILS** after tests, reviewed unit installation, a pre-deadline healthy run and
+external production smoke pass.
 
 ## 15. Breaking changes
 

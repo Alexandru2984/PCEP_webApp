@@ -337,6 +337,10 @@ sudo systemctl daemon-reload
 
 Inspect the first run with `journalctl -u pcep-db-offsite.service`. Confirm a success
 heartbeat and a failure page before installing the `OnSuccess` drop-in. The health
-monitor should read `/var/lib/pcep-db-offsite/last-success` as root and alert when its
-UTC timestamp is older than 24 hours. Remove the plaintext staging config after its
-offline recovery copy and encrypted systemd credential have both been verified.
+monitor reads `/var/lib/pcep-db-offsite/last-success` without exposing its private
+fields. The tracked operations-health service begins failing closed on 2026-10-27
+when that marker is missing, malformed or older than 24 hours; its generic public
+state is polled by the twice-hourly external smoke. This is the technical
+missed-success alert, not proof that a human notification was delivered. Remove the
+plaintext staging config after its offline recovery copy and encrypted systemd
+credential have both been verified.
