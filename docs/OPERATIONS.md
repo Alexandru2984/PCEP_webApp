@@ -1299,6 +1299,18 @@ proves that an unknown application path remains distinguishable from `/index.htm
 while a canary query value never reaches the log. Existing Nginx log rotation
 covers these files.
 
+Nginx's fixed rate-limit diagnostic includes the client address and original
+request, so the learner vhost emits routine `limit_req` messages at `notice`, below
+its `warn` error-log threshold. Rejected requests remain observable as `429` entries
+in the structured, redacted access log. The `/api/` location also raises its error-log
+threshold to `crit`: request-level upstream failures remain visible as 5xx access-log
+entries and through external health checks without copying learner query strings.
+The isolated contract forces both a query-bearing `429` and an upstream failure and
+rejects either canary in the error log. Other unexpected Nginx failures outside the
+API can still include request context; all four PCEP access and error logs are
+therefore operationally sensitive `www-data:adm` mode-0640 files and must not be
+exported as public CI artifacts.
+
 ## Study interface and recovery
 
 The exam navigator collapses initially on small screens, uses five mobile

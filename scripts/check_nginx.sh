@@ -81,6 +81,17 @@ printf '%s\n' \
     '        add_header X-Accel-Redirect "/should-not-run" always;' \
     '        return 204;' \
     '    }' \
+    '}' \
+    'server {' \
+    '    listen 127.0.0.1:8001;' \
+    '    server_name backend-fixture;' \
+    '    location = /api/stats/ {' \
+    '        default_type application/json;' \
+    '        return 200 "{}";' \
+    '    }' \
+    '    location = /api/error-probe/ {' \
+    '        return 444;' \
+    '    }' \
     '}' > "$stage/shared.conf"
 mounts=(
     # Match sites-enabled ordering: pcep-runner sorts before pcep.micutu.com.
@@ -100,6 +111,10 @@ docker run --rm --network none "${mounts[@]}" "$nginx_image" nginx -t
 grep -Fqx 'limit_req_zone $binary_remote_addr zone=pcep_api:10m rate=10r/s;' \
     "$root/nginx/pcep.micutu.com.conf"
 grep -Fqx '        limit_req zone=pcep_api burst=60 nodelay;' \
+    "$root/nginx/pcep.micutu.com.conf"
+grep -Fqx '    limit_req_log_level notice;' \
+    "$root/nginx/pcep.micutu.com.conf"
+grep -Fqx '        error_log /var/log/nginx/pcep_error.log crit;' \
     "$root/nginx/pcep.micutu.com.conf"
 assert_absent 'static filesystem alias' \
     -Fq 'alias /var/www/pcep/static/' "$root/nginx/pcep.micutu.com.conf"
@@ -324,6 +339,12 @@ for retired_path in /static /static/ /static/admin/css/base.css /media /media/ /
         -Fqi 'must never be published' "$stage/$retired_label.body"
 done
 
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --output /dev/null --write-out '%{http_code}' \
+    "$base_url/api/error-probe/?audit-api-error-query=must-not-be-logged")
+[[ "$status" == 502 ]]
+
 status=''
 for _ in $(seq 1 30); do
     status=$(curl --http1.1 --insecure --silent --show-error \
@@ -348,7 +369,9 @@ for _ in $(seq 1 120); do
     status=$(curl --http1.1 --insecure --silent --show-error \
         --resolve "pcep.micutu.com:$port:127.0.0.1" \
         --dump-header "$stage/429.headers" --output "$stage/429.body" \
-        --write-out '%{http_code}' "$base_url/api/stats/" 2>/dev/null || true)
+        --write-out '%{http_code}' \
+        "$base_url/api/stats/?audit-rate-limit-query=must-not-be-logged" \
+        2>/dev/null || true)
     [[ "$status" == 429 ]] && break
 done
 [[ "$status" == 429 ]]
@@ -359,5 +382,11 @@ grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" 
 grep -Fqi 'Retry-After: 1' "$stage/429.headers.clean"
 grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' "$stage/429.headers.clean"
 grep -Fqx '{"detail":"Too many requests. Please wait and retry."}' "$stage/429.body"
+docker exec "$container" cat /var/log/nginx/pcep_error.log \
+    > "$stage/pcep-error.log"
+assert_absent 'rate-limit error-log query string' \
+    -Fq 'audit-rate-limit-query' "$stage/pcep-error.log"
+assert_absent 'API upstream error-log query string' \
+    -Fq 'audit-api-error-query' "$stage/pcep-error.log"
 
 printf '%s\n' 'Nginx syntax, isolated runner, disabled admin/static/media and generated API error contracts: OK'
