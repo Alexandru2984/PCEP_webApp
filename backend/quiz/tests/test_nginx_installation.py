@@ -55,7 +55,7 @@ def verify(project, nginx):
 def test_accepts_exact_files_and_active_symlinks(tmp_path):
     project, nginx = installation(tmp_path)
 
-    assert verify(project, nginx) == {'vhosts': 2, 'snippets': 5}
+    assert verify(project, nginx) == {'vhosts': 2, 'snippets': 6}
 
 
 def test_rejects_inactive_regular_copy(tmp_path):

@@ -11,7 +11,7 @@ Browser
   → HTTPS on loopback system Nginx
       ├─ / and versioned assets → /var/www/pcep/frontend
       ├─ /practice/, sitemap, robots → /var/www/pcep/seo
-      ├─ /static/ and /media/ → host release directories
+      ├─ /static* and /media* → hardened retired-content 404
       ├─ /api/ → 127.0.0.1:8001
       │            → pcep_backend (Gunicorn, three workers)
       │            → pcep_db (PostgreSQL 16)
@@ -336,7 +336,8 @@ its cost material.
 - **Nginx:** tracked production vhost, centralized headers/CSP, verified proxy
   headers, JSON request IDs/timing logs without IP/query/cookie/auth data, body
   and rate limits, compression, strict route caching, correct manifest/WASM/JS
-  media types and missing-asset 404s. Every reload followed `nginx -t`.
+  media types, missing-asset 404s and fail-closed retired static/media routes.
+  Every reload followed `nginx -t`.
 - **Release retention:** a read-only-by-default utility reports only exact
   frontend/static rollback and backup snapshots, enforces at least two retained
   copies and requires `--apply` before removal. Database/security backups cannot
@@ -2744,11 +2745,10 @@ about 30 minutes plus workflow execution. Recovery-status staleness is detected 
 the same external job after its two-hour freshness window. These are machine MTTD
 claims only: guaranteed human MTTD remains unbounded until the repository owner
 confirms that an exercised issue reaches a human-controlled email/mobile channel.
-The synthetic failure did open issue #62 and the next healthy run closed it, proving
-the technical alert and recovery path but not human delivery. The workflow now
-assigns and mentions the repository owner as the named responder and repairs that
-assignment on a deduplicated existing alert; the next exercise must verify this
-GitHub-side routing without claiming that user notification settings delivered it.
+The post-install exercise opened issue #68 assigned to and explicitly mentioning the
+repository owner; the next healthy run closed it after the full contract passed.
+This proves the technical GitHub-side creation, routing and recovery path but not
+delivery through the owner's email/mobile notification settings.
 
 The incident posture has more than paper evidence: the application credential was
 rotated after an accidental transcript disclosure, backup restoration was performed
@@ -2780,7 +2780,7 @@ Accepted risks require an owner and a revisit trigger:
 | --- | --- | --- | --- |
 | Repository/production owner | No independently controlled off-host recovery copy | 2026-10-27, or before any non-reconstructible/server-side learner data is stored, whichever comes first | Current learner state is browser-local and the question bank is source-controlled; host-loss availability remains explicitly unprotected. |
 | Repository/production owner | Human alert delivery is unverified | Before public promotion, or 2026-10-20, whichever comes first | Twice-hourly issue creation is proven, but unattended operation is not acceptable without a named responder receiving the alert. |
-| Repository/Cloudflare owner | Retired `/static` and `/media` origin routes remain until a scoped cache purge is available | Before merging PR #46 or its replacement; re-evaluate by 2026-11-12 | The routes expose only generated Django assets and no media, while admin is a hardened 404. Origin retirement without cache purge would leave stale edge 200s and create false monitoring failures. |
+| Repository/Cloudflare owner | Previously cached `/static` objects can remain edge-visible after origin retirement | Re-evaluate by 2026-11-12, or earlier after a verified hostname-and-prefix-scoped purge | Both origin route families now fail closed and cannot refill the cache. The external contract uses new canaries until the original 30-day legacy TTL is exhausted; no media object was present. |
 | Production owner | Runtime backend bridge still permits outbound connections | Before adding any server-side URL fetch, webhook, account data or higher-value secret | An isolated Docker fixture proved this engine drops the loopback published port on an `internal` network. A sidecar/Unix-socket redesign is not justified for a backend with no outbound request feature. |
 | Product/production owner | Capacity evidence covers only a small read-only workload | Before a marketing event, material database growth or a worker/query/container-limit change | The tested floor exceeds the current per-source limit and ordinary anonymous flows, but cannot establish fleet-wide concurrency or distributed-abuse capacity. |
 
@@ -2790,6 +2790,35 @@ opens, error/latency behavior exceeds the documented capacity gate, or the produ
 scope crosses any boundary above. Until human notification and off-host recovery are
 proven, the owner must actively inspect GitHub production-smoke results and local
 timer health; this is the operational cost of accepting the 🟡 verdict.
+
+### Static/media origin retirement — 2026-10-13
+
+The learner application has no Django admin, uploads, templates or dynamic static
+consumer, but Nginx still exposed retained Django static artifacts and an empty media
+tree. Both the exact and descendant `/static` and `/media` routes now use one hardened
+404 policy with `no-store`, a deny-all document CSP, the shared security headers and
+a request ID. Host artifacts remain untouched for rollback evidence. An isolated
+test mounts sentinel content at both former alias roots and proves it cannot be read;
+the twice-hourly public contract probes previously nonexistent canary objects so an
+old CDN entry cannot mask origin drift.
+
+The dominant STRIDE risks were information disclosure from unintentionally retained
+content and tampering through a future file placed in a public alias. Their origin
+blast radius is now eliminated; the remaining edge blast radius is limited to
+generated, public Django static files cached before cutover. No media object, secret,
+learner record or answer data was found in scope. A cached legacy static response can
+survive its original 30-day TTL, but origin retirement prevents refill. The phase-two
+deadline is 2026-11-12, when representative legacy URLs become strict public 404
+checks unless a narrower verified purge closes the phase earlier.
+
+CI detects route-policy drift in the isolated Nginx fixture, and production detection
+is at most about 30 minutes plus workflow execution. Recovery restores the backed-up
+vhost only if a separately reviewed operator origin genuinely requires these assets;
+the public learner origin is not an acceptable rollback target. No vendor, credential,
+personal-data flow or regulatory scope is added, and no FAIR loss estimate is claimed
+without business-impact inputs. The CISO verdict is **SHIP** after PR validation,
+configuration backup, `nginx -t`, reload, installation verification and public smoke
+all pass.
 
 ## 15. Breaking changes
 

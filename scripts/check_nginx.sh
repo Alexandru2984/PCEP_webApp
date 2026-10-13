@@ -31,7 +31,8 @@ trap cleanup EXIT
 nginx_image=${NGINX_TEST_IMAGE:-nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236}
 mkdir -p "$stage/certs" "$stage/snippets" "$stage/frontend/pyodide" \
     "$stage/operations-health" \
-    "$stage/frontend/pyodide.previous.audit"
+    "$stage/frontend/pyodide.previous.audit" "$stage/static/admin/css" \
+    "$stage/media"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=pcep.micutu.com' -keyout "$stage/certs/privkey.pem" -out "$stage/certs/fullchain.pem" 2>/dev/null
 cp "$root"/nginx/snippets/pcep-*.conf "$stage/snippets/"
 cp "$root/frontend/public/runner.html" "$root/frontend/public/runner-bridge.js" \
@@ -45,6 +46,8 @@ printf '%s\n' '{"checked_at":"2026-10-13T09:00:00Z","schema":1,"status":"ok"}' \
     > "$stage/operations-health/status.json"
 printf '%s\n' 'must never be published' \
     > "$stage/frontend/pyodide.previous.audit/pyodide.js"
+printf '%s\n' 'must never be published' > "$stage/static/admin/css/base.css"
+printf '%s\n' 'must never be published' > "$stage/media/probe.txt"
 printf 'location ~ /\\. { deny all; }\n' > "$stage/snippets/block-dotfiles.conf"
 # Shared variables/includes are provided by the actual production host.
 sed -e '/include \/etc\/letsencrypt\/options-ssl-nginx.conf;/d' -e '/ssl_dhparam \/etc\/letsencrypt\/ssl-dhparams.pem;/d' "$root/nginx/pcep.micutu.com.conf" > "$stage/pcep.conf"
@@ -87,6 +90,8 @@ mounts=(
     -v "$stage/snippets:/etc/nginx/snippets:ro"
     -v "$stage/certs:/etc/letsencrypt/live/pcep.micutu.com:ro"
     -v "$stage/frontend:/var/www/pcep/frontend:ro"
+    -v "$stage/static:/var/www/pcep/static:ro"
+    -v "$stage/media:/var/www/pcep/media:ro"
     -v "$stage/operations-health/status.json:/var/lib/pcep-operations-health/status.json:ro"
 )
 docker run --rm --network none "${mounts[@]}" "$nginx_image" nginx -t
@@ -96,6 +101,10 @@ grep -Fqx 'limit_req_zone $binary_remote_addr zone=pcep_api:10m rate=10r/s;' \
     "$root/nginx/pcep.micutu.com.conf"
 grep -Fqx '        limit_req zone=pcep_api burst=60 nodelay;' \
     "$root/nginx/pcep.micutu.com.conf"
+assert_absent 'static filesystem alias' \
+    -Fq 'alias /var/www/pcep/static/' "$root/nginx/pcep.micutu.com.conf"
+assert_absent 'media filesystem alias' \
+    -Fq 'alias /var/www/pcep/media/' "$root/nginx/pcep.micutu.com.conf"
 
 analytics_snippet="$root/nginx/snippets/pcep-analytics-proxy.conf"
 [[ $(grep -Fc 'include snippets/pcep-analytics-proxy.conf;' \
@@ -291,6 +300,30 @@ for admin_path in /admin /admin/login/; do
         -Eqi 'Django administration|admin login' "$stage/$admin_label.body"
 done
 
+for retired_path in /static /static/ /static/admin/css/base.css /media /media/ /media/probe.txt; do
+    retired_label=${retired_path//\//_}
+    status=$(curl --http1.1 --insecure --silent --show-error \
+        --resolve "pcep.micutu.com:$port:127.0.0.1" \
+        --dump-header "$stage/$retired_label.headers" \
+        --output "$stage/$retired_label.body" \
+        --write-out '%{http_code}' "$base_url$retired_path")
+    [[ "$status" == 404 ]]
+    tr -d '\r' < "$stage/$retired_label.headers" \
+        > "$stage/$retired_label.headers.clean"
+    grep -Fqi 'Cache-Control: no-store' "$stage/$retired_label.headers.clean"
+    grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
+        "$stage/$retired_label.headers.clean"
+    grep -Fqi 'X-Content-Type-Options: nosniff' \
+        "$stage/$retired_label.headers.clean"
+    grep -Fqi 'X-Frame-Options: DENY' "$stage/$retired_label.headers.clean"
+    grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' \
+        "$stage/$retired_label.headers.clean"
+    assert_absent "retired route $retired_path Set-Cookie header" \
+        -Eqi '^Set-Cookie:' "$stage/$retired_label.headers.clean"
+    assert_absent "retired route $retired_path file disclosure" \
+        -Fqi 'must never be published' "$stage/$retired_label.body"
+done
+
 status=''
 for _ in $(seq 1 30); do
     status=$(curl --http1.1 --insecure --silent --show-error \
@@ -327,4 +360,4 @@ grep -Fqi 'Retry-After: 1' "$stage/429.headers.clean"
 grep -Eqi '^X-Request-ID: [0-9a-f]{32}$' "$stage/429.headers.clean"
 grep -Fqx '{"detail":"Too many requests. Please wait and retry."}' "$stage/429.body"
 
-printf '%s\n' 'Nginx syntax, isolated runner, disabled admin and generated API error contracts: OK'
+printf '%s\n' 'Nginx syntax, isolated runner, disabled admin/static/media and generated API error contracts: OK'

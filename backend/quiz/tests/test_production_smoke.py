@@ -267,6 +267,27 @@ def test_public_admin_must_be_a_strict_cookie_free_404():
             smoke.check_admin_unavailable(invalid)
 
 
+def test_retired_public_content_must_be_a_strict_cookie_free_404():
+    headers = {
+        **SHARED_HEADERS,
+        'cache-control': 'no-store',
+        'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+        'x-request-id': 'a' * 32,
+    }
+    smoke.check_public_404(
+        response(headers, b'Not found', status=404),
+        'Retired content',
+    )
+
+    for invalid in [
+        response({**headers, 'cache-control': 'public'}, status=404),
+        response({**headers, 'set-cookie': 'session=secret'}, status=404),
+        response(headers, status=200),
+    ]:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_public_404(invalid, 'Retired content')
+
+
 def test_operations_health_requires_minimal_fresh_success_and_strict_headers():
     headers = {
         **SHARED_HEADERS,
