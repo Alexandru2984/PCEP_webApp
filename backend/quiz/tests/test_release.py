@@ -22,7 +22,7 @@ def static_release(root, marker):
 def frontend_release(root, marker='public data'):
     for name in [
         'sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js',
-        'manifest.webmanifest', 'assets/new.js',
+        'manifest.webmanifest', '.well-known/security.txt', 'assets/new.js',
     ]:
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -79,6 +79,53 @@ def test_rejects_incomplete_release_and_symlinks_before_touching_live(tmp_path):
     with pytest.raises(ValueError, match='Unsafe file'):
         release.publish(source, target, kind='static')
     assert (target / 'admin/css/base.css').read_text() == 'old'
+
+
+def test_frontend_allows_only_the_reviewed_well_known_resource(tmp_path, monkeypatch):
+    source, hashes = frontend_release(tmp_path / 'source')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
+    release.validate_release(source)
+
+    (source / '.well-known/credentials').write_text('must not publish')
+    with pytest.raises(ValueError, match='Unsafe file'):
+        release.validate_release(source)
+
+    (source / '.well-known/credentials').unlink()
+    (source / 'assets/.private').mkdir()
+    (source / 'assets/.private/token').write_text('must not publish')
+    with pytest.raises(ValueError, match='Unsafe file'):
+        release.validate_release(source)
+
+
+def test_frontend_seeds_disclosure_into_backup_and_immediate_rollback(
+    tmp_path, monkeypatch
+):
+    source, hashes = frontend_release(tmp_path / 'source', 'new')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
+    target, _old_hashes = frontend_release(tmp_path / 'live', 'old')
+    (target / '.well-known/security.txt').unlink()
+
+    previous = release.publish(source, target, tmp_path / 'backup')
+
+    expected = (source / '.well-known/security.txt').read_text()
+    assert (target / '.well-known/security.txt').read_text() == expected
+    assert (previous / '.well-known/security.txt').read_text() == expected
+    assert next(
+        (tmp_path / 'backup').glob('live.*/.well-known/security.txt')
+    ).read_text() == expected
+
+
+def test_frontend_refuses_unsafe_live_well_known_path(tmp_path, monkeypatch):
+    source, hashes = frontend_release(tmp_path / 'source')
+    monkeypatch.setattr(release, 'PYODIDE_SHA256', hashes)
+    target = tmp_path / 'live'
+    target.mkdir()
+    (target / '.well-known').symlink_to(tmp_path)
+
+    with pytest.raises(ValueError, match='real directory'):
+        release.publish(source, target)
+
+    assert not (target / 'index.html').exists()
 
 
 def test_initial_publication_is_atomic_and_separate(tmp_path):

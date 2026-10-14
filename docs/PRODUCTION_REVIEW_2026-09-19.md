@@ -2915,6 +2915,54 @@ added. A defensible FAIR/ALE value remains unavailable without business loss inp
 The CISO verdict is **SHIP** after tests, live role verification, timer installation,
 fresh-marker publication and external smoke all pass.
 
+### RFC 9116 vulnerability disclosure — 2026-10-14
+
+The standard `/.well-known/security.txt` URL previously returned the generic SPA
+shell with HTTP 200 and `text/html`. A researcher following the conventional
+discovery path therefore received no private reporting instructions even though
+GitHub private vulnerability reporting was enabled. The release now contains a
+bounded RFC 9116 document whose only contact is the private-advisory form, plus a
+canonical URL, repository policy, preferred languages and a mandatory expiry. An
+exact Nginx location serves only that file as cookie-free `text/plain` with a
+deny-all CSP and no-store caching. The service worker cannot turn the path back into
+an SPA navigation.
+
+The top STRIDE risks are repudiation through an undiscoverable or expired reporting
+channel, spoofing through contact-link drift and information disclosure when a
+researcher is diverted to a public issue. The immediate technical blast radius was
+one discovery route and every prospective reporter; it exposed no learner record,
+credential, database row or regional system. A delayed future report could affect
+all users and production assets implicated by that vulnerability, but there is no
+incident-frequency or loss-impact evidence from which to claim a FAIR annual loss
+expectancy.
+
+Build validation makes the document a mandatory release artifact and permits no
+other hidden resource. The atomic publisher safely seeds it into the pre-swap live
+tree, so both first-deployment rollback copies retain the channel; hostile symlinks
+abort before backup or swap. Isolated Nginx tests verify exact bytes, media type,
+headers, cookie absence and method restriction. The external smoke verifies the private
+contact, canonical policy, field order and an expiry between 30 and 365 days away on
+its twice-hourly schedule. The lower bound creates a renewal incident before the
+document becomes stale; technical MTTD is about 30 minutes plus workflow execution.
+It opens the existing deduplicated incident issue; guaranteed human MTTD remains
+limited by the separately recorded notification-delivery gap. Response is
+to validate GitHub private reporting, update or replace the contact and expiry,
+republish the frontend, reload only a reviewed Nginx change if needed and rerun the
+complete public contract. The general incident tabletop and human delivery test
+remain outstanding operational exercises, not reasons to leave the discovery path
+false.
+
+GitHub is the existing repository and advisory processor; this change adds no
+vendor, credential, OAuth scope or public disclosure channel. Reporters are told not
+to submit credentials, production data or personal data, but advisory content can
+still become restricted incident evidence under the existing retention and response
+rules. Account-level DPA and residency terms were not independently revalidated; on
+repository/provider offboarding, the `Contact` and `Policy` targets must be replaced
+before the old channel is disabled. If a report establishes awareness of a personal-
+data breach likely to risk individuals, the existing GDPR Article 33 assessment and
+72-hour supervisory-authority clock apply. The CISO verdict is **SHIP** after build,
+isolated route tests, CI, configuration backup, deploy and external smoke pass.
+
 ## 15. Breaking changes
 
 None.

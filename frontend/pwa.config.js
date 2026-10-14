@@ -28,6 +28,7 @@ export const pwaOptions = {
       /^\/media(?:\/|$)/,
       /^\/practice(?:\/|$)/,
       /^\/u(?:\/|$)/,
+      /^\/\.well-known(?:\/|$)/,
       /^\/pyodide/,
       /^\/(?:py-worker\.js|runner\.html|runner-bridge\.js)$/,
       /^\/assets(?:\/|$)/,

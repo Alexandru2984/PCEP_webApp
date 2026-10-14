@@ -15,6 +15,7 @@ describe('public-only service worker policy', () => {
       '/admin/',
       '/practice/module1/',
       '/u/api/send',
+      '/.well-known/security.txt',
       '/robots.txt',
       '/sitemap.xml',
       '/assets/missing.js',

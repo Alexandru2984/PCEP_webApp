@@ -23,6 +23,11 @@ PYODIDE_FILE_NAMES = frozenset({
     'pyodide-lock.json',
     'python_stdlib.zip',
 })
+FRONTEND_WELL_KNOWN_PATHS = frozenset({
+    Path('.well-known'),
+    Path('.well-known/security.txt'),
+})
+SECURITY_TXT_PATH = Path('.well-known/security.txt')
 
 
 def load_pyodide_hashes(path=PYODIDE_MANIFEST):
@@ -67,11 +72,20 @@ def validate_release(source, kind='frontend'):
     if not source.is_dir():
         raise ValueError('Release source must be a directory.')
     for path in source.rglob('*'):
-        if path.is_symlink() or path.name.startswith('.') or path.suffix in ('.pem', '.key'):
+        relative = path.relative_to(source)
+        has_hidden_component = any(part.startswith('.') for part in relative.parts)
+        allowed_well_known = (
+            kind == 'frontend' and relative in FRONTEND_WELL_KNOWN_PATHS
+        )
+        if (
+            path.is_symlink()
+            or (has_hidden_component and not allowed_well_known)
+            or path.suffix in ('.pem', '.key')
+        ):
             raise ValueError(f'Unsafe file in release: {path.relative_to(source)}')
     required = ['admin/css/base.css', 'admin/js/core.js'] if kind == 'static' else [
         'index.html', 'sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js',
-        'manifest.webmanifest',
+        'manifest.webmanifest', '.well-known/security.txt',
         *(f'pyodide/{name}' for name in sorted(PYODIDE_FILE_NAMES)),
     ]
     for name in required:
@@ -137,6 +151,28 @@ def previous_asset_mtimes(target):
     return mtimes
 
 
+def seed_rollback_security_txt(source, target):
+    """Atomically add the reviewed disclosure file to the pre-swap release."""
+    well_known = target / SECURITY_TXT_PATH.parent
+    if os.path.lexists(well_known):
+        if well_known.is_symlink() or not well_known.is_dir():
+            raise ValueError('The live .well-known path must be a real directory.')
+    else:
+        well_known.mkdir(mode=0o755)
+    destination = target / SECURITY_TXT_PATH
+    if os.path.lexists(destination) and (
+        destination.is_symlink() or not destination.is_file()
+    ):
+        raise ValueError('The live security.txt path must be a regular file.')
+    temporary = well_known / f'.security.txt.{uuid.uuid4().hex}.tmp'
+    try:
+        shutil.copyfile(source / SECURITY_TXT_PATH, temporary)
+        temporary.chmod(0o644)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def publish(
     source,
     target,
@@ -158,6 +194,11 @@ def publish(
         raise ValueError('Release source and live root must be separate directories.')
     validate_release(source, kind)
     target.parent.mkdir(parents=True, exist_ok=True)
+    # On the first RFC 9116 deployment the currently live release predates the
+    # required file. Seed it before backup/swap so both rollback copies retain
+    # the disclosure channel even if the application release is rolled back.
+    if kind == 'frontend' and target.exists():
+        seed_rollback_security_txt(source, target)
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8]
     stage = Path(tempfile.mkdtemp(prefix=f'.{target.name}.release-', dir=target.parent))
     swapped = False

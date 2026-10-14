@@ -12,6 +12,9 @@ Please use GitHub's **Security** tab and select **Report a vulnerability**. This
 creates a private security advisory visible only to the reporter and the
 repository maintainers.
 
+The production service also publishes the canonical RFC 9116 discovery document
+at `https://pcep.micutu.com/.well-known/security.txt`.
+
 Do not open a public issue, discussion or pull request for a suspected
 vulnerability. Do not include credentials, access tokens, personal data or data
 copied from production in a report. If the private reporting form is unavailable,
