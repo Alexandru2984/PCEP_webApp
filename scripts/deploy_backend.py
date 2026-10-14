@@ -720,6 +720,7 @@ def verify_backend_runtime(config, expected_image):
         'no_new_privileges': host.get('SecurityOpt') == ['no-new-privileges:true'],
         'bounded_processes': host.get('PidsLimit') == 128,
         'bounded_memory': host.get('Memory') == 512 * 1024 * 1024,
+        'bounded_cpu': host.get('NanoCpus') == 2_000_000_000,
         'ephemeral_hardened_tmp': host.get('Tmpfs') == {
             '/tmp': 'size=64m,mode=1777,noexec,nosuid,nodev'
         },

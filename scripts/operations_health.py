@@ -51,6 +51,20 @@ def load_installation_verifier():
     return module
 
 
+def load_container_runtime_verifier():
+    path = Path(__file__).with_name('verify_container_runtime.py')
+    spec = importlib.util.spec_from_file_location(
+        'pcep_container_runtime', path
+    )
+    if spec is None or spec.loader is None:
+        raise OperationsHealthError(
+            'Cannot load the container runtime verifier.'
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def utc_moment(value, label):
     if not isinstance(value, str) or not UTC_TIMESTAMP_PATTERN.fullmatch(value):
         raise OperationsHealthError(f'{label} timestamp is invalid.')
@@ -232,6 +246,8 @@ def execute(
     database_security_max_age_hours=2,
     verify_installation=False,
     installation_module=None,
+    verify_container_runtime=False,
+    container_runtime_module=None,
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
@@ -275,6 +291,16 @@ def execute(
             verifier.verify_installation()
         except Exception:
             failures.append('Operational installation drift detected.')
+    if verify_container_runtime:
+        # Container inspection errors remain in the private service journal;
+        # the public marker reveals no runtime metadata or environment values.
+        try:
+            verifier = (
+                container_runtime_module or load_container_runtime_verifier()
+            )
+            verifier.verify_container_runtime()
+        except Exception:
+            failures.append('Container runtime drift detected.')
 
     payload = write_public_status(output, 'degraded' if failures else 'ok', moment)
     if failures:
@@ -325,6 +351,7 @@ def main():
         '--database-security-max-age-hours', type=bounded_hours, default=2
     )
     parser.add_argument('--verify-installation', action='store_true')
+    parser.add_argument('--verify-container-runtime', action='store_true')
     args = parser.parse_args()
     try:
         payload = execute(
@@ -341,6 +368,7 @@ def main():
                 args.database_security_max_age_hours
             ),
             verify_installation=args.verify_installation,
+            verify_container_runtime=args.verify_container_runtime,
         )
     except (OperationsHealthError, OSError, ValueError) as error:
         parser.exit(1, f'Operations health degraded: {error}\n')

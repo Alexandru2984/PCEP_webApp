@@ -300,6 +300,35 @@ def test_installation_drift_publishes_only_generic_degraded_state(tmp_path):
     assert 'SENSITIVE_INSTALLATION_DETAIL' not in output.read_text()
 
 
+def test_container_drift_publishes_only_generic_degraded_state(tmp_path):
+    backups = tmp_path / 'backups'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261014T110000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-14T10:00:00Z')
+    output = tmp_path / 'public/status.json'
+    output.parent.mkdir(mode=0o755)
+
+    class DriftingRuntime:
+        @staticmethod
+        def verify_container_runtime():
+            raise RuntimeError('SENSITIVE_CONTAINER_DETAIL')
+
+    with pytest.raises(health.OperationsHealthError, match='runtime drift'):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=datetime(2026, 10, 14, 12, tzinfo=timezone.utc),
+            backup_module=backup,
+            verify_container_runtime=True,
+            container_runtime_module=DriftingRuntime,
+        )
+
+    assert json.loads(output.read_text())['status'] == 'degraded'
+    assert 'SENSITIVE_CONTAINER_DETAIL' not in output.read_text()
+
+
 @pytest.mark.parametrize('value', [0, 337, 'invalid'])
 def test_freshness_windows_are_bounded(value):
     with pytest.raises(Exception, match='age'):
@@ -331,6 +360,7 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     )
     assert '--database-security-max-age-hours 2' in service
     assert '--verify-installation' in service
+    assert '--verify-container-runtime' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
 
 

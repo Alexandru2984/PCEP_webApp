@@ -447,6 +447,38 @@ backed-up file, reload systemd and rerun the verifier and health service. The pu
 status remains deliberately generic; use
 `journalctl -u pcep-operations-health.service` for the private failure reason.
 
+The hourly publisher also runs `make verify-container-runtime`. The verifier
+requires exactly the reviewed backend and database containers and exactly those two
+members on the non-attachable PCEP bridge. It checks healthy/running state, Compose
+identity, immutable backend image identity and release, exact environment-name
+allowlists, non-root users, entrypoints, healthchecks, read-only roots, dropped
+capabilities, `no-new-privileges`, private namespaces, Docker's AppArmor profile,
+loopback-only backend publication, absence of a database host port, the single
+reviewed PGDATA volume, no unexpected backend mount, bounded/rotated logs and exact
+memory, PID and CPU limits. Inspection parses environment values only in memory;
+errors and the public health marker never contain those values.
+
+Run the standalone target after any Compose deployment or intentional runtime
+update. The declared steady-state CPU quotas are two of the host's ten cores for
+each long-running container and one core for the one-shot migrator. Apply the live
+long-running limits without a restart, then rerun the verifier and bounded capacity
+smoke:
+
+```bash
+docker update --cpus 2 pcep_backend pcep_db
+make verify-container-runtime
+make capacity-smoke
+```
+
+A defective CPU limit can be rolled back without restart with
+`docker update --cpus 0 <container>`; do not leave that emergency state in place or
+remove the declarative Compose limit.
+For any other drift, preserve private inspection/journal evidence, isolate the
+unexpected container or network member and recreate only from the reviewed Compose
+release. The check uses the Docker socket under the existing `micu` identity, which
+already has host-equivalent Docker authority; it does not independently attest a
+compromised host or operator.
+
 The external GitHub smoke checks both `status` and `checked_at`, so it detects a
 reported recovery failure and a publisher that stopped refreshing. The endpoint is
 not a signed or independent attestation: a fully compromised production host can
@@ -613,15 +645,15 @@ Gunicorn runs the explicit synchronous worker contract over HTTP/1 only. Clearte
 HTTP/2 is disabled, ambiguous underscore-containing headers are dropped, and the
 unused administrative control socket is disabled rather than created inside the
 read-only container filesystem.
-The non-root backend filesystem is read-only except the existing static/media
-volumes and a 64 MB temporary filesystem. Capabilities are dropped, privilege
-escalation is disabled, and the backend is capped at 512 MB and 128 processes.
+The non-root backend filesystem is read-only except a 64 MB temporary filesystem.
+Capabilities are dropped, privilege escalation is disabled, and the backend is
+capped at 512 MB, 128 processes and two CPU cores.
 PostgreSQL starts directly as its non-root user with a read-only root filesystem,
-all capabilities dropped, `no-new-privileges`, 512 MB/128-process limits and bounded
-noexec tmpfs mounts for `/tmp` and its Unix socket. Only the external PGDATA volume
-is persistent and writable, and no database port is published to the host. Its local
-image extends a digest-pinned PostgreSQL 16.15 Alpine base only to remove the unused
-root-only `gosu` switcher and its independently compiled runtime.
+all capabilities dropped, `no-new-privileges`, 512 MB/128-process/two-core limits
+and bounded noexec tmpfs mounts for `/tmp` and its Unix socket. Only the external
+PGDATA volume is persistent and writable, and no database port is published to the
+host. Its local image extends a digest-pinned PostgreSQL 16.15 Alpine base only to
+remove the unused root-only `gosu` switcher and its independently compiled runtime.
 Fresh clusters bootstrap `pcep_admin` only for container-local administration,
 `pcep_owner` as a non-login database/schema/object owner, `pcep_migrator` as a
 normally `NOLOGIN`/passwordless member that can explicitly assume the owner role,

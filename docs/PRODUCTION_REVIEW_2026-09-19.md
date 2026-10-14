@@ -3006,6 +3006,54 @@ There are no business loss/frequency inputs from which to calculate a defensible
 FAIR annual loss expectancy. The CISO verdict is **SHIP** after focused/full tests,
 CI, backed-up unit installation, live verifier success and external smoke pass.
 
+### Container-runtime drift and CPU containment — 2026-10-14
+
+Deploy-time checks already proved the backend isolation policy, but there was no
+continuous control for a manual recreation, `docker update`, unexpected project
+container or foreign member attached to the database network. Both long-running
+containers also had 512 MiB memory and 128-process limits but no CPU quota. On the
+ten-core host, a runaway three-worker backend or PostgreSQL workload could therefore
+consume substantially more shared compute than the small read-only workload needs.
+The reviewed steady state now declares two cores for each long-running container
+and one for the ephemeral migrator; the existing 15 request/second capacity floor
+must be repeated after live application.
+
+An hourly read-only verifier now requires exactly two PCEP project containers and
+two PCEP bridge members. It checks healthy state, image/release identity, exact
+environment-name allowlists, users, commands, healthchecks, privileges, namespaces,
+AppArmor, ports, mounts, log bounds and CPU/memory/PID limits. Database credentials
+and the Django secret are parsed only to prove presence; neither values nor Docker
+stderr can enter its errors. Operations health publishes only the same generic
+`degraded` state, and the external smoke consumes it. Normal runtime drift is
+therefore detected within the hourly run plus the twice-hourly external poll;
+stopping the health timer itself is caught by marker staleness in roughly two to
+three hours. Guaranteed human MTTD remains subject to the open notification-delivery
+exercise.
+
+The top STRIDE risks are elevation of privilege through a privileged/root container,
+information disclosure through an unintended public database port or mount, and
+denial of service through unbounded CPU or a hostile network peer. The immediate
+blast radius is two containers, one Docker bridge, the 308-question API and every
+active learner; database compromise can affect the complete question bank and
+recovery data, but the current product still stores no learner account/progress,
+payment or health record server-side. The two-core limits reserve six of ten host
+cores for the host, edge/tunnel and unrelated recovery work while remaining above
+the measured application demand.
+
+Response is to preserve private Docker/journal evidence, remove or isolate an
+unexpected peer, restore the declarative CPU quota and recreate the affected service
+only from a reviewed image/Compose release. Database recovery still requires the
+verified backup/restore runbook; do not destroy a suspect container before evidence
+and recovery state are secured. The incident tabletop must include a malicious
+Docker-network attachment and resource-exhaustion scenario. The verifier executes
+under the existing Docker-authorized `micu` identity and cannot attest a fully
+compromised host or Docker daemon. No vendor, credential, DPA or personal-data flow
+is added. If a runtime incident exposes personal data, the existing GDPR breach
+assessment and applicable 72-hour Article 33 clock remain mandatory. No defensible
+FAIR annual loss expectancy exists without business loss and frequency inputs. The
+CISO verdict is **SHIP WITH GUARDRAILS** only after full CI, no-restart CPU rollout,
+live runtime verification, capacity smoke and external production smoke pass.
+
 ## 15. Breaking changes
 
 None.

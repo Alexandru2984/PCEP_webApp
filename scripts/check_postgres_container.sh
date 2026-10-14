@@ -53,6 +53,7 @@ require(
 )
 require(service.get("pids_limit") == 128, "the PID limit must remain 128")
 require(service.get("mem_limit") == "536870912", "the memory limit must remain 512 MiB")
+require(service.get("cpus") == 2.0, "the CPU limit must remain 2 cores")
 require(not service.get("ports"), "PostgreSQL must not publish a host port")
 require(service.get("stop_grace_period") == "1m0s", "graceful shutdown must get 60 seconds")
 require(
@@ -97,6 +98,7 @@ require(
 )
 require(migrator.get("pids_limit") == 64, "the migrator PID limit must remain 64")
 require(migrator.get("mem_limit") == "268435456", "the migrator memory limit must remain 256 MiB")
+require(migrator.get("cpus") == 1.0, "the migrator CPU limit must remain 1 core")
 require(not migrator.get("ports"), "the migrator must not publish ports")
 require(not migrator.get("volumes"), "the migrator must not mount persistent data")
 require(
