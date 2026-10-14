@@ -33,7 +33,7 @@ CAPACITY_DURATION ?= 20
 CAPACITY_RATE ?= 15
 CAPACITY_CONCURRENCY ?= 6
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -48,6 +48,7 @@ help:
 		'  check-workflows  Validate GitHub Actions syntax, shell and security' \
 		'  check-systemd    Validate every operational systemd unit and drop-in' \
 		'  verify-nginx-installation Verify active PCEP vhosts and snippets' \
+		'  verify-operations-installation Verify installed systemd/SEO policy' \
 		'  build            Build the frontend production bundle' \
 		'  compose-build-frontend Build frontend through the pinned container' \
 		'  django-check     Run Django production deploy checks' \
@@ -117,6 +118,9 @@ check-systemd:
 
 verify-nginx-installation:
 	"$(PYTHON_BIN)" scripts/verify_nginx_installation.py
+
+verify-operations-installation:
+	"$(PYTHON_BIN)" scripts/verify_operations_installation.py
 
 build: build-frontend
 

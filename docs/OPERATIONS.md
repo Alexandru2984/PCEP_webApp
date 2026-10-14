@@ -427,6 +427,26 @@ still publishes the generic state
 route `/.well-known/pcep-operations.json` is GET-only, no-store and deny-all CSP;
 it never exposes file names, counts, hashes, ages or error details.
 
+The same hourly run also verifies operational installation drift. It requires the
+12 reviewed PCEP service/timer files under `/etc/systemd/system` to be root-owned,
+mode 0644 and byte-identical to `ops/systemd`; requires all six timers to have
+root-owned enablement symlinks pointing at those exact files and to be active;
+rejects any other PCEP activation link; and requires the root-owned mode-0755
+`/usr/local/sbin/pcep-seo-pages` to match its repository source. The systemd roots,
+timer enablement directory, optional drop-in directory and generator directory must
+not be symlinks or writable by group/others. Unknown `pcep-*` units or drop-ins fail
+closed. The offsite service and backup drop-in are valid only when both are absent
+or both are installed exactly; the verifier does not activate offsite replication.
+
+Run `make verify-operations-installation` after every operational install and
+before/after a systemd rollback. When a reviewed unit changes, first preserve the
+currently installed file in the restricted release backup, then install the new
+file as `root:root` mode 0644, run `systemctl daemon-reload`, execute the verifier
+and start `pcep-operations-health.service`. If validation fails, restore the exact
+backed-up file, reload systemd and rerun the verifier and health service. The public
+status remains deliberately generic; use
+`journalctl -u pcep-operations-health.service` for the private failure reason.
+
 The external GitHub smoke checks both `status` and `checked_at`, so it detects a
 reported recovery failure and a publisher that stopped refreshing. The endpoint is
 not a signed or independent attestation: a fully compromised production host can
