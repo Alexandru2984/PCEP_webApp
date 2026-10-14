@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify PCEP database role boundaries every hour
+
+[Timer]
+OnCalendar=*-*-* *:07:00
+Persistent=true
+RandomizedDelaySec=5m
+AccuracySec=1m
+
+[Install]
+WantedBy=timers.target

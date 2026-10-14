@@ -47,6 +47,13 @@ def offsite_status(path, completed_at):
     path.chmod(0o600)
 
 
+def database_security_status(path, completed_at):
+    path.write_text(
+        json.dumps({'schema': 1, 'completed_at': completed_at}) + '\n'
+    )
+    path.chmod(0o600)
+
+
 def test_healthy_recovery_attestation_is_minimal_atomic_and_publicly_readable(tmp_path):
     backups = tmp_path / 'backups'
     backups.mkdir(mode=0o700)
@@ -216,6 +223,54 @@ def test_offsite_marker_rejects_extra_fields_and_public_permissions(tmp_path):
         health.read_offsite_status(marker)
 
 
+def test_database_security_marker_is_required_and_fresh(tmp_path):
+    backups = tmp_path / 'backups'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261014T110000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-14T10:00:00Z')
+    security_marker = tmp_path / 'database-security.json'
+    output = tmp_path / 'public' / 'status.json'
+    output.parent.mkdir(mode=0o755)
+    now = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
+
+    with pytest.raises(health.OperationsHealthError, match='security.*unavailable'):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=now,
+            backup_module=backup,
+            database_security_status=security_marker,
+        )
+    assert json.loads(output.read_text())['status'] == 'degraded'
+
+    database_security_status(security_marker, '2026-10-14T10:00:00Z')
+    security_marker.chmod(0o644)
+    with pytest.raises(health.OperationsHealthError, match='permissions'):
+        health.verify_database_security_freshness(security_marker, 2, now)
+    security_marker.chmod(0o600)
+    assert health.execute(
+        backups,
+        restore,
+        output,
+        now=now,
+        backup_module=backup,
+        database_security_status=security_marker,
+    )['status'] == 'ok'
+
+    database_security_status(security_marker, '2026-10-14T09:59:59Z')
+    with pytest.raises(health.OperationsHealthError, match='security check.*stale'):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=now,
+            backup_module=backup,
+            database_security_status=security_marker,
+        )
+
+
 @pytest.mark.parametrize('value', [0, 337, 'invalid'])
 def test_freshness_windows_are_bounded(value):
     with pytest.raises(Exception, match='age'):
@@ -241,3 +296,28 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert '--offsite-required-after 2026-10-27' in service
     assert '--offsite-max-age-hours 24' in service
     assert 'ReadOnlyPaths=-/var/lib/pcep-db-offsite' in service
+    assert (
+        '--database-security-status /var/lib/pcep-db-security/last-success.json'
+        in service
+    )
+    assert '--database-security-max-age-hours 2' in service
+    assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
+
+
+def test_database_security_timer_is_hourly_networkless_and_marker_only():
+    service = (
+        PROJECT_ROOT / 'ops/systemd/pcep-database-security.service'
+    ).read_text()
+    timer = (
+        PROJECT_ROOT / 'ops/systemd/pcep-database-security.timer'
+    ).read_text()
+
+    assert 'StateDirectory=pcep-db-security' in service
+    assert 'StateDirectoryMode=0700' in service
+    assert 'PrivateNetwork=true' in service
+    assert 'RestrictAddressFamilies=AF_UNIX' in service
+    assert 'CapabilityBoundingSet=' in service
+    assert 'NoNewPrivileges=true' in service
+    assert '--status-file /var/lib/pcep-db-security/last-success.json' in service
+    assert 'OnCalendar=*-*-* *:07:00' in timer
+    assert 'Persistent=true' in timer
