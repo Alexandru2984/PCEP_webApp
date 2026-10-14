@@ -306,6 +306,19 @@ def test_legacy_static_cache_check_activates_at_the_documented_local_deadline():
         smoke.retired_content_paths(datetime(2026, 11, 12))
 
 
+def test_sensitive_route_canaries_cover_encoded_names_and_separators():
+    assert '/%61dmin/login/' in smoke.ADMIN_DENIAL_PATHS
+    assert '/admin%2flogin/' in smoke.ADMIN_DENIAL_PATHS
+    assert '/%72unner.html' in smoke.LEARNER_ORIGIN_RUNNER_DENIAL_PATHS
+    assert '/pyodide%2fVERSION' in smoke.LEARNER_ORIGIN_RUNNER_DENIAL_PATHS
+    assert '/%73tatic/pcep-retired-origin-canary-20261013.txt' in (
+        smoke.RETIRED_CONTENT_CANARY_PATHS
+    )
+    assert '/media%2fpcep-retired-origin-canary-20261013.txt' in (
+        smoke.RETIRED_CONTENT_CANARY_PATHS
+    )
+
+
 def test_operations_health_requires_minimal_fresh_success_and_strict_headers():
     headers = {
         **SHARED_HEADERS,

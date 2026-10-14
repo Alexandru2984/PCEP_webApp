@@ -288,16 +288,27 @@ status=$(curl --http1.1 --insecure --silent --show-error \
     --output /dev/null --write-out '%{http_code}' "$runner_url/api/live/")
 [[ "$status" == 404 ]]
 
-for isolated_path in /runner.html /runner.html/probe /runner-bridge.js /runner-bridge.js/probe /py-worker.js /py-worker.js/probe /pyodide /pyodide/VERSION /pyodide.previous.audit/pyodide.js; do
+for isolated_path in \
+    /runner.html /runner.html/probe /runner-bridge.js \
+    /runner-bridge.js/probe /py-worker.js /py-worker.js/probe \
+    /pyodide /pyodide/VERSION /pyodide.previous.audit/pyodide.js \
+    /%72unner.html /runner.html%2fprobe /%70y-worker.js \
+    /pyodide%2fVERSION /x/../pyodide/VERSION //pyodide/VERSION
+do
     status=$(curl --http1.1 --insecure --silent --show-error \
+        --path-as-is \
         --resolve "pcep.micutu.com:$port:127.0.0.1" \
         --output /dev/null --write-out '%{http_code}' "$base_url$isolated_path")
     [[ "$status" == 404 ]]
 done
 
-for admin_path in /admin /admin/login/; do
+for admin_path in \
+    /admin /admin/login/ /%61dmin/login/ /admin%2flogin/ \
+    /x/../admin/login/ //admin/login/
+do
     admin_label=${admin_path//\//_}
     status=$(curl --http1.1 --insecure --silent --show-error \
+        --path-as-is \
         --resolve "pcep.micutu.com:$port:127.0.0.1" \
         --dump-header "$stage/$admin_label.headers" \
         --output "$stage/$admin_label.body" \
@@ -315,9 +326,16 @@ for admin_path in /admin /admin/login/; do
         -Eqi 'Django administration|admin login' "$stage/$admin_label.body"
 done
 
-for retired_path in /static /static/ /static/admin/css/base.css /media /media/ /media/probe.txt; do
+for retired_path in \
+    /static /static/ /static/admin/css/base.css \
+    /%73tatic/admin/css/base.css /static%2fadmin/css/base.css \
+    /x/../static/admin/css/base.css //static/admin/css/base.css \
+    /media /media/ /media/probe.txt \
+    /%6dedia/probe.txt /media%2fprobe.txt /x/../media/probe.txt //media/probe.txt
+do
     retired_label=${retired_path//\//_}
     status=$(curl --http1.1 --insecure --silent --show-error \
+        --path-as-is \
         --resolve "pcep.micutu.com:$port:127.0.0.1" \
         --dump-header "$stage/$retired_label.headers" \
         --output "$stage/$retired_label.body" \

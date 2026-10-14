@@ -36,9 +36,39 @@ RETIRED_CONTENT_CACHE_DEADLINE = date(2026, 11, 12)
 RETIRED_CONTENT_CANARY_PATHS = (
     '/static/pcep-retired-origin-canary-20261013.txt',
     '/media/pcep-retired-origin-canary-20261013.txt',
+    # CDN and origin parsers must agree that encoded separators and names stay
+    # inside the retired route boundary. These unique canaries are never
+    # legitimate objects, so the checks cannot be masked by an old cache hit.
+    '/%73tatic/pcep-retired-origin-canary-20261013.txt',
+    '/static%2fpcep-retired-origin-canary-20261013.txt',
+    '/%6dedia/pcep-retired-origin-canary-20261013.txt',
+    '/media%2fpcep-retired-origin-canary-20261013.txt',
 )
 RETIRED_CONTENT_LEGACY_PATHS = (
     '/static/admin/css/base.css',
+)
+ADMIN_DENIAL_PATHS = (
+    '/admin/login/',
+    '/%61dmin/login/',
+    '/admin%2flogin/',
+)
+LEARNER_ORIGIN_RUNNER_DENIAL_PATHS = (
+    '/runner.html',
+    '/runner.html/probe',
+    '/runner-bridge.js',
+    '/runner-bridge.js/probe',
+    '/py-worker.js',
+    '/py-worker.js/probe',
+    '/pyodide',
+    '/pyodide/VERSION',
+    '/pyodide.previous.audit/pyodide.js',
+    # Exercise normalization at the Cloudflare-to-Nginx boundary. A decoded
+    # runner filename or slash must remain unavailable on the learner origin.
+    '/%72unner.html',
+    '/runner.html%2fprobe',
+    '/%70y-worker.js',
+    '/pyodide%2fVERSION',
+    '/x/../pyodide/VERSION',
 )
 FORBIDDEN_ANSWER_FIELDS = {
     'is_correct',
@@ -778,8 +808,9 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     releases = set()
     require(runner_origin != origin, 'Python runner still shares the application origin.')
 
-    admin = public_get(origin, '/admin/login/', expected_status=404)
-    check_admin_unavailable(admin)
+    for path in ADMIN_DENIAL_PATHS:
+        admin = public_get(origin, path, expected_status=404)
+        check_admin_unavailable(admin)
 
     for path in retired_content_paths():
         retired = public_get(origin, path, expected_status=404)
@@ -788,17 +819,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
     operations = public_get(origin, '/.well-known/pcep-operations.json')
     check_operations_health(operations)
 
-    for path in (
-        '/runner.html',
-        '/runner.html/probe',
-        '/runner-bridge.js',
-        '/runner-bridge.js/probe',
-        '/py-worker.js',
-        '/py-worker.js/probe',
-        '/pyodide',
-        '/pyodide/VERSION',
-        '/pyodide.previous.audit/pyodide.js',
-    ):
+    for path in LEARNER_ORIGIN_RUNNER_DENIAL_PATHS:
         isolated = public_get(origin, path, expected_status=404)
         check_public_404(isolated, f'Learner-origin runner path {path}')
 
