@@ -351,17 +351,22 @@ sudo install -m 0644 ops/systemd/pcep-db-backup.service /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-backup.timer /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-restore-check.service /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-db-restore-check.timer /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-database-security.service /etc/systemd/system/
+sudo install -m 0644 ops/systemd/pcep-database-security.timer /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-operations-health.service /etc/systemd/system/
 sudo install -m 0644 ops/systemd/pcep-operations-health.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pcep-db-backup.timer
 sudo systemctl enable --now pcep-db-restore-check.timer
+sudo systemctl enable --now pcep-database-security.timer
 sudo systemctl start pcep-db-backup.service
 sudo systemctl start pcep-db-restore-check.service
+sudo systemctl start pcep-database-security.service
 sudo systemctl start pcep-operations-health.service
 sudo systemctl enable --now pcep-operations-health.timer
 systemctl status pcep-db-backup.timer pcep-db-backup.service \
   pcep-db-restore-check.timer pcep-db-restore-check.service \
+  pcep-database-security.timer pcep-database-security.service \
   pcep-operations-health.timer pcep-operations-health.service
 ```
 
@@ -389,10 +394,22 @@ Failed drills never replace that marker. Inspect runs with
 backup-code, PostgreSQL or schema changes; never test a restore over the live
 database.
 
-`pcep-operations-health.timer` runs hourly after the scheduled backup/restore
-windows. Its networkless, unprivileged service verifies all retained local backup
-checksums, requires the newest verified backup to be at most 26 hours old and the
-last successful isolated restore to be at most 170 hours old. Beginning at
+`pcep-database-security.timer` runs hourly at `:07`, with up to five minutes of
+randomized delay. Its networkless, capability-free oneshot uses only the existing
+Docker Unix socket to execute the deploy-time, read-only PostgreSQL role audit. The
+audit requires exact role attributes, memberships, database/schema/object ownership,
+runtime grants and future-object default grants. It atomically refreshes a private
+mode-0600 success marker only after the complete posture passes; a failure preserves
+the prior marker and logs the detailed reason locally. Like the existing backup
+service, it inherits `micu`'s Docker-socket authority, which is equivalent to host
+control. It detects accidental or narrower database drift; it cannot independently
+attest a host or operator account that is already compromised.
+
+`pcep-operations-health.timer` runs hourly after the scheduled backup/restore and
+database-security windows. Its networkless, unprivileged service verifies all
+retained local backup checksums, requires the newest verified backup to be at most
+26 hours old, the last successful isolated restore to be at most 170 hours old and
+the last successful database-role audit to be at most two hours old. Beginning at
 `2026-10-27T00:00:00Z`, it also requires the private offsite success marker to have
 the exact reviewed shape, safe ownership/mode and an age of at most 24 hours. A
 missing, malformed or stale marker deliberately degrades health; this deadline does

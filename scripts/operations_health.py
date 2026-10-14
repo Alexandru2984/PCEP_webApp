@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish a minimal public attestation of PCEP backup and restore freshness."""
+"""Publish minimal PCEP recovery and database-security health."""
 
 import argparse
 from datetime import date, datetime, timedelta, timezone
@@ -86,29 +86,40 @@ def verify_backup_freshness(backup_root, max_age_hours, now, backup_module=None)
     return moment
 
 
-def read_restore_status(path):
+def read_success_status(path, label, private=False):
     status = Path(path).absolute()
     if status.is_symlink() or not status.is_file():
-        raise OperationsHealthError('Restore success status is unavailable.')
+        raise OperationsHealthError(f'{label} status is unavailable.')
     stat = status.stat()
-    if stat.st_uid != os.getuid() or stat.st_mode & 0o022:
-        raise OperationsHealthError('Restore success status permissions are unsafe.')
+    forbidden_mode = 0o077 if private else 0o022
+    if stat.st_uid != os.getuid() or stat.st_mode & forbidden_mode:
+        raise OperationsHealthError(f'{label} status permissions are unsafe.')
     if stat.st_size > MAX_STATUS_BYTES:
-        raise OperationsHealthError('Restore success status is oversized.')
+        raise OperationsHealthError(f'{label} status is oversized.')
     try:
         payload = json.loads(status.read_text())
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise OperationsHealthError('Restore success status is invalid.') from error
+        raise OperationsHealthError(f'{label} status is invalid.') from error
     if not isinstance(payload, dict) or set(payload) != {'schema', 'completed_at'}:
-        raise OperationsHealthError('Restore success status shape is invalid.')
+        raise OperationsHealthError(f'{label} status shape is invalid.')
     if payload['schema'] != 1 or isinstance(payload['schema'], bool):
-        raise OperationsHealthError('Restore success status schema is invalid.')
-    return utc_moment(payload['completed_at'], 'Restore success')
+        raise OperationsHealthError(f'{label} status schema is invalid.')
+    return utc_moment(payload['completed_at'], label)
+
+
+def read_restore_status(path):
+    return read_success_status(path, 'Restore success')
 
 
 def verify_restore_freshness(path, max_age_hours, now):
     moment = read_restore_status(path)
     require_fresh(moment, now, max_age_hours, 'Last isolated restore')
+    return moment
+
+
+def verify_database_security_freshness(path, max_age_hours, now):
+    moment = read_success_status(path, 'Database security success', private=True)
+    require_fresh(moment, now, max_age_hours, 'Last database security check')
     return moment
 
 
@@ -203,11 +214,16 @@ def execute(
     offsite_status=None,
     offsite_required_after=None,
     offsite_max_age_hours=24,
+    database_security_status=None,
+    database_security_max_age_hours=2,
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
     restore_max_age_hours = bounded_hours(restore_max_age_hours)
     offsite_max_age_hours = bounded_hours(offsite_max_age_hours)
+    database_security_max_age_hours = bounded_hours(
+        database_security_max_age_hours
+    )
     if offsite_required_after is not None:
         offsite_required_after = calendar_date(offsite_required_after)
     failures = []
@@ -226,6 +242,15 @@ def execute(
         verify_restore_freshness(restore_status, restore_max_age_hours, moment)
     except OperationsHealthError as error:
         failures.append(str(error))
+    if database_security_status is not None:
+        try:
+            verify_database_security_freshness(
+                database_security_status,
+                database_security_max_age_hours,
+                moment,
+            )
+        except OperationsHealthError as error:
+            failures.append(str(error))
 
     payload = write_public_status(output, 'degraded' if failures else 'ok', moment)
     if failures:
@@ -271,6 +296,10 @@ def main():
     parser.add_argument('--offsite-status', type=Path)
     parser.add_argument('--offsite-required-after', type=calendar_date)
     parser.add_argument('--offsite-max-age-hours', type=bounded_hours, default=24)
+    parser.add_argument('--database-security-status', type=Path)
+    parser.add_argument(
+        '--database-security-max-age-hours', type=bounded_hours, default=2
+    )
     args = parser.parse_args()
     try:
         payload = execute(
@@ -282,6 +311,10 @@ def main():
             offsite_status=args.offsite_status,
             offsite_required_after=args.offsite_required_after,
             offsite_max_age_hours=args.offsite_max_age_hours,
+            database_security_status=args.database_security_status,
+            database_security_max_age_hours=(
+                args.database_security_max_age_hours
+            ),
         )
     except (OperationsHealthError, OSError, ValueError) as error:
         parser.exit(1, f'Operations health degraded: {error}\n')

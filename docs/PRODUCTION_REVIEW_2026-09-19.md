@@ -2881,6 +2881,40 @@ no FAIR estimate is claimed without loss inputs. The CISO verdict is **SHIP WITH
 GUARDRAILS** after tests, reviewed unit installation, a pre-deadline healthy run and
 external production smoke pass.
 
+### Database privilege-drift detection — 2026-10-14
+
+The live database passed the complete least-privilege audit: the application login
+cannot own or create database/schema objects, temporary objects, roles or databases;
+cannot truncate, reference, trigger, replicate, bypass row security or act as
+superuser; and receives only the reviewed table DML and sequence runtime grants.
+The non-login owner and normally disabled migrator retain the exact reviewed
+membership, ownership and default-grant posture. Previously this full control ran
+only at backend deploy, leaving an unbounded detection gap between releases.
+
+An hourly, networkless systemd check now runs the same read-only audit through the
+existing local Docker socket and refreshes only a private atomic success marker.
+The operations-health publisher requires that marker to be no more than two hours
+old; missing, malformed, unsafe, stale or failed evidence produces only the existing
+generic public `degraded` state. The external smoke and incident-issue path consume
+that state. Technical database-drift MTTD is therefore bounded to roughly two to
+three hours for the public signal, plus the external poll; guaranteed human MTTD
+still depends on the separately accepted notification-delivery risk. Because the
+check uses the existing Docker-authorized host user and its marker is same-host, it
+does not claim to detect or attest a compromised host/operator identity.
+
+The top STRIDE risks are tampering with question-bank data, elevation from the
+runtime login to schema ownership and repudiation of an unrecorded privilege change.
+A fully compromised application role can still alter or delete the 308-question
+public bank through required DML, affecting every learner, but cannot alter schema,
+roles or the database itself. Response follows the existing incident runbook:
+isolate the backend, preserve evidence, rotate credentials, restore exact grants and
+validate a backup before reopening. No learner account, server-side progress,
+payment or health data enters scope; if personal data is introduced, the GDPR
+72-hour assessment and the whole threat model must be revisited. No vendor or DPA is
+added. A defensible FAIR/ALE value remains unavailable without business loss inputs.
+The CISO verdict is **SHIP** after tests, live role verification, timer installation,
+fresh-marker publication and external smoke all pass.
+
 ## 15. Breaking changes
 
 None.
