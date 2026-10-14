@@ -294,6 +294,7 @@ def runtime_inspection(image=CANDIDATE_IMAGE, mounts=None, environment=None):
                 'SecurityOpt': ['no-new-privileges:true'],
                 'PidsLimit': 128,
                 'Memory': 512 * 1024 * 1024,
+                'NanoCpus': 2_000_000_000,
                 'Tmpfs': {'/tmp': 'size=64m,mode=1777,noexec,nosuid,nodev'},
                 'PortBindings': {
                     '8000/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '8001'}]
