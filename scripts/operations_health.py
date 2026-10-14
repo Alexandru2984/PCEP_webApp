@@ -37,6 +37,20 @@ def load_database_backup():
     return module
 
 
+def load_installation_verifier():
+    path = Path(__file__).with_name('verify_operations_installation.py')
+    spec = importlib.util.spec_from_file_location(
+        'pcep_operations_installation', path
+    )
+    if spec is None or spec.loader is None:
+        raise OperationsHealthError(
+            'Cannot load the operations installation verifier.'
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def utc_moment(value, label):
     if not isinstance(value, str) or not UTC_TIMESTAMP_PATTERN.fullmatch(value):
         raise OperationsHealthError(f'{label} timestamp is invalid.')
@@ -216,6 +230,8 @@ def execute(
     offsite_max_age_hours=24,
     database_security_status=None,
     database_security_max_age_hours=2,
+    verify_installation=False,
+    installation_module=None,
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
@@ -251,6 +267,14 @@ def execute(
             )
         except OperationsHealthError as error:
             failures.append(str(error))
+    if verify_installation:
+        # Any verifier/import failure is an unhealthy attestation, while the
+        # public marker deliberately remains free of installation details.
+        try:
+            verifier = installation_module or load_installation_verifier()
+            verifier.verify_installation()
+        except Exception:
+            failures.append('Operational installation drift detected.')
 
     payload = write_public_status(output, 'degraded' if failures else 'ok', moment)
     if failures:
@@ -300,6 +324,7 @@ def main():
     parser.add_argument(
         '--database-security-max-age-hours', type=bounded_hours, default=2
     )
+    parser.add_argument('--verify-installation', action='store_true')
     args = parser.parse_args()
     try:
         payload = execute(
@@ -315,6 +340,7 @@ def main():
             database_security_max_age_hours=(
                 args.database_security_max_age_hours
             ),
+            verify_installation=args.verify_installation,
         )
     except (OperationsHealthError, OSError, ValueError) as error:
         parser.exit(1, f'Operations health degraded: {error}\n')

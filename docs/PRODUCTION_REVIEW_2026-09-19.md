@@ -2963,6 +2963,49 @@ data breach likely to risk individuals, the existing GDPR Article 33 assessment 
 72-hour supervisory-authority clock apply. The CISO verdict is **SHIP** after build,
 isolated route tests, CI, configuration backup, deploy and external smoke pass.
 
+### Operational installation-drift detection — 2026-10-14
+
+The reviewed source and live installation previously matched, but that fact was a
+manual point-in-time observation. The hourly operations-health service now checks
+the complete allowlisted installation: 12 required PCEP unit files, six timer
+enablement links with active runtime state and one host-installed SEO generator.
+Unexpected PCEP activation links are rejected. Files must be byte-identical to the
+repository with exact root ownership and modes; security-relevant parent and
+drop-in directories cannot be symlinks or writable by group/others. Unknown PCEP
+units/drop-ins fail closed. The optional offsite service and backup drop-in remain
+valid only as an entirely absent or entirely exact pair, so this control neither
+activates nor weakens the still-gated offsite design.
+
+The top STRIDE risks are tampering with a scheduled unit or generator, repudiation
+of an unrecorded host-only change and denial of service by disabling or redirecting
+a timer. The direct policy blast radius is 12 unit files, six schedules and one
+generator. A missed backup/restore/security check can weaken recovery or privilege
+detection for the entire deployment; a modified generator can mispublish the
+public practice pages derived from the 308-question bank. The verifier reads no
+learner state or production credential and publishes only the existing generic
+`degraded` signal.
+
+Normal drift is detected on the next hourly run and consumed by the twice-hourly
+external smoke. Disabling the health timer itself leaves the public marker stale,
+so technical detection remains bounded to roughly two to three hours including the
+external poll. This is machine MTTD only: guaranteed human MTTD remains unbounded
+until the separately recorded notification-delivery exercise is completed. A fully
+compromised host or repository owner can alter both the implementation and its
+evidence, so this is configuration-drift detection rather than an independent host
+integrity attestation.
+
+Response is to preserve journals and the suspect files, compare them with the
+reviewed commit, restore the exact root-owned installation from the restricted
+release backup, reload systemd, run the standalone verifier, restart the health
+check and repeat the full public smoke before reopening. The human incident
+tabletop remains outstanding and must include malicious timer disablement as well
+as host/provider loss. No new vendor, subprocess credential or personal-data flow
+is introduced. If an incident nevertheless exposes personal data, the existing
+GDPR breach assessment and, where applicable, 72-hour Article 33 clock still apply.
+There are no business loss/frequency inputs from which to calculate a defensible
+FAIR annual loss expectancy. The CISO verdict is **SHIP** after focused/full tests,
+CI, backed-up unit installation, live verifier success and external smoke pass.
+
 ## 15. Breaking changes
 
 None.
