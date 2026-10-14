@@ -1303,6 +1303,20 @@ The exact `/manifest.webmanifest` location supplies
 `application/manifest+json`; the stock Nginx MIME table otherwise serves that
 extension as `application/octet-stream` and browsers may ignore installation
 metadata.
+
+The exact `/.well-known/security.txt` location publishes the RFC 9116 pointer to
+GitHub private vulnerability reporting and must never use the SPA fallback. The
+release publisher permits only `.well-known/security.txt` beneath a hidden path;
+all other dotfiles remain rejected. Before its atomic directory swap, the publisher
+copies the reviewed file atomically into the currently live release. The external
+backup and immediate rollback therefore retain the disclosure channel even on the
+first deployment; an unsafe live `.well-known` symlink or non-directory aborts the
+publication. Its `Expires` value is an intentional renewal gate: update it to a UTC
+timestamp less than 365 days ahead, review that the private-advisory form and policy
+links still work, and deploy before the smoke's 30-day renewal window begins ahead
+of `2027-10-01T00:00:00Z`. The twice-hourly production smoke treats an expiry inside
+that window, a cacheable or non-canonical document, a public-issue contact or an
+HTML response as a production incident.
 Cloudflare initially imposed its four-hour default TTL on plain no-cache
 JavaScript responses. Public GET/HEAD requests now report BYPASS with the stronger
 policy; verify both origin and public cache headers after each deployment. Common headers cover worker, SEO,

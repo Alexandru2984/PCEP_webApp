@@ -31,6 +31,7 @@ trap cleanup EXIT
 nginx_image=${NGINX_TEST_IMAGE:-nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236}
 mkdir -p "$stage/certs" "$stage/snippets" "$stage/frontend/pyodide" \
     "$stage/operations-health" \
+    "$stage/frontend/.well-known" \
     "$stage/frontend/pyodide.previous.audit" "$stage/static/admin/css" \
     "$stage/media"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=pcep.micutu.com' -keyout "$stage/certs/privkey.pem" -out "$stage/certs/fullchain.pem" 2>/dev/null
@@ -38,6 +39,8 @@ cp "$root"/nginx/snippets/pcep-*.conf "$stage/snippets/"
 cp "$root/frontend/public/runner.html" "$root/frontend/public/runner-bridge.js" \
     "$root/frontend/public/py-worker.js" "$stage/frontend/"
 cp "$root/frontend/index.html" "$stage/frontend/index.html"
+cp "$root/frontend/public/.well-known/security.txt" \
+    "$stage/frontend/.well-known/security.txt"
 # The Ops job intentionally does not download the 12 MB runtime. This fixture
 # exercises Nginx routing only; fetch/build and production smoke verify the real
 # pinned runtime independently.
@@ -198,6 +201,29 @@ status=$(curl --http1.1 --insecure --silent --show-error \
     --resolve "pcep.micutu.com:$port:127.0.0.1" \
     --request POST --output /dev/null --write-out '%{http_code}' \
     "$base_url/.well-known/pcep-operations.json")
+[[ "$status" == 403 ]]
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --dump-header "$stage/security-txt.headers" \
+    --output "$stage/security-txt.body" \
+    --write-out '%{http_code}' "$base_url/.well-known/security.txt")
+[[ "$status" == 200 ]]
+tr -d '\r' < "$stage/security-txt.headers" \
+    > "$stage/security-txt.headers.clean"
+grep -Fqi 'Content-Type: text/plain' "$stage/security-txt.headers.clean"
+grep -Fqi 'Cache-Control: no-cache, no-store, must-revalidate' \
+    "$stage/security-txt.headers.clean"
+grep -Fqi "Content-Security-Policy: default-src 'none'; frame-ancestors 'none'" \
+    "$stage/security-txt.headers.clean"
+assert_absent 'security.txt Set-Cookie header' \
+    -Eqi '^Set-Cookie:' "$stage/security-txt.headers.clean"
+cmp "$root/frontend/public/.well-known/security.txt" "$stage/security-txt.body"
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --request POST --output /dev/null --write-out '%{http_code}' \
+    "$base_url/.well-known/security.txt")
 [[ "$status" == 403 ]]
 
 # SPA fallback must retain the original path for detection without logging the
@@ -407,4 +433,4 @@ assert_absent 'rate-limit error-log query string' \
 assert_absent 'API upstream error-log query string' \
     -Fq 'audit-api-error-query' "$stage/pcep-error.log"
 
-printf '%s\n' 'Nginx syntax, isolated runner, disabled admin/static/media and generated API error contracts: OK'
+printf '%s\n' 'Nginx syntax, disclosure metadata, isolated runner, disabled admin/static/media and generated API error contracts: OK'

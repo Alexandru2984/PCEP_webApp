@@ -27,7 +27,8 @@ def use_fixture_runtime_hashes(monkeypatch):
 def complete_frontend_release(root):
     files = [
         'index.html', 'sw.js', 'runner.html', 'runner-bridge.js', 'py-worker.js',
-        'manifest.webmanifest', 'pyodide/VERSION', 'pyodide/pyodide.js',
+        'manifest.webmanifest', '.well-known/security.txt',
+        'pyodide/VERSION', 'pyodide/pyodide.js',
         'pyodide/pyodide.asm.js', 'pyodide/pyodide.asm.wasm',
         'pyodide/pyodide-lock.json', 'pyodide/python_stdlib.zip',
     ]

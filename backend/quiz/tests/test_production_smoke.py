@@ -356,6 +356,63 @@ def test_operations_health_requires_minimal_fresh_success_and_strict_headers():
         )
 
 
+def test_security_txt_requires_private_canonical_fresh_disclosure_metadata():
+    headers = {
+        **SHARED_HEADERS,
+        'cache-control': 'no-cache, no-store, must-revalidate',
+        'content-type': 'text/plain',
+        'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+        'x-request-id': 'a' * 32,
+    }
+    body = b'''Contact: https://github.com/Alexandru2984/PCEP_webApp/security/advisories/new
+Expires: 2027-10-01T00:00:00Z
+Preferred-Languages: en, ro
+Canonical: https://pcep.micutu.com/.well-known/security.txt
+Policy: https://github.com/Alexandru2984/PCEP_webApp/security/policy
+'''
+    now = datetime(2026, 10, 14, 12, tzinfo=timezone.utc)
+    fields = smoke.check_security_txt(response(headers, body), now=now)
+    assert fields['Contact'].endswith('/security/advisories/new')
+
+    invalid_bodies = [
+        body.replace(b'2027-10-01', b'2026-10-01'),
+        body.replace(b'2027-10-01', b'2026-11-01'),
+        body.replace(b'2027-10-01', b'2027-10-15'),
+        body.replace(b'/security/advisories/new', b'/issues/new'),
+        body.replace(
+            b'Canonical: https://pcep.micutu.com/.well-known/security.txt\n',
+            b'',
+        ),
+        body.replace(b'en, ro', b'ro, en'),
+    ]
+    for invalid in invalid_bodies:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_security_txt(response(headers, invalid), now=now)
+
+    for invalid in [
+        response({**headers, 'content-type': 'text/html'}, body),
+        response({**headers, 'cache-control': 'public, max-age=86400'}, body),
+        response({**headers, 'set-cookie': 'session=secret'}, body),
+    ]:
+        with pytest.raises(smoke.SmokeError):
+            smoke.check_security_txt(invalid, now=now)
+
+
+def test_tracked_security_txt_is_current_and_matches_the_public_contract():
+    headers = {
+        **SHARED_HEADERS,
+        'cache-control': 'no-store',
+        'content-type': 'text/plain',
+        'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+        'x-request-id': 'a' * 32,
+    }
+    source = (
+        Path(__file__).resolve().parents[3]
+        / 'frontend/public/.well-known/security.txt'
+    ).read_bytes()
+    smoke.check_security_txt(response(headers, source))
+
+
 def test_runner_headers_forbid_credentials_and_cross_origin_resources():
     headers = {
         'strict-transport-security': 'max-age=31536000; includeSubDomains',

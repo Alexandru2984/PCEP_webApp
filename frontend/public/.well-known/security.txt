@@ -1,0 +1,5 @@
+Contact: https://github.com/Alexandru2984/PCEP_webApp/security/advisories/new
+Expires: 2027-10-01T00:00:00Z
+Preferred-Languages: en, ro
+Canonical: https://pcep.micutu.com/.well-known/security.txt
+Policy: https://github.com/Alexandru2984/PCEP_webApp/security/policy

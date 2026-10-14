@@ -32,6 +32,14 @@ WEBSITE_ID_PATTERN = re.compile(
 UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 OPERATIONS_STATUS_MAX_AGE = timedelta(hours=2)
 OPERATIONS_FUTURE_TOLERANCE = timedelta(minutes=5)
+SECURITY_TXT_MAX_BYTES = 4096
+SECURITY_TXT_MIN_VALIDITY = timedelta(days=30)
+SECURITY_TXT_MAX_VALIDITY = timedelta(days=365)
+SECURITY_TXT_CONTACT = (
+    'https://github.com/Alexandru2984/PCEP_webApp/security/advisories/new'
+)
+SECURITY_TXT_CANONICAL = 'https://pcep.micutu.com/.well-known/security.txt'
+SECURITY_TXT_POLICY = 'https://github.com/Alexandru2984/PCEP_webApp/security/policy'
 RETIRED_CONTENT_CACHE_DEADLINE = date(2026, 11, 12)
 RETIRED_CONTENT_CANARY_PATHS = (
     '/static/pcep-retired-origin-canary-20261013.txt',
@@ -466,6 +474,84 @@ def check_operations_health(response, now=None):
     return payload
 
 
+def check_security_txt(response, now=None):
+    label = 'Vulnerability disclosure document'
+    check_shared_security_headers(response, label)
+    require('no-store' in response.headers.get('cache-control', ''), f'{label} is cacheable.')
+    require(
+        response.headers.get('content-type', '').lower().startswith('text/plain'),
+        f'{label} did not return plain text.',
+    )
+    require('set-cookie' not in response.headers, f'{label} sets a cookie.')
+    require(
+        csp_directives(response.headers.get('content-security-policy', ''))
+        == {
+            'default-src': ["'none'"],
+            'frame-ancestors': ["'none'"],
+        },
+        f'{label} CSP drifted.',
+    )
+    require(
+        REQUEST_ID_PATTERN.fullmatch(response.headers.get('x-request-id', ''))
+        is not None,
+        f'{label} has an invalid request ID.',
+    )
+    require(
+        0 < len(response.body) <= SECURITY_TXT_MAX_BYTES
+        and response.body.endswith(b'\n')
+        and b'\r' not in response.body,
+        f'{label} has invalid framing.',
+    )
+    try:
+        lines = response.body.decode('utf-8').splitlines()
+    except UnicodeDecodeError as error:
+        raise SmokeError(f'{label} is not valid UTF-8.') from error
+    expected_names = [
+        'Contact',
+        'Expires',
+        'Preferred-Languages',
+        'Canonical',
+        'Policy',
+    ]
+    fields = []
+    for line in lines:
+        name, separator, value = line.partition(': ')
+        require(separator and name and value, f'{label} has a malformed field.')
+        fields.append((name, value))
+    require(
+        [name for name, _value in fields] == expected_names,
+        f'{label} fields drifted.',
+    )
+    values = dict(fields)
+    require(values['Contact'] == SECURITY_TXT_CONTACT, f'{label} contact drifted.')
+    require(
+        values['Preferred-Languages'] == 'en, ro',
+        f'{label} preferred languages drifted.',
+    )
+    require(
+        values['Canonical'] == SECURITY_TXT_CANONICAL,
+        f'{label} canonical URL drifted.',
+    )
+    require(values['Policy'] == SECURITY_TXT_POLICY, f'{label} policy URL drifted.')
+    require(
+        UTC_TIMESTAMP_PATTERN.fullmatch(values['Expires']) is not None,
+        f'{label} has an invalid expiry.',
+    )
+    try:
+        expires = datetime.strptime(values['Expires'], '%Y-%m-%dT%H:%M:%SZ').replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as error:
+        raise SmokeError(f'{label} has an invalid expiry.') from error
+    current = now or datetime.now(timezone.utc)
+    require(current.tzinfo is not None, 'Smoke-check time must include a timezone.')
+    validity = expires - current.astimezone(timezone.utc)
+    require(validity > timedelta(0), f'{label} has expired.')
+    require(validity >= SECURITY_TXT_MIN_VALIDITY, f'{label} expires too soon.')
+    require(validity < SECURITY_TXT_MAX_VALIDITY, f'{label} expiry is too distant.')
+    return values
+
+
 def check_runner_headers(response, label):
     require(
         response.headers.get('strict-transport-security', '').startswith('max-age='),
@@ -816,6 +902,9 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         retired = public_get(origin, path, expected_status=404)
         check_public_404(retired, f'Retired learner-origin route {path}')
 
+    disclosure = public_get(origin, '/.well-known/security.txt')
+    check_security_txt(disclosure)
+
     operations = public_get(origin, '/.well-known/pcep-operations.json')
     check_operations_health(operations)
 
@@ -928,6 +1017,7 @@ def run(origin, runner_origin=DEFAULT_RUNNER_ORIGIN):
         'static_media': 'disabled',
         'runner': 'isolated',
         'analytics': 'consent-gated-integrity-pinned',
+        'disclosure': 'private-rfc9116',
         'recovery': 'externally-monitored',
     }
 
@@ -962,6 +1052,7 @@ def main(argv=None):
         f'static_media={result["static_media"]} '
         f'runner={result["runner"]} '
         f'analytics={result["analytics"]} '
+        f'disclosure={result["disclosure"]} '
         f'recovery={result["recovery"]} '
         f'targeted_order={",".join(map(str, result["targeted_order"]))}'
     )
