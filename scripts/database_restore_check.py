@@ -19,10 +19,12 @@ import uuid
 DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
 DEFAULT_SOURCE_CONTAINER = 'pcep_db'
 DEFAULT_RESTORE_CONTAINER = 'pcep_db_restore_check'
+DEFAULT_LOCK_ROOT = Path('/var/lib/pcep-db-restore-check')
 RESTORE_IMAGE_PROFILE = 'pcep-postgres-16-v1'
 RESTORE_CONTAINER_LABEL = 'com.pcep.restore-drill'
 CONTAINER_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$')
 CONTAINER_ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
+OWNERSHIP_TOKEN_PATTERN = re.compile(r'^[0-9a-f]{32}$')
 IMAGE_ID_PATTERN = re.compile(r'^sha256:[0-9a-f]{64}$')
 IMAGE_REFERENCE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$')
 POSTGRES_VERSION_PATTERN = re.compile(r'^postgres \(PostgreSQL\) (?P<major>\d+)(?:\.\d+)*$')
@@ -79,6 +81,21 @@ SELECT json_build_object(
 
 class RestoreCheckError(RuntimeError):
     pass
+
+
+def load_operation_lock():
+    path = Path(__file__).with_name('operation_lock.py')
+    spec = importlib.util.spec_from_file_location('pcep_operation_lock', path)
+    if spec is None or spec.loader is None:
+        raise RestoreCheckError('Cannot load the operation-lock implementation.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+operation_lock = load_operation_lock()
+OperationLockError = operation_lock.OperationLockError
+exclusive_operation_lock = operation_lock.exclusive_operation_lock
 
 
 def load_database_backup():
@@ -273,10 +290,17 @@ def select_restore_image(source_container, fallback_image=None, runner=run_comma
     return fallback_id, True
 
 
-def docker_run_command(container, image_id):
+def validate_ownership_token(value):
+    if not isinstance(value, str) or not OWNERSHIP_TOKEN_PATTERN.fullmatch(value):
+        raise RestoreCheckError('Invalid restore ownership token.')
+    return value
+
+
+def docker_run_command(container, image_id, ownership_token):
     validate_container_name(container, 'restore')
     if not IMAGE_ID_PATTERN.fullmatch(image_id):
         raise RestoreCheckError('Invalid restore image ID.')
+    validate_ownership_token(ownership_token)
     return [
         'docker',
         'run',
@@ -284,7 +308,7 @@ def docker_run_command(container, image_id):
         '--name',
         container,
         '--label',
-        f'{RESTORE_CONTAINER_LABEL}=true',
+        f'{RESTORE_CONTAINER_LABEL}={ownership_token}',
         '--network',
         'none',
         '--user',
@@ -326,10 +350,16 @@ def docker_run_command(container, image_id):
     ]
 
 
-def owned_restore_container_id(container, image_id, runner=run_command):
+def owned_restore_container_id(
+    container,
+    image_id,
+    ownership_token,
+    runner=run_command,
+):
     validate_container_name(container, 'restore')
     if not IMAGE_ID_PATTERN.fullmatch(image_id):
         raise RestoreCheckError('Invalid restore image ID.')
+    validate_ownership_token(ownership_token)
     result = runner(
         [
             'docker',
@@ -357,8 +387,10 @@ def owned_restore_container_id(container, image_id, runner=run_command):
         ) from error
     if not isinstance(labels, dict):
         raise RestoreCheckError('Disposable restore container labels are invalid.')
-    if labels.get(RESTORE_CONTAINER_LABEL) != 'true':
-        raise RestoreCheckError('Refusing to remove an unowned restore container.')
+    if labels.get(RESTORE_CONTAINER_LABEL) != ownership_token:
+        raise RestoreCheckError(
+            'Refusing to remove a restore container owned by another run.'
+        )
     if lines[1] != image_id:
         raise RestoreCheckError(
             'Refusing to remove a restore container with another image.'
@@ -371,11 +403,17 @@ def owned_restore_container_id(container, image_id, runner=run_command):
 def remove_owned_restore_container(
     container,
     image_id,
+    ownership_token,
     runner=run_command,
     *,
     missing_ok=False,
 ):
-    container_id = owned_restore_container_id(container, image_id, runner)
+    container_id = owned_restore_container_id(
+        container,
+        image_id,
+        ownership_token,
+        runner,
+    )
     if container_id is None:
         if missing_ok:
             return False
@@ -384,11 +422,12 @@ def remove_owned_restore_container(
     return True
 
 
-def best_effort_restore_cleanup(container, image_id, runner):
+def best_effort_restore_cleanup(container, image_id, ownership_token, runner):
     try:
         remove_owned_restore_container(
             container,
             image_id,
+            ownership_token,
             runner,
             missing_ok=True,
         )
@@ -403,21 +442,48 @@ def best_effort_restore_cleanup(container, image_id, runner):
 
 
 @contextmanager
-def disposable_restore_container(container, image_id, runner=run_command):
+def disposable_restore_container(
+    container,
+    image_id,
+    runner=run_command,
+    *,
+    ownership_token=None,
+):
+    ownership_token = validate_ownership_token(
+        ownership_token if ownership_token is not None else uuid.uuid4().hex
+    )
     try:
-        runner(docker_run_command(container, image_id), timeout=60)
+        runner(
+            docker_run_command(container, image_id, ownership_token),
+            timeout=60,
+        )
     except BaseException:
         # docker may have created the container even if the detached client
         # times out or is interrupted before returning its ID.
-        best_effort_restore_cleanup(container, image_id, runner)
+        best_effort_restore_cleanup(
+            container,
+            image_id,
+            ownership_token,
+            runner,
+        )
         raise
     try:
         yield
     except BaseException:
-        best_effort_restore_cleanup(container, image_id, runner)
+        best_effort_restore_cleanup(
+            container,
+            image_id,
+            ownership_token,
+            runner,
+        )
         raise
     else:
-        remove_owned_restore_container(container, image_id, runner)
+        remove_owned_restore_container(
+            container,
+            image_id,
+            ownership_token,
+            runner,
+        )
 
 
 def container_logs(container):
@@ -660,7 +726,7 @@ def write_success_status(path, now=None):
         temporary.unlink(missing_ok=True)
 
 
-def execute(
+def _execute_unlocked(
     backup_root,
     source_container,
     restore_container,
@@ -694,6 +760,30 @@ def execute(
         f"{metrics['migrations']} migrations."
     )
     return backup, image_id, metrics
+
+
+def execute(
+    backup_root,
+    source_container,
+    restore_container,
+    fallback_image=None,
+    status_file=None,
+    lock_root=None,
+):
+    try:
+        with exclusive_operation_lock(
+            'database-restore-check',
+            root=lock_root if lock_root is not None else DEFAULT_LOCK_ROOT,
+        ):
+            return _execute_unlocked(
+                backup_root,
+                source_container,
+                restore_container,
+                fallback_image,
+                status_file,
+            )
+    except OperationLockError as error:
+        raise RestoreCheckError(str(error)) from error
 
 
 def interrupted(signum, _frame):
