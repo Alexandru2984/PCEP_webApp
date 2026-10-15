@@ -56,7 +56,13 @@ def installation(tmp_path, include_offsite=False):
     return project, installed_root, seo_installed
 
 
-def verify(project, installed_root, seo_installed, active_timer_check=None):
+def verify(
+    project,
+    installed_root,
+    seo_installed,
+    active_timer_check=None,
+    failed_service_check=None,
+):
     return verification.verify_installation(
         project,
         installed_root,
@@ -64,6 +70,7 @@ def verify(project, installed_root, seo_installed, active_timer_check=None):
         expected_uid=os.getuid(),
         expected_gid=os.getgid(),
         active_timer_check=active_timer_check or (lambda _name: True),
+        failed_service_check=failed_service_check or (lambda _name: False),
     )
 
 
@@ -143,6 +150,29 @@ def test_rejects_inactive_timer_or_unexpected_activation(tmp_path):
         match='Unexpected PCEP systemd activation',
     ):
         verify(project, installed_root, seo_installed)
+
+
+def test_rejects_failed_scheduled_service_but_not_current_publisher(tmp_path):
+    project, installed_root, seo_installed = installation(tmp_path)
+    inspected = []
+
+    def failed(name):
+        inspected.append(name)
+        return name == 'pcep-seo-pages.service'
+
+    with pytest.raises(
+        verification.OperationsInstallationError,
+        match='Scheduled PCEP service is failed: pcep-seo-pages.service',
+    ):
+        verify(
+            project,
+            installed_root,
+            seo_installed,
+            failed_service_check=failed,
+        )
+
+    assert 'pcep-operations-health.service' not in inspected
+    assert 'pcep-db-offsite.service' not in inspected
 
 
 def test_rejects_partial_offsite_or_unexpected_pcep_unit(tmp_path):

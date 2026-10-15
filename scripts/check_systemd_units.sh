@@ -8,7 +8,7 @@ unit_root="$root/ops/systemd"
 
 die() { echo "systemd-check: $*" >&2; exit 1; }
 
-for command in cp find install mktemp sort systemd-analyze; do
+for command in cp find grep install mktemp sort systemd-analyze; do
     command -v "$command" >/dev/null 2>&1 || die "$command is required."
 done
 [[ -d "$unit_root" && ! -L "$unit_root" ]] \
@@ -46,6 +46,24 @@ done < <(
         | sort -z
 )
 (( ${#units[@]} > 0 )) || die 'no systemd units found.'
+
+# Every executable service gets the same conservative syscall baseline. Units
+# that already have a private network namespace also retain a cgroup IP deny as
+# defense in depth; networked retention/offsite jobs declare narrower policies.
+for unit in "${units[@]}"; do
+    [[ "$unit" == *.service ]] || continue
+    grep -Fqx 'SystemCallFilter=@system-service' "$unit_root/$unit" \
+        || die "missing syscall allowlist: $unit"
+    grep -Fqx 'SystemCallErrorNumber=EPERM' "$unit_root/$unit" \
+        || die "missing syscall refusal policy: $unit"
+    if grep -Fqx 'PrivateNetwork=true' "$unit_root/$unit"; then
+        grep -Fqx 'IPAddressDeny=any' "$unit_root/$unit" \
+            || die "networkless service lacks an IP deny: $unit"
+    fi
+done
+
+grep -Fqx 'UMask=0077' "$unit_root/pcep-operations-health.service" \
+    || die 'operations health must create private files by default.'
 
 dropin_count=0
 while IFS= read -r -d '' dropin; do

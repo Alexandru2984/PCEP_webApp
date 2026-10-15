@@ -369,6 +369,7 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
         PROJECT_ROOT / 'ops/systemd/pcep-operations-health.service'
     ).read_text()
 
+    assert 'UMask=0077' in service
     assert 'StateDirectoryMode=0750' in service
     assert 'Group=www-data' in service
     assert (
@@ -392,6 +393,9 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert '--verify-nginx-installation' in service
     assert '--verify-container-runtime' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
+    assert 'IPAddressDeny=any' in service
+    assert 'SystemCallFilter=@system-service' in service
+    assert 'SystemCallErrorNumber=EPERM' in service
 
 
 def test_database_security_timer_is_hourly_networkless_and_marker_only():
