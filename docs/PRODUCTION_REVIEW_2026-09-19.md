@@ -3179,6 +3179,44 @@ frequency and loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after fu
 CI, backed-up unit installation, representative live service runs, improved live
 exposure scores, healthy operations publication and external smoke pass.
 
+### Restore-drill startup cleanup — 2026-10-15
+
+A controlled restore run exposed a Docker failure mode in which the daemon created
+and ran the disposable database container but the detached client did not return
+before its 60-second timeout. The previous context manager had not yet reached its
+cleanup block, so the dead named container remained and would have made every later
+scheduled drill fail on a name collision. Startup and interrupted-body failures now
+perform best-effort cleanup as well as the existing successful path. Cleanup first
+requires the exact drill label and expected immutable image ID, then removes the
+container by its validated 64-hex-character ID. It refuses an unlabelled,
+same-named or different-image container.
+
+The top STRIDE risks are denial of service from an orphan blocking future recovery
+tests, tampering or destructive cleanup through deliberate container-name squatting,
+and repudiation or false recovery confidence when no new success marker can be
+written. The direct cleanup blast radius is one disposable, networkless container
+and one weekly schedule. The recovery-confidence blast radius includes the newest
+local backup and all 308 questions it should restore; neither cleanup nor the drill
+connects to or removes the production database, backup files or application
+containers.
+
+A failed service state is retained immediately. The hourly health publisher checks
+both that state and the bounded-age success marker, and the twice-hourly external
+smoke consumes the generic result, giving normal machine MTTD about one hour plus
+the poll, or two to three hours if the publisher itself stops. Guaranteed human
+MTTD remains unbounded until notification delivery is confirmed. Response is to
+preserve the service and Docker journals, inspect label/image/ID without printing
+environment values, remove only a proven drill container, rerun the isolated restore
+and then republish health. The incident tabletop must exercise both a client timeout
+after daemon-side creation and a hostile same-name container.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+incident exposes personal data, the existing breach assessment and applicable GDPR
+Article 33 72-hour clock remain mandatory. No defensible FAIR/ALE estimate exists
+without incident-frequency and business-loss inputs. The CISO verdict is **SHIP
+WITH GUARDRAILS** after focused and full tests, live restore/cleanup verification,
+fresh healthy publication, full CI and external production smoke.
+
 ## 15. Breaking changes
 
 None.
