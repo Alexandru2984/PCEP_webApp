@@ -398,14 +398,18 @@ source (legacy `pcep_user` or separated `pcep_owner`), migrations, the
 one-correct-choice index and every question's
 four-choice/one-answer invariants,
 then verifies the source checksum again, atomically records only the successful UTC
-completion time under `/var/lib/pcep-db-restore-check/`, and removes the container.
-Cleanup re-inspects the container label and exact expected image, resolves its
-immutable container ID, and removes only that ID. The same ownership-checked,
-best-effort cleanup runs if `docker run --detach` times out or is interrupted after
-the daemon has already created the container; a same-named container without the
-reviewed label and image is never removed. Failed drills never replace the success
-marker. If cleanup itself cannot be confirmed, preserve `docker inspect` and the
-unit journal before manually removing anything. Inspect runs with
+completion time under the private mode-`0700`
+`/var/lib/pcep-db-restore-check/`, and removes the container. Scheduled and manual
+drills share a non-blocking lock in that systemd state directory; a concurrent run
+is refused before backup or Docker inspection. Each admitted run adds a new random
+128-bit ownership token to the container. Cleanup requires that exact token and
+expected image, resolves the immutable container ID, and removes only that ID. The
+same ownership-checked, best-effort cleanup runs if `docker run --detach` times out
+or is interrupted after the daemon has already created the container; a same-named
+container from another restore run, or one without the exact token and image, is
+never removed. Failed drills never replace the success marker. If cleanup itself
+cannot be confirmed, preserve `docker inspect` and the unit journal before manually
+removing anything. Inspect runs with
 `journalctl -u pcep-db-restore-check.service`. Repeat the drill directly after
 backup-code, PostgreSQL or schema changes; never test a restore over the live
 database.

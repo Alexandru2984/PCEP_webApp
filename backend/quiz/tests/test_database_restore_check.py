@@ -189,7 +189,10 @@ def test_refuses_unreviewed_or_secret_bearing_fallbacks():
 
 def test_restore_container_command_is_ephemeral_and_isolated():
     image_id = f"sha256:{'b' * 64}"
-    command = restore.docker_run_command('pcep_db_restore_check', image_id)
+    ownership_token = 'a' * 32
+    command = restore.docker_run_command(
+        'pcep_db_restore_check', image_id, ownership_token
+    )
 
     assert command[-1] == image_id
     assert command[command.index('--network') + 1] == 'none'
@@ -199,6 +202,7 @@ def test_restore_container_command_is_ephemeral_and_isolated():
     assert '/var/lib/postgresql/data:rw,noexec,nosuid,nodev,size=256m,mode=0700,uid=70,gid=70' in command
     assert 'PCEP_OWNER_ROLE=pcep_owner' in command
     assert 'PCEP_MIGRATOR_USER=pcep_migrator' in command
+    assert f'{restore.RESTORE_CONTAINER_LABEL}={ownership_token}' in command
     assert not {'--publish', '-p', '--volume', '-v'} & set(command)
 
 
@@ -206,12 +210,13 @@ def test_disposable_container_is_removed_after_a_failed_check():
     calls = []
     image_id = f"sha256:{'c' * 64}"
     container_id = 'd' * 64
+    ownership_token = 'a' * 32
 
     def runner(command, **_kwargs):
         calls.append(command)
         if command[:3] == ['docker', 'inspect', '--type']:
             metadata = (
-                json.dumps({restore.RESTORE_CONTAINER_LABEL: 'true'})
+                json.dumps({restore.RESTORE_CONTAINER_LABEL: ownership_token})
                 + f'\n{image_id}\n{container_id}\n'
             )
             return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
@@ -219,7 +224,10 @@ def test_disposable_container_is_removed_after_a_failed_check():
 
     with pytest.raises(RuntimeError, match='synthetic failure'):
         with restore.disposable_restore_container(
-            'pcep_db_restore_check', image_id, runner
+            'pcep_db_restore_check',
+            image_id,
+            runner,
+            ownership_token=ownership_token,
         ):
             raise RuntimeError('synthetic failure')
 
@@ -230,6 +238,7 @@ def test_start_timeout_removes_a_created_owned_container():
     calls = []
     image_id = f"sha256:{'c' * 64}"
     container_id = 'e' * 64
+    ownership_token = 'b' * 32
 
     def runner(command, **_kwargs):
         calls.append(command)
@@ -237,7 +246,7 @@ def test_start_timeout_removes_a_created_owned_container():
             raise restore.RestoreCheckError('Command timed out: docker')
         if command[:3] == ['docker', 'inspect', '--type']:
             metadata = (
-                json.dumps({restore.RESTORE_CONTAINER_LABEL: 'true'})
+                json.dumps({restore.RESTORE_CONTAINER_LABEL: ownership_token})
                 + f'\n{image_id}\n{container_id}\n'
             )
             return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
@@ -245,40 +254,51 @@ def test_start_timeout_removes_a_created_owned_container():
 
     with pytest.raises(restore.RestoreCheckError, match='timed out'):
         with restore.disposable_restore_container(
-            'pcep_db_restore_check', image_id, runner
+            'pcep_db_restore_check',
+            image_id,
+            runner,
+            ownership_token=ownership_token,
         ):
             pytest.fail('startup failure must not yield')
 
     assert calls[-1] == ['docker', 'rm', '--force', container_id]
 
 
-def test_start_failure_does_not_remove_an_unowned_same_named_container(capsys):
+def test_start_failure_does_not_remove_another_runs_same_named_container(capsys):
     calls = []
     image_id = f"sha256:{'c' * 64}"
+    ownership_token = 'c' * 32
+    other_token = 'd' * 32
 
     def runner(command, **_kwargs):
         calls.append(command)
         if command[:2] == ['docker', 'run']:
             raise restore.RestoreCheckError('name is already in use')
         if command[:3] == ['docker', 'inspect', '--type']:
-            metadata = json.dumps({'owner': 'other'}) + f'\n{image_id}\n{"f" * 64}\n'
+            metadata = (
+                json.dumps({restore.RESTORE_CONTAINER_LABEL: other_token})
+                + f'\n{image_id}\n{"f" * 64}\n'
+            )
             return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
         raise AssertionError(command)
 
     with pytest.raises(restore.RestoreCheckError, match='already in use'):
         with restore.disposable_restore_container(
-            'pcep_db_restore_check', image_id, runner
+            'pcep_db_restore_check',
+            image_id,
+            runner,
+            ownership_token=ownership_token,
         ):
             pytest.fail('startup failure must not yield')
 
     assert not any(command[:3] == ['docker', 'rm', '--force'] for command in calls)
-    assert 'Refusing to remove an unowned restore container' in capsys.readouterr().err
+    assert 'owned by another run' in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
     ('labels', 'actual_image', 'container_id', 'message'),
     [
-        ({'owner': 'other'}, None, 'f' * 64, 'unowned'),
+        ({'owner': 'other'}, None, 'f' * 64, 'owned by another run'),
         (
             {restore.RESTORE_CONTAINER_LABEL: 'true'},
             f"sha256:{'a' * 64}",
@@ -300,6 +320,9 @@ def test_cleanup_requires_exact_label_image_and_immutable_id(
     message,
 ):
     image_id = f"sha256:{'c' * 64}"
+    ownership_token = 'e' * 32
+    if labels.get(restore.RESTORE_CONTAINER_LABEL) == 'true':
+        labels = {restore.RESTORE_CONTAINER_LABEL: ownership_token}
     metadata = (
         json.dumps(labels)
         + f'\n{actual_image or image_id}\n{container_id}\n'
@@ -311,8 +334,40 @@ def test_cleanup_requires_exact_label_image_and_immutable_id(
 
     with pytest.raises(restore.RestoreCheckError, match=message):
         restore.owned_restore_container_id(
-            'pcep_db_restore_check', image_id, runner
+            'pcep_db_restore_check',
+            image_id,
+            ownership_token,
+            runner,
         )
+
+
+def test_restore_check_refuses_a_concurrent_run(tmp_path, monkeypatch):
+    lock_root = tmp_path / 'locks'
+    monkeypatch.setattr(
+        restore,
+        '_execute_unlocked',
+        lambda *_args, **_kwargs: pytest.fail(
+            'A locked restore check must not inspect backups or Docker.'
+        ),
+    )
+
+    with restore.exclusive_operation_lock(
+        'database-restore-check',
+        root=lock_root,
+    ):
+        with pytest.raises(restore.RestoreCheckError, match='already running'):
+            restore.execute(
+                tmp_path,
+                'pcep_db',
+                'pcep_db_restore_check',
+                lock_root=lock_root,
+            )
+
+
+@pytest.mark.parametrize('token', ['', 'short', '../escape', 'g' * 32, 'a' * 33])
+def test_rejects_unsafe_restore_ownership_tokens(token):
+    with pytest.raises(restore.RestoreCheckError, match='ownership token'):
+        restore.validate_ownership_token(token)
 
 
 def test_validates_restored_schema_and_question_integrity():

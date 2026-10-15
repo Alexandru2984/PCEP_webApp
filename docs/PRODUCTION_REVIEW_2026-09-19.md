@@ -3326,6 +3326,52 @@ business-loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused
 full tests, live private-lock validation, both production dry-runs, full CI and
 external production smoke.
 
+### Restore-drill concurrency ownership — 2026-10-15
+
+The restore drill's startup-timeout cleanup previously proved only a generic drill
+label plus the expected image and fixed container name. Two legitimate overlapping
+runs therefore looked identical: when the second `docker run` failed on the name
+collision, its recovery path could inspect and remove the first run's active
+container. The systemd timer serializes its own unit, but it does not serialize a
+simultaneous manual invocation.
+
+Scheduled and manual drills now share a non-blocking lock in the service's private
+mode-`0700` state directory. Each admitted run also generates a distinct validated
+128-bit token and places it in the Docker ownership label before creation. Every
+success, body-failure and startup-timeout cleanup requires that exact token, the
+expected immutable image ID and a valid full container ID before removal. A
+same-named container carrying another legitimate run's token is explicitly refused,
+preserving defense in depth if a caller bypasses the cooperating lock.
+
+The top STRIDE risks are tampering through cross-run deletion, denial of service
+when the weekly recovery proof is interrupted or blocked, and repudiation/false
+recovery confidence if one run reports another run's resource state. The direct
+blast radius is one networkless disposable container bounded to 768 MiB and 128
+PIDs. The recovery-confidence radius is the newest verified daily backup and all
+308 questions it must restore; the production database, application containers and
+backup files are never removal targets.
+
+A cooperating collision is detected synchronously before backup or Docker
+inspection, giving immediate machine and interactive MTTD. Token mismatch is also
+detected during cleanup and retained in the private unit journal. The hourly health
+publisher and twice-hourly external poll detect a failed scheduled result or stale
+success marker in roughly one to three hours, but guaranteed human MTTD remains
+unbounded until notification delivery is confirmed.
+
+Response is to preserve both journals/command outputs, inspect only label, image and
+immutable ID without printing environment values, let the legitimate holder finish,
+then rerun the refused drill and republish health. Never delete an active lock or
+remove a mismatched container. The incident tabletop must cover timer versus manual
+invocation, startup timeout after daemon-side creation, and a same-name container
+with another valid drill token.
+
+No vendor, credential, subprocessor, DPA or new personal-data flow is added. If a
+wider incident exposes personal data, breach assessment and the applicable GDPR
+Article 33 72-hour notification clock remain mandatory. FAIR/ALE cannot be defended
+without incident-frequency, active-user and business-loss inputs. The CISO verdict
+is **SHIP WITH GUARDRAILS** after focused/full tests, exact live service execution,
+healthy publication, full CI and external production smoke.
+
 ## 15. Breaking changes
 
 None.
