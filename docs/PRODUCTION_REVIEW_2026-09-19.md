@@ -3135,6 +3135,50 @@ frequency and business-loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS**
 after full CI, backed-up root installation, isolated/live verification, Nginx reload
 and external production smoke pass.
 
+### Scheduled-service syscall containment — 2026-10-15
+
+All seven repository-owned systemd services now use the positive
+`@system-service` syscall set and return `EPERM` for denied calls. The five
+networkless worker services also combine their existing private network namespace
+with `IPAddressDeny=any`; the health publisher changes its default umask from 0027
+to 0077 while retaining the explicit mode-0600 marker and named Nginx ACL. The
+networked analytics and optional offsite services keep only their already reviewed
+loopback/public address policies. Repository validation fails if any service loses
+the syscall controls or a networkless unit loses its IP deny.
+
+Compatibility was exercised with a real Docker-socket database-role audit, a
+loopback Umami retention transaction that was explicitly rolled back, and the
+installed Go rclone binary. On systemd 259 the offline exposure scores fall from
+2.1–2.7 to 0.6–1.6 across the seven definitions; these scores are a comparative
+hardening signal, not proof of isolation. The hourly installation verifier now also
+rejects a failed state for every installed scheduled PCEP oneshot except its own
+currently executing publisher. A timer can therefore no longer appear healthy
+while its most recent analytics, backup, restore, database-security or SEO job is
+failed.
+
+The top STRIDE risks are elevation of privilege through an unnecessary kernel
+interface, tampering or data loss after a failed maintenance job is overlooked, and
+denial of service from an allowlist that blocks a legitimate runtime call. The
+direct policy blast radius is seven service definitions and six enabled schedules;
+the operational blast radius includes the two public origins, all 308 questions,
+local recovery copies and the bounded Umami data set. A denied call fails the job
+immediately and enters its private journal. The hourly publisher detects retained
+failed states, and the external poll consumes the generic result; normal machine
+MTTD is therefore roughly one hour plus the poll, or two to three hours if the
+publisher itself stops. Guaranteed human MTTD remains unbounded pending notification
+delivery confirmation.
+
+Response is to preserve the unit journal and exact installed bytes, distinguish a
+malicious policy change from a legitimate `EPERM`, and restore the prior reviewed
+unit before `daemon-reload` if compatibility is not proved. The incident tabletop
+must include both a hidden failed timer job and an attempted forbidden syscall. No
+vendor, credential, subprocessor, DPA or personal-data flow is added. If an incident
+exposes personal data, the existing breach assessment and applicable GDPR Article
+33 72-hour clock remain mandatory. No defensible FAIR/ALE estimate exists without
+frequency and loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after full
+CI, backed-up unit installation, representative live service runs, improved live
+exposure scores, healthy operations publication and external smoke pass.
+
 ## 15. Breaking changes
 
 None.

@@ -143,6 +143,27 @@ def timer_is_active(name):
     return result.returncode == 0
 
 
+def service_is_failed(name):
+    try:
+        result = subprocess.run(
+            ['/usr/bin/systemctl', 'is-failed', '--quiet', name],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise OperationsInstallationError(
+            f'Cannot query the failure state of {name}.'
+        ) from error
+    if result.returncode not in {0, 1}:
+        raise OperationsInstallationError(
+            f'Cannot query the failure state of {name}.'
+        )
+    return result.returncode == 0
+
+
 def verify_installation(
     project_root=PROJECT_ROOT,
     systemd_root=SYSTEMD_ROOT,
@@ -150,6 +171,7 @@ def verify_installation(
     expected_uid=0,
     expected_gid=0,
     active_timer_check=None,
+    failed_service_check=None,
 ):
     project_root = Path(project_root).resolve()
     source_root = project_root / 'ops/systemd'
@@ -244,6 +266,22 @@ def verify_installation(
             )
         if not active_timer_check(name):
             raise OperationsInstallationError(f'{name} must be active.')
+
+    # The publisher is executing inside its own service, so inspect the other
+    # scheduled jobs only. A failed oneshot remains failed until a later
+    # successful run and must not hide behind an active timer.
+    failed_service_check = failed_service_check or service_is_failed
+    monitored_services = {
+        name
+        for name in installed_files
+        if name.endswith('.service')
+        and name != 'pcep-operations-health.service'
+    }
+    for name in sorted(monitored_services):
+        if failed_service_check(name):
+            raise OperationsInstallationError(
+                f'Scheduled PCEP service is failed: {name}'
+            )
 
     expected_activations = {
         f'timers.target.wants/{name}' for name in timers

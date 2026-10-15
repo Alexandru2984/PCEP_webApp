@@ -446,6 +446,25 @@ public status without publishing a path, hash or policy detail. This detects an
 accidental or narrower origin-policy change; like every same-host verifier, it
 cannot independently attest an already compromised root account.
 
+All seven repository service definitions use systemd's `@system-service` syscall
+allowlist and return `EPERM` for a denied call. This keeps ordinary filesystem,
+process, timer, IPC and network I/O needed by Python, Docker and rclone while
+excluding debug, module, mount, raw-I/O, reboot and swap syscall classes. Every
+`PrivateNetwork=true` service also has `IPAddressDeny=any`, so accidental namespace
+weakening does not silently restore IP access. Operations health uses `UMask=0077`;
+its explicit mode-0600 marker plus the named Nginx ACL remain the only publication
+path. `scripts/check_systemd_units.sh` fails if any service loses the syscall policy
+or if a networkless service loses its IP deny.
+
+The installation verifier also rejects a failed state on every installed scheduled
+PCEP service except the operations-health service currently executing it. This
+prevents an active timer from masking a failed analytics-retention, backup, restore,
+database-security, SEO-generation or activated offsite oneshot. The private journal
+retains the service-specific failure; the public status remains only `degraded`.
+After a denied syscall, preserve the unit journal, identify the exact `EPERM`, test a
+minimal reviewed allowance if it is genuinely required, and never replace the
+allowlist with a broad denylist or `SystemCallFilter=` reset.
+
 Run `make verify-operations-installation` after every operational install and
 before/after a systemd rollback. When a reviewed unit changes, first preserve the
 currently installed file in the restricted release backup, then install the new
