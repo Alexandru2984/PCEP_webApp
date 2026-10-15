@@ -443,7 +443,10 @@ systemd grants only the named Nginx user the ACL `user:www-data:r--`; no general
 group or other read permission is granted. The service runs as `micu:www-data`, so
 only the publisher can write it and Nginx can read it. On any validation failure it
 still publishes the generic state
-`degraded`, logs the private reason locally and exits nonzero. The public exact
+`degraded`, logs the private reason locally and exits nonzero. Verifier exceptions
+are retained only in that private journal as one control-character-free line with
+the detail bounded to 512 characters; the public JSON remains the same three-field
+document. The public exact
 route `/.well-known/pcep-operations.json` is GET-only, no-store and deny-all CSP;
 it never exposes file names, counts, hashes, ages or error details.
 
@@ -480,7 +483,8 @@ The installation verifier also rejects a failed state on every installed schedul
 PCEP service except the operations-health service currently executing it. This
 prevents an active timer from masking a failed analytics-retention, backup, restore,
 database-security, SEO-generation or activated offsite oneshot. The private journal
-retains the service-specific failure; the public status remains only `degraded`.
+retains the service-specific failure, exact mismatched reviewed path or sanitized
+runtime-policy diagnostic; the public status remains only `degraded`.
 After a denied syscall, preserve the unit journal, identify the exact `EPERM`, test a
 minimal reviewed allowance if it is genuinely required, and never replace the
 allowlist with a broad denylist or `SystemCallFilter=` reset.

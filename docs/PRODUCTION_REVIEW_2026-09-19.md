@@ -3461,6 +3461,48 @@ The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full regression tests
 real two-generation publication probe, live SEO regeneration, full CI and external
 production smoke.
 
+### Private operations-health diagnostics — 2026-10-15
+
+Operations health correctly published only a generic three-field `degraded` marker,
+but its three verifier wrappers also discarded the underlying installation, Nginx
+or container-runtime exception before the service journal was written. The live
+degraded interval observed on 2026-10-15 demonstrated the operational gap: external
+monitoring could identify the unhealthy window, while the retained journal could
+not reconstruct which reviewed path, scheduled unit or runtime assertion caused it.
+
+Verifier failures now keep their existing generic category plus the underlying
+sanitized verifier message in the private service exception. Control characters and
+newlines are collapsed, empty errors fall back to their class name and detail is
+bounded to 512 characters. The public marker remains exactly `schema`, `status` and
+`checked_at`; tests inject recognizable diagnostic canaries and prove they appear in
+the private exception but never in the public file. The verifiers themselves emit
+allowlisted paths, unit/container roles and policy assertions, never environment
+values, credentials or raw Docker stderr.
+
+The top STRIDE risks are repudiation when failure evidence is discarded, tampering
+that remains hard to localize across several attested surfaces, and denial of
+service prolonged by diagnosis without an actionable component. The diagnostic
+blast radius covers 12 reviewed units, six timers, two Nginx vhosts, six snippets,
+two containers and one network. Public disclosure remains three non-sensitive JSON
+fields, and no new reader, network route or journal permission is introduced.
+
+The hourly publisher still gives at most roughly one hour machine MTTD for scheduled
+drift, while twice-hourly external smoke detects the generic degraded marker in at
+most 30 minutes. Once an operator reaches the journal, component-level diagnosis is
+available in that same failed invocation instead of being unbounded; guaranteed
+human MTTD remains unbounded until notification delivery is confirmed. Response is
+to preserve the exact journal and installed bytes, compare only the named surface
+with its reviewed source, restore or isolate it, rerun its standalone verifier and
+then republish health. The tabletop must cover a unit hash mismatch, a failed
+scheduled oneshot, container isolation drift and multiline/oversized exception text.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. A wider
+incident involving personal data still requires breach assessment and the applicable
+GDPR Article 33 72-hour notification clock. FAIR/ALE is not defensible without
+incident-frequency, response-time and business-loss inputs. The CISO verdict is
+**SHIP WITH GUARDRAILS** after focused/full tests, a controlled private/public
+canary, full CI, live health publication and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

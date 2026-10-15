@@ -18,6 +18,7 @@ BACKUP_PATTERN = re.compile(r'^pcep_db_daily_(\d{8}T\d{6}Z)\.sql\.gz$')
 UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 MAX_STATUS_BYTES = 256
 MAX_OFFSITE_STATUS_BYTES = 512
+MAX_PRIVATE_DIAGNOSTIC_CHARS = 512
 FUTURE_TOLERANCE = timedelta(minutes=5)
 OFFSITE_REMOTE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
 SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
@@ -25,6 +26,19 @@ SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
 
 class OperationsHealthError(RuntimeError):
     pass
+
+
+def private_diagnostic(label, error):
+    """Bound one journal-only verifier error without control-character injection."""
+    raw = str(error)
+    printable = ''.join(
+        character if character.isprintable() else ' '
+        for character in raw
+    )
+    detail = ' '.join(printable.split()) or error.__class__.__name__
+    if len(detail) > MAX_PRIVATE_DIAGNOSTIC_CHARS:
+        detail = f'{detail[:MAX_PRIVATE_DIAGNOSTIC_CHARS - 3]}...'
+    return f'{label}: {detail}'
 
 
 def load_database_backup():
@@ -305,8 +319,13 @@ def execute(
         try:
             verifier = installation_module or load_installation_verifier()
             verifier.verify_installation()
-        except Exception:
-            failures.append('Operational installation drift detected.')
+        except Exception as error:
+            failures.append(
+                private_diagnostic(
+                    'Operational installation drift detected',
+                    error,
+                )
+            )
     if verify_nginx_installation:
         # Nginx file or activation drift is private; the public marker exposes
         # only the same generic degraded state as every other failed control.
@@ -316,8 +335,13 @@ def execute(
                 or load_nginx_installation_verifier()
             )
             verifier.verify_installation()
-        except Exception:
-            failures.append('Nginx installation drift detected.')
+        except Exception as error:
+            failures.append(
+                private_diagnostic(
+                    'Nginx installation drift detected',
+                    error,
+                )
+            )
     if verify_container_runtime:
         # Container inspection errors remain in the private service journal;
         # the public marker reveals no runtime metadata or environment values.
@@ -326,8 +350,13 @@ def execute(
                 container_runtime_module or load_container_runtime_verifier()
             )
             verifier.verify_container_runtime()
-        except Exception:
-            failures.append('Container runtime drift detected.')
+        except Exception as error:
+            failures.append(
+                private_diagnostic(
+                    'Container runtime drift detected',
+                    error,
+                )
+            )
 
     payload = write_public_status(output, 'degraded' if failures else 'ok', moment)
     if failures:
