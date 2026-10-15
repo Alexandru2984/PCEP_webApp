@@ -3544,6 +3544,54 @@ backup-growth, storage-failure and business-loss inputs. The CISO verdict is
 **SHIP WITH GUARDRAILS** after failure-injection/full tests, read-only live inventory,
 full CI, healthy publication and exact-SHA external smoke.
 
+### Crash-durable release-snapshot pruning — 2026-10-15
+
+Frontend release retention recursively removed each validated old snapshot but did
+not flush the directory containing that removed tree. Atomic namespace operations
+do not by themselves make the deletion durable. A power, kernel or storage failure
+could therefore resurrect a fully or partly removed snapshot after the command had
+advanced or reported success, leaving disk use and recovery inventory different
+from the reviewed plan.
+
+Every selected tree removal is now followed immediately by an `fsync` of its exact
+resolved parent, opened read-only with directory and no-follow protections where
+the platform exposes them. An open, type-check or flush failure aborts before the
+next tree. Existing allowlists, symlink refusal, current-contract validation,
+non-blocking publisher lock and minimum two-valid-snapshot floor remain unchanged.
+The live root is never a removal candidate.
+
+The top STRIDE risks are denial of service through unexpectedly persistent release
+trees and eventual disk exhaustion, repudiation when reported reclaimed space does
+not survive a crash, and tampering/recovery confusion from a resurfaced partial
+tree. The read-only production plan found eight rollback roots and eight external
+copies: five valid snapshots per location remain protected while three plus three
+old candidates totaling 98.7 MiB are eligible. At any interruption, only the one
+tree whose removal is in progress can lack a durable outcome; the live release and
+the five retained snapshots in each location are outside the deletion set.
+
+An open or `fsync` failure is synchronous and stops the command, giving immediate
+machine and invoking-operator MTTD. A crash that exposes latent storage behavior is
+visible on the next retention dry-run or disk-capacity check, but no dedicated
+snapshot-resurrection alert exists, so guaranteed machine and human MTTD for that
+latent case are unbounded until monitoring and alert delivery are confirmed. Live
+availability continues to be covered by hourly health and twice-hourly external
+smoke, but those signals do not attest old snapshot inventory.
+
+Response is to preserve the command, filesystem and kernel journals, run retention
+again without `--apply`, validate live and retained roots, compare only exact
+allowlisted candidates, restore disk headroom, then apply the reviewed plan again.
+Never use a broad recursive delete or remove an unvalidated tree. The incident
+tabletop must cover failure after the first recursive removal, parent-directory
+`fsync` failure and power loss before and after that flush.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+host incident exposes personal data, breach assessment and the applicable GDPR
+Article 33 72-hour notification clock remain mandatory. FAIR/ALE is not defensible
+without storage-failure frequency, disk-growth, active-user and business-loss
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after failure-injection/full
+tests, a read-only live inventory, full CI, healthy publication and exact-SHA
+external smoke.
+
 ## 15. Breaking changes
 
 None.
