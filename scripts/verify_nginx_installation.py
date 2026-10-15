@@ -43,7 +43,12 @@ def require_source(path, label):
         raise ValueError(f'{label} source must be a regular file: {path}')
 
 
-def verify_installation(project_root, nginx_root, expected_uid=0, expected_gid=0):
+def verify_installation(
+    project_root=PROJECT_ROOT,
+    nginx_root=Path('/etc/nginx'),
+    expected_uid=0,
+    expected_gid=0,
+):
     project_root = Path(project_root).resolve()
     nginx_root = Path(nginx_root).absolute()
 

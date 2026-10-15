@@ -51,6 +51,20 @@ def load_installation_verifier():
     return module
 
 
+def load_nginx_installation_verifier():
+    path = Path(__file__).with_name('verify_nginx_installation.py')
+    spec = importlib.util.spec_from_file_location(
+        'pcep_nginx_installation', path
+    )
+    if spec is None or spec.loader is None:
+        raise OperationsHealthError(
+            'Cannot load the Nginx installation verifier.'
+        )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def load_container_runtime_verifier():
     path = Path(__file__).with_name('verify_container_runtime.py')
     spec = importlib.util.spec_from_file_location(
@@ -246,6 +260,8 @@ def execute(
     database_security_max_age_hours=2,
     verify_installation=False,
     installation_module=None,
+    verify_nginx_installation=False,
+    nginx_installation_module=None,
     verify_container_runtime=False,
     container_runtime_module=None,
 ):
@@ -291,6 +307,17 @@ def execute(
             verifier.verify_installation()
         except Exception:
             failures.append('Operational installation drift detected.')
+    if verify_nginx_installation:
+        # Nginx file or activation drift is private; the public marker exposes
+        # only the same generic degraded state as every other failed control.
+        try:
+            verifier = (
+                nginx_installation_module
+                or load_nginx_installation_verifier()
+            )
+            verifier.verify_installation()
+        except Exception:
+            failures.append('Nginx installation drift detected.')
     if verify_container_runtime:
         # Container inspection errors remain in the private service journal;
         # the public marker reveals no runtime metadata or environment values.
@@ -351,6 +378,7 @@ def main():
         '--database-security-max-age-hours', type=bounded_hours, default=2
     )
     parser.add_argument('--verify-installation', action='store_true')
+    parser.add_argument('--verify-nginx-installation', action='store_true')
     parser.add_argument('--verify-container-runtime', action='store_true')
     args = parser.parse_args()
     try:
@@ -368,6 +396,7 @@ def main():
                 args.database_security_max_age_hours
             ),
             verify_installation=args.verify_installation,
+            verify_nginx_installation=args.verify_nginx_installation,
             verify_container_runtime=args.verify_container_runtime,
         )
     except (OperationsHealthError, OSError, ValueError) as error:
