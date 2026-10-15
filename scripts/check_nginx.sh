@@ -2,7 +2,10 @@
 # Isolated syntax check with disposable certificates; never reloads host Nginx.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-stage=$(mktemp -d)
+probe_token="$(tr -d '-' </proc/sys/kernel/random/uuid)"
+[[ "$probe_token" =~ ^[0-9a-f]{32}$ ]]
+probe_label='com.pcep.nginx-check'
+stage=$(mktemp -d /tmp/pcep-nginx-check.XXXXXX)
 container=''
 
 assert_absent() {
@@ -22,10 +25,53 @@ assert_absent() {
 }
 
 cleanup() {
-    if [[ -n "$container" ]]; then
-        docker rm -f "$container" >/dev/null 2>&1 || true
+    local exit_code=$?
+    local cleanup_error=0
+    local candidates candidate_id owner remaining
+
+    if candidates="$(
+        docker container ls --all --quiet --no-trunc \
+            --filter "label=$probe_label=$probe_token" 2>/dev/null
+    )"; then
+        while IFS= read -r candidate_id; do
+            [[ -n "$candidate_id" ]] || continue
+            [[ "$candidate_id" =~ ^[0-9a-f]{64}$ ]] || continue
+            owner="$(
+                docker container inspect \
+                    --format '{{ index .Config.Labels "com.pcep.nginx-check" }}' \
+                    "$candidate_id" 2>/dev/null || true
+            )"
+            if [[ "$owner" == "$probe_token" ]]; then
+                docker rm -f "$candidate_id" >/dev/null 2>&1 \
+                    || cleanup_error=1
+            else
+                cleanup_error=1
+            fi
+        done <<<"$candidates"
+    else
+        cleanup_error=1
     fi
-    rm -rf "$stage"
+    if [[ "$stage" =~ ^/tmp/pcep-nginx-check\.[A-Za-z0-9]{6}$ \
+        && -d "$stage" && ! -L "$stage" ]]; then
+        rm -rf -- "$stage" || cleanup_error=1
+        [[ ! -e "$stage" ]] || cleanup_error=1
+    else
+        printf 'Nginx check refused unsafe temporary cleanup: %s\n' "$stage" >&2
+        cleanup_error=1
+    fi
+    if remaining="$(
+        docker container ls --all --quiet --no-trunc \
+            --filter "label=$probe_label=$probe_token" 2>/dev/null
+    )"; then
+        [[ -z "$remaining" ]] || cleanup_error=1
+    else
+        cleanup_error=1
+    fi
+    if ((cleanup_error != 0)); then
+        printf 'Nginx check could not prove complete disposable cleanup.\n' >&2
+        ((exit_code != 0)) || return 1
+    fi
+    return "$exit_code"
 }
 trap cleanup EXIT
 nginx_image=${NGINX_TEST_IMAGE:-nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236}
@@ -160,7 +206,15 @@ head -c 70000 /dev/zero | tr '\0' x > "$stage/oversized.json"
     head -c 9000 /dev/zero | tr '\0' x
     printf '\n'
 } > "$stage/accept-over-limit.header"
-container=$(docker run -d --rm -p 127.0.0.1::443 "${mounts[@]}" "$nginx_image")
+container=$(docker run -d --rm \
+    --label "$probe_label=$probe_token" \
+    -p 127.0.0.1::443 "${mounts[@]}" "$nginx_image")
+[[ "$container" =~ ^[0-9a-f]{64}$ ]]
+[[ $(
+    docker container inspect \
+        --format '{{ index .Config.Labels "com.pcep.nginx-check" }}' \
+        "$container"
+) == "$probe_token" ]]
 port=$(docker port "$container" 443/tcp)
 port=${port##*:}
 base_url="https://pcep.micutu.com:$port"
