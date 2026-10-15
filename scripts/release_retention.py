@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 
 
 RELEASE_KINDS = {'frontend', 'static'}
@@ -136,6 +137,23 @@ def human_bytes(size):
         value /= 1024
 
 
+def fsync_directory(path):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, 'O_CLOEXEC', 0)
+        | getattr(os, 'O_DIRECTORY', 0)
+    )
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise ValueError(f'Release snapshot parent is not a directory: {path}')
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def remove_snapshot(path, parent, pattern):
     parent = Path(parent).resolve()
     path = Path(path)
@@ -147,6 +165,9 @@ def remove_snapshot(path, parent, pattern):
     ):
         raise ValueError(f'Refusing to remove unsafe release snapshot: {path}')
     shutil.rmtree(path)
+    # Commit this namespace change before attempting another snapshot. A crash
+    # must not resurrect an untracked, potentially partial release tree.
+    fsync_directory(parent)
 
 
 def _execute_unlocked(target, backup_root, keep=5, apply=False, validator=None):

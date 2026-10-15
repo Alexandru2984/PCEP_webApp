@@ -814,8 +814,11 @@ and reports allocated space without following symlinks. Invalid or obsolete
 snapshots are selected for removal rather than consuming the rollback floor; the
 command refuses all pruning unless at least two valid snapshots remain in each
 location. It cannot select database dumps, `security-*` directories or other
-backup files. After reviewing every listed path, apply the exact plan explicitly
-with:
+backup files. After each selected tree is removed, the utility fsyncs that exact
+parent directory before advancing. A flush failure stops the run before the next
+snapshot, so a completed removal cannot be reported while its namespace change is
+still only in volatile cache. After reviewing every listed path, apply the exact
+plan explicitly with:
 
 ```bash
 backend/.venv/bin/python scripts/release_retention.py \

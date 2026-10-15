@@ -96,7 +96,7 @@ def test_retention_refuses_a_concurrent_publish(tmp_path):
     assert len(list(target.parent.glob('.frontend.previous-*'))) == 7
 
 
-def test_apply_only_removes_matching_old_frontend_snapshots(tmp_path):
+def test_apply_only_removes_matching_old_frontend_snapshots(tmp_path, monkeypatch):
     target, backup_root, suffixes = snapshot_roots(tmp_path)
     security = backup_root / 'security-20260918'
     database = backup_root / 'pcep_db_20260925.sql.gz'
@@ -104,6 +104,12 @@ def test_apply_only_removes_matching_old_frontend_snapshots(tmp_path):
     security.mkdir()
     database.write_text('database backup')
     static.mkdir()
+    flushed = []
+    monkeypatch.setattr(
+        retention,
+        'fsync_directory',
+        lambda path: flushed.append(Path(path)),
+    )
 
     retention.execute(target, backup_root, keep=5, apply=True)
 
@@ -112,6 +118,25 @@ def test_apply_only_removes_matching_old_frontend_snapshots(tmp_path):
     assert security.is_dir()
     assert database.read_text() == 'database backup'
     assert static.is_dir()
+    assert flushed == [target.parent] * 2 + [backup_root] * 2
+
+
+def test_directory_fsync_failure_stops_before_the_next_removal(
+    tmp_path, monkeypatch
+):
+    target, backup_root, _suffixes = snapshot_roots(tmp_path, count=4)
+
+    def fail_fsync(_path):
+        raise OSError('simulated directory fsync failure')
+
+    monkeypatch.setattr(retention, 'fsync_directory', fail_fsync)
+
+    with pytest.raises(OSError, match='directory fsync failure'):
+        retention.execute(target, backup_root, keep=2, apply=True)
+
+    assert target.is_dir()
+    assert len(list(target.parent.glob('.frontend.previous-*'))) == 3
+    assert len(list(backup_root.glob('frontend.*'))) == 4
 
 
 def test_invalid_new_snapshots_are_not_counted_as_retained_rollbacks(tmp_path):
