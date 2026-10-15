@@ -20,7 +20,9 @@ DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
 DEFAULT_SOURCE_CONTAINER = 'pcep_db'
 DEFAULT_RESTORE_CONTAINER = 'pcep_db_restore_check'
 RESTORE_IMAGE_PROFILE = 'pcep-postgres-16-v1'
+RESTORE_CONTAINER_LABEL = 'com.pcep.restore-drill'
 CONTAINER_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$')
+CONTAINER_ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
 IMAGE_ID_PATTERN = re.compile(r'^sha256:[0-9a-f]{64}$')
 IMAGE_REFERENCE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}$')
 POSTGRES_VERSION_PATTERN = re.compile(r'^postgres \(PostgreSQL\) (?P<major>\d+)(?:\.\d+)*$')
@@ -282,7 +284,7 @@ def docker_run_command(container, image_id):
         '--name',
         container,
         '--label',
-        'com.pcep.restore-drill=true',
+        f'{RESTORE_CONTAINER_LABEL}=true',
         '--network',
         'none',
         '--user',
@@ -324,13 +326,98 @@ def docker_run_command(container, image_id):
     ]
 
 
+def owned_restore_container_id(container, image_id, runner=run_command):
+    validate_container_name(container, 'restore')
+    if not IMAGE_ID_PATTERN.fullmatch(image_id):
+        raise RestoreCheckError('Invalid restore image ID.')
+    result = runner(
+        [
+            'docker',
+            'inspect',
+            '--type',
+            'container',
+            '--format',
+            '{{json .Config.Labels}}\n{{.Image}}\n{{.Id}}',
+            container,
+        ],
+        timeout=30,
+        check=False,
+    )
+    if result.returncode:
+        return None
+
+    lines = result.stdout.splitlines()
+    if len(lines) != 3:
+        raise RestoreCheckError('Disposable restore container metadata is invalid.')
+    try:
+        labels = json.loads(lines[0])
+    except json.JSONDecodeError as error:
+        raise RestoreCheckError(
+            'Disposable restore container labels are invalid.'
+        ) from error
+    if not isinstance(labels, dict):
+        raise RestoreCheckError('Disposable restore container labels are invalid.')
+    if labels.get(RESTORE_CONTAINER_LABEL) != 'true':
+        raise RestoreCheckError('Refusing to remove an unowned restore container.')
+    if lines[1] != image_id:
+        raise RestoreCheckError(
+            'Refusing to remove a restore container with another image.'
+        )
+    if not CONTAINER_ID_PATTERN.fullmatch(lines[2]):
+        raise RestoreCheckError('Disposable restore container ID is invalid.')
+    return lines[2]
+
+
+def remove_owned_restore_container(
+    container,
+    image_id,
+    runner=run_command,
+    *,
+    missing_ok=False,
+):
+    container_id = owned_restore_container_id(container, image_id, runner)
+    if container_id is None:
+        if missing_ok:
+            return False
+        raise RestoreCheckError('Disposable restore container is missing during cleanup.')
+    runner(['docker', 'rm', '--force', container_id], timeout=60)
+    return True
+
+
+def best_effort_restore_cleanup(container, image_id, runner):
+    try:
+        remove_owned_restore_container(
+            container,
+            image_id,
+            runner,
+            missing_ok=True,
+        )
+    except RestoreCheckError as error:
+        # Preserve the initiating failure. Ownership checks above prevent this
+        # recovery path from deleting a same-named container it did not create.
+        print(
+            f'Warning: disposable restore cleanup failed: {error}',
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 @contextmanager
 def disposable_restore_container(container, image_id, runner=run_command):
-    runner(docker_run_command(container, image_id), timeout=60)
+    try:
+        runner(docker_run_command(container, image_id), timeout=60)
+    except BaseException:
+        # docker may have created the container even if the detached client
+        # times out or is interrupted before returning its ID.
+        best_effort_restore_cleanup(container, image_id, runner)
+        raise
     try:
         yield
-    finally:
-        runner(['docker', 'rm', '--force', container], timeout=60)
+    except BaseException:
+        best_effort_restore_cleanup(container, image_id, runner)
+        raise
+    else:
+        remove_owned_restore_container(container, image_id, runner)
 
 
 def container_logs(container):

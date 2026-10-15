@@ -389,7 +389,13 @@ one-correct-choice index and every question's
 four-choice/one-answer invariants,
 then verifies the source checksum again, atomically records only the successful UTC
 completion time under `/var/lib/pcep-db-restore-check/`, and removes the container.
-Failed drills never replace that marker. Inspect runs with
+Cleanup re-inspects the container label and exact expected image, resolves its
+immutable container ID, and removes only that ID. The same ownership-checked,
+best-effort cleanup runs if `docker run --detach` times out or is interrupted after
+the daemon has already created the container; a same-named container without the
+reviewed label and image is never removed. Failed drills never replace the success
+marker. If cleanup itself cannot be confirmed, preserve `docker inspect` and the
+unit journal before manually removing anything. Inspect runs with
 `journalctl -u pcep-db-restore-check.service`. Repeat the drill directly after
 backup-code, PostgreSQL or schema changes; never test a restore over the live
 database.

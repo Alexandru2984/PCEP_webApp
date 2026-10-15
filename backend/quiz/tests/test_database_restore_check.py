@@ -204,19 +204,115 @@ def test_restore_container_command_is_ephemeral_and_isolated():
 
 def test_disposable_container_is_removed_after_a_failed_check():
     calls = []
+    image_id = f"sha256:{'c' * 64}"
+    container_id = 'd' * 64
 
     def runner(command, **_kwargs):
         calls.append(command)
+        if command[:3] == ['docker', 'inspect', '--type']:
+            metadata = (
+                json.dumps({restore.RESTORE_CONTAINER_LABEL: 'true'})
+                + f'\n{image_id}\n{container_id}\n'
+            )
+            return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
         return SimpleNamespace(returncode=0, stdout='', stderr='')
 
-    image_id = f"sha256:{'c' * 64}"
     with pytest.raises(RuntimeError, match='synthetic failure'):
         with restore.disposable_restore_container(
             'pcep_db_restore_check', image_id, runner
         ):
             raise RuntimeError('synthetic failure')
 
-    assert calls[-1] == ['docker', 'rm', '--force', 'pcep_db_restore_check']
+    assert calls[-1] == ['docker', 'rm', '--force', container_id]
+
+
+def test_start_timeout_removes_a_created_owned_container():
+    calls = []
+    image_id = f"sha256:{'c' * 64}"
+    container_id = 'e' * 64
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        if command[:2] == ['docker', 'run']:
+            raise restore.RestoreCheckError('Command timed out: docker')
+        if command[:3] == ['docker', 'inspect', '--type']:
+            metadata = (
+                json.dumps({restore.RESTORE_CONTAINER_LABEL: 'true'})
+                + f'\n{image_id}\n{container_id}\n'
+            )
+            return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
+        return SimpleNamespace(returncode=0, stdout='', stderr='')
+
+    with pytest.raises(restore.RestoreCheckError, match='timed out'):
+        with restore.disposable_restore_container(
+            'pcep_db_restore_check', image_id, runner
+        ):
+            pytest.fail('startup failure must not yield')
+
+    assert calls[-1] == ['docker', 'rm', '--force', container_id]
+
+
+def test_start_failure_does_not_remove_an_unowned_same_named_container(capsys):
+    calls = []
+    image_id = f"sha256:{'c' * 64}"
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        if command[:2] == ['docker', 'run']:
+            raise restore.RestoreCheckError('name is already in use')
+        if command[:3] == ['docker', 'inspect', '--type']:
+            metadata = json.dumps({'owner': 'other'}) + f'\n{image_id}\n{"f" * 64}\n'
+            return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
+        raise AssertionError(command)
+
+    with pytest.raises(restore.RestoreCheckError, match='already in use'):
+        with restore.disposable_restore_container(
+            'pcep_db_restore_check', image_id, runner
+        ):
+            pytest.fail('startup failure must not yield')
+
+    assert not any(command[:3] == ['docker', 'rm', '--force'] for command in calls)
+    assert 'Refusing to remove an unowned restore container' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ('labels', 'actual_image', 'container_id', 'message'),
+    [
+        ({'owner': 'other'}, None, 'f' * 64, 'unowned'),
+        (
+            {restore.RESTORE_CONTAINER_LABEL: 'true'},
+            f"sha256:{'a' * 64}",
+            'f' * 64,
+            'another image',
+        ),
+        (
+            {restore.RESTORE_CONTAINER_LABEL: 'true'},
+            None,
+            '../unsafe',
+            'ID is invalid',
+        ),
+    ],
+)
+def test_cleanup_requires_exact_label_image_and_immutable_id(
+    labels,
+    actual_image,
+    container_id,
+    message,
+):
+    image_id = f"sha256:{'c' * 64}"
+    metadata = (
+        json.dumps(labels)
+        + f'\n{actual_image or image_id}\n{container_id}\n'
+    )
+
+    def runner(command, **_kwargs):
+        assert command[:3] == ['docker', 'inspect', '--type']
+        return SimpleNamespace(returncode=0, stdout=metadata, stderr='')
+
+    with pytest.raises(restore.RestoreCheckError, match=message):
+        restore.owned_restore_container_id(
+            'pcep_db_restore_check', image_id, runner
+        )
 
 
 def test_validates_restored_schema_and_question_integrity():
