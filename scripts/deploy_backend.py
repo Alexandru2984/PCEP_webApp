@@ -609,6 +609,17 @@ def snapshot_running_backend(config, stamp):
     return rollback_tag
 
 
+def fsync_directory(path):
+    flags = os.O_RDONLY
+    if hasattr(os, 'O_DIRECTORY'):
+        flags |= os.O_DIRECTORY
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def backup_database(config, stamp, filename_prefix='pcep_db'):
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,31}', filename_prefix):
         raise ReleaseError('Database backup prefix must be a bounded safe label.')
@@ -660,6 +671,8 @@ def backup_database(config, stamp, filename_prefix='pcep_db'):
         with final_path.open('rb') as backup:
             while chunk := backup.read(1024 * 1024):
                 digest_builder.update(chunk)
+            os.fsync(backup.fileno())
+        fsync_directory(backup_root)
         digest = digest_builder.hexdigest()
         return final_path, digest
     finally:

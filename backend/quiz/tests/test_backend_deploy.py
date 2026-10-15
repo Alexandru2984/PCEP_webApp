@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import json
+import stat
 from pathlib import Path
 
 import pytest
@@ -523,6 +524,8 @@ def test_fallback_rollback_rejects_embedded_runtime_secrets(tmp_path, monkeypatc
 
 def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):
     database_dump = b'--\n-- PostgreSQL database dump\n--\nSELECT 1;\n'
+    fsync_types = []
+    real_fsync = release.os.fsync
 
     class FakeProcess:
         def __init__(self):
@@ -536,6 +539,13 @@ def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):
 
     monkeypatch.setattr(release.subprocess, 'Popen', lambda *_args, **_kwargs: FakeProcess())
 
+    def record_fsync(descriptor):
+        mode = release.os.fstat(descriptor).st_mode
+        fsync_types.append('directory' if stat.S_ISDIR(mode) else 'file')
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(release.os, 'fsync', record_fsync)
+
     path, digest = release.backup_database(config(tmp_path), '20260928T010203Z')
 
     assert path.name == 'pcep_db_20260928T010203Z.sql.gz'
@@ -543,6 +553,7 @@ def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):
     assert len(digest) == 64
     with release.gzip.open(path, 'rb') as backup:
         assert backup.read() == database_dump
+    assert fsync_types == ['file', 'directory']
     assert not list((tmp_path / 'backups').glob('.*.partial-*'))
 
 
