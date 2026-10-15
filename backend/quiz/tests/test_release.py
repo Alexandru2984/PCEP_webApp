@@ -63,6 +63,125 @@ def test_publish_swaps_complete_directory_and_retains_previous(tmp_path):
     assert (target / 'admin/css/base.css').read_text() == 'old'
 
 
+def test_publish_flushes_release_backup_and_parent_in_cutover_order(
+    tmp_path, monkeypatch
+):
+    source = static_release(tmp_path / 'source', 'new')
+    target = static_release(tmp_path / 'live', 'old')
+    backup_root = tmp_path / 'backup'
+    events = []
+    real_exchange = release.exchange_directories
+
+    monkeypatch.setattr(
+        release,
+        'fsync_tree',
+        lambda path: events.append(('tree', Path(path).name)),
+    )
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda path: events.append(('directory', Path(path).name)),
+    )
+
+    def exchange(first, second):
+        events.append(('exchange', Path(first).name, Path(second).name))
+        real_exchange(first, second)
+
+    monkeypatch.setattr(release, 'exchange_directories', exchange)
+
+    release.publish(source, target, backup_root, kind='static')
+
+    assert events[0][0] == 'tree'
+    assert events[0][1].startswith('.live.release-')
+    assert events[1][0] == 'tree'
+    assert events[1][1].startswith('live.')
+    assert events[2] == ('directory', 'backup')
+    assert events[3][0] == 'exchange'
+    assert events[4:] == [('directory', tmp_path.name)] * 2
+
+
+def test_flush_failure_keeps_live_release_and_prevents_exchange(tmp_path, monkeypatch):
+    source = static_release(tmp_path / 'source', 'new')
+    target = static_release(tmp_path / 'live', 'old')
+    monkeypatch.setattr(
+        release,
+        'fsync_tree',
+        lambda _path: (_ for _ in ()).throw(OSError('storage failure')),
+    )
+    monkeypatch.setattr(
+        release,
+        'exchange_directories',
+        lambda *_args: pytest.fail('exchange must not run after a flush failure'),
+    )
+
+    with pytest.raises(OSError, match='storage failure'):
+        release.publish(source, target, kind='static')
+
+    assert (target / 'admin/css/base.css').read_text() == 'old'
+    assert not list(tmp_path.glob('.live.release-*'))
+
+
+def test_parent_flush_failure_after_exchange_preserves_both_generations(
+    tmp_path, monkeypatch
+):
+    source = static_release(tmp_path / 'source', 'new')
+    target = static_release(tmp_path / 'live', 'old')
+    monkeypatch.setattr(release, 'fsync_tree', lambda _path: None)
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda _path: (_ for _ in ()).throw(OSError('parent storage failure')),
+    )
+
+    with pytest.raises(OSError, match='parent storage failure'):
+        release.publish(source, target, kind='static')
+
+    assert (target / 'admin/css/base.css').read_text() == 'new'
+    retained = list(tmp_path.glob('.live.release-*'))
+    assert len(retained) == 1
+    assert (retained[0] / 'admin/css/base.css').read_text() == 'old'
+
+
+def test_security_txt_seed_is_durable_before_publication_continues(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / 'source'
+    disclosure = source / '.well-known/security.txt'
+    disclosure.parent.mkdir(parents=True)
+    disclosure.write_text('Contact: mailto:security@example.test\n')
+    target = tmp_path / 'live'
+    target.mkdir()
+    events = []
+    real_replace = os.replace
+
+    monkeypatch.setattr(
+        release,
+        'fsync_regular_file',
+        lambda path: events.append(('file', Path(path).name)),
+    )
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda path: events.append(('directory', Path(path).name)),
+    )
+
+    def replace(source_path, destination_path):
+        events.append(('replace', Path(destination_path).name))
+        real_replace(source_path, destination_path)
+
+    monkeypatch.setattr(release.os, 'replace', replace)
+
+    release.seed_rollback_security_txt(source, target)
+
+    assert [event[0] for event in events] == ['file', 'replace', 'directory']
+    assert events[0][1].startswith('.security.txt.')
+    assert events[1:] == [
+        ('replace', 'security.txt'),
+        ('directory', '.well-known'),
+    ]
+    assert (target / '.well-known/security.txt').read_text() == disclosure.read_text()
+
+
 def test_publish_refuses_a_concurrent_operation_for_the_same_target(
     tmp_path, monkeypatch
 ):

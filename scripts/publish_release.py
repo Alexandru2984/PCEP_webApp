@@ -8,6 +8,7 @@ import importlib.util
 import os
 from pathlib import Path
 import shutil
+import stat
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -151,6 +152,53 @@ def exchange_directories(first, second):
         raise OSError(code, os.strerror(code))
 
 
+def fsync_regular_file(path):
+    flags = os.O_RDONLY | getattr(os, 'O_CLOEXEC', 0)
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError(f'Release entry is not a regular file: {path}')
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def fsync_directory(path):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, 'O_CLOEXEC', 0)
+        | getattr(os, 'O_DIRECTORY', 0)
+    )
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise ValueError(f'Release entry is not a directory: {path}')
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def fsync_tree(root):
+    """Make every validated release byte and directory entry crash-durable."""
+    root = Path(root)
+    directories = []
+    for path in (root, *root.rglob('*')):
+        if path.is_symlink():
+            raise ValueError(f'Unsafe symlink while flushing release: {path}')
+        if path.is_dir():
+            directories.append(path)
+        elif path.is_file():
+            fsync_regular_file(path)
+        else:
+            raise ValueError(f'Unsupported release entry while flushing: {path}')
+    for directory in sorted(directories, key=lambda path: len(path.parts), reverse=True):
+        fsync_directory(directory)
+
+
 def previous_asset_mtimes(target):
     """Identify every chunk built with the currently referenced entry assets."""
     index = target / 'index.html'
@@ -185,7 +233,9 @@ def seed_rollback_security_txt(source, target):
     try:
         shutil.copyfile(source / SECURITY_TXT_PATH, temporary)
         temporary.chmod(0o644)
+        fsync_regular_file(temporary)
         os.replace(temporary, destination)
+        fsync_directory(well_known)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -256,24 +306,31 @@ def _publish_unlocked(
                         destination.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(asset, destination)
         validate_release(stage, kind)
+        fsync_tree(stage)
         if backup_root and target.exists():
             backup_root = Path(backup_root).absolute()
             if backup_root.resolve().is_relative_to(resolved_target):
                 raise ValueError('Backup root must be outside the live root.')
             backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-            shutil.copytree(target, backup_root / f'{target.name}.{stamp}')
+            backup = backup_root / f'{target.name}.{stamp}'
+            shutil.copytree(target, backup)
+            fsync_tree(backup)
+            fsync_directory(backup_root)
         if target.exists():
             exchange_directories(stage, target)
             swapped = True
+            fsync_directory(target.parent)
             previous = target.parent / f'.{target.name}.previous-{stamp}'
             try:
                 stage.rename(previous)
+                fsync_directory(target.parent)
             except OSError:
                 # A successful swap remains successful; never delete the prior root.
                 previous = stage
             return previous
         os.replace(stage, target)
         swapped = True
+        fsync_directory(target.parent)
         return None
     finally:
         if not swapped and stage.exists():
@@ -326,7 +383,7 @@ def main():
             args.asset_retention_days,
         )
     except (OSError, ValueError) as error:
-        parser.exit(1, f'Publication failed before swap: {error}\n')
+        parser.exit(1, f'Publication did not complete durably: {error}\n')
     print(f'Published complete {args.kind} release to {args.target}')
     if previous:
         print(f'Previous release retained at {previous}')

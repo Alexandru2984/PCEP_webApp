@@ -81,18 +81,91 @@ def test_failed_generation_keeps_the_complete_live_tree(tmp_path):
     assert list(tmp_path.glob('.seo.release-*')) == []
 
 
-def test_publication_replaces_the_live_tree_as_one_validated_release(tmp_path):
+def test_publication_replaces_the_live_tree_as_one_validated_release(
+    tmp_path, monkeypatch
+):
     live = tmp_path / 'seo'
     live.mkdir()
     (live / 'stale-answer-key.html').write_text('secret', encoding='utf-8')
+    events = []
+    real_exchange = seo_pages.exchange_directories
+
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_tree',
+        lambda path: events.append(('tree', Path(path).name)),
+    )
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_directory',
+        lambda path: events.append(('directory', Path(path).name)),
+    )
+
+    def exchange(first, second):
+        events.append(('exchange', Path(first).name, Path(second).name))
+        real_exchange(first, second)
+
+    monkeypatch.setattr(seo_pages, 'exchange_directories', exchange)
 
     assert seo_pages.publish_questions(valid_questions(), live) == 52
 
+    assert events[0][0] == 'tree'
+    assert events[0][1].startswith('.seo.release-')
+    assert events[1][0] == 'exchange'
+    assert events[2:] == [('directory', tmp_path.name)] * 2
     assert not (live / 'stale-answer-key.html').exists()
     seo_pages.validate_release(live)
     assert (live / 'practice/index.html').stat().st_mode & 0o777 == 0o644
     assert live.stat().st_mode & 0o777 == 0o755
     assert not any(path.is_symlink() for path in live.rglob('*'))
+
+
+def test_seo_flush_failure_keeps_live_tree_and_prevents_exchange(
+    tmp_path, monkeypatch
+):
+    live = tmp_path / 'seo'
+    live.mkdir()
+    marker = live / 'existing.html'
+    marker.write_text('known-good', encoding='utf-8')
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_tree',
+        lambda _path: (_ for _ in ()).throw(OSError('storage failure')),
+    )
+    monkeypatch.setattr(
+        seo_pages,
+        'exchange_directories',
+        lambda *_args: pytest.fail('exchange must not run after a flush failure'),
+    )
+
+    with pytest.raises(OSError, match='storage failure'):
+        seo_pages.publish_questions(valid_questions(), live)
+
+    assert marker.read_text(encoding='utf-8') == 'known-good'
+    assert list(tmp_path.glob('.seo.release-*')) == []
+
+
+def test_seo_parent_flush_failure_after_exchange_preserves_both_generations(
+    tmp_path, monkeypatch
+):
+    live = tmp_path / 'seo'
+    live.mkdir()
+    marker = live / 'existing.html'
+    marker.write_text('known-good', encoding='utf-8')
+    monkeypatch.setattr(seo_pages, 'fsync_tree', lambda _path: None)
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_directory',
+        lambda _path: (_ for _ in ()).throw(OSError('parent storage failure')),
+    )
+
+    with pytest.raises(OSError, match='parent storage failure'):
+        seo_pages.publish_questions(valid_questions(), live)
+
+    seo_pages.validate_release(live)
+    retained = list(tmp_path.glob('.seo.release-*'))
+    assert len(retained) == 1
+    assert (retained[0] / 'existing.html').read_text(encoding='utf-8') == 'known-good'
 
 
 def test_publication_rejects_symlinked_live_root(tmp_path):

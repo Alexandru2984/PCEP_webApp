@@ -528,12 +528,53 @@ def normalize_public_modes(root: pathlib.Path) -> None:
         entry.chmod(0o755 if entry.is_dir() else 0o644)
 
 
-def fsync_directory(path: pathlib.Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+def fsync_regular_file(path: pathlib.Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
     try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise SeoPublishError(f"intrarea SEO nu este fisier obisnuit: {path}")
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def fsync_directory(path: pathlib.Path) -> None:
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+    )
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise SeoPublishError(f"intrarea SEO nu este director: {path}")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def fsync_tree(root: pathlib.Path) -> None:
+    directories = []
+    for entry in (root, *root.rglob("*")):
+        if entry.is_symlink():
+            raise SeoPublishError("release-ul SEO s-a schimbat intr-o legatura simbolica")
+        if entry.is_dir():
+            directories.append(entry)
+        elif entry.is_file():
+            fsync_regular_file(entry)
+        else:
+            raise SeoPublishError(f"intrare SEO nesuportata la sincronizare: {entry}")
+    for directory in sorted(
+        directories,
+        key=lambda entry: len(entry.parts),
+        reverse=True,
+    ):
+        fsync_directory(directory)
 
 
 def publish_questions(questions: list[dict], target: pathlib.Path = OUT_ROOT) -> int:
@@ -545,6 +586,7 @@ def publish_questions(questions: list[dict], target: pathlib.Path = OUT_ROOT) ->
             total = render_release(stage, questions)
             normalize_public_modes(stage)
             validate_release(stage)
+            fsync_tree(stage)
             if target.exists():
                 exchange_directories(stage, target)
             else:
@@ -558,6 +600,15 @@ def publish_questions(questions: list[dict], target: pathlib.Path = OUT_ROOT) ->
                     f"[pcep-seo] avertisment: versiunea precedenta ramane la {stage}: {error}",
                     file=sys.stderr,
                 )
+            else:
+                try:
+                    fsync_directory(parent)
+                except OSError as error:
+                    print(
+                        "[pcep-seo] avertisment: stergerea versiunii precedente "
+                        f"nu a putut fi sincronizata: {error}",
+                        file=sys.stderr,
+                    )
             return total
         finally:
             if not published and stage.exists():
