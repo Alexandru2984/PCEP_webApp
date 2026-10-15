@@ -3372,6 +3372,45 @@ without incident-frequency, active-user and business-loss inputs. The CISO verdi
 is **SHIP WITH GUARDRAILS** after focused/full tests, exact live service execution,
 healthy publication, full CI and external production smoke.
 
+### Crash-durable deployment backups — 2026-10-15
+
+The deploy gate previously closed and validated the compressed PostgreSQL dump,
+atomically renamed it into place and calculated its SHA-256, but did not explicitly
+flush the file or parent directory before allowing image build and cutover. A host
+reset or storage/power failure in that interval could therefore leave the reported
+rollback backup missing or incomplete even though the process had observed valid
+bytes in page cache.
+
+The shared backup implementation now fsyncs the completed mode-`0600` dump after
+full decompression/header validation and digest calculation, then fsyncs the private
+backup directory so the rename is durable. Any flush failure aborts deployment
+before candidate build, migration activation or service replacement. Daily backups
+retain their independent checksum-sidecar fsync sequence; its extra file flush is
+intentionally harmless defense in depth.
+
+The top STRIDE risks are tampering/data loss through non-durable recovery evidence,
+repudiation when a deploy reports a backup that does not survive a crash, and denial
+of service if recovery must proceed without the promised pre-cutover snapshot. The
+direct blast radius is one deployment backup and the current 308-question database;
+the running database and retained older daily/pre-deploy backups are not modified by
+the new flush operations.
+
+An fsync or directory-open failure is synchronous and stops the deploy, giving
+immediate machine/operator MTTD. Latent storage faults remain covered by daily
+checksum verification and the weekly isolated restore, with hourly/twice-hourly
+machine publication; guaranteed human MTTD remains unbounded until notification
+delivery is confirmed. Response is to preserve the filesystem/kernel journal,
+quarantine the affected backup, run storage diagnostics, create and isolate-restore
+a new dump, and only then retry deployment. The tabletop must include power loss
+after rename and explicit file/directory fsync failure.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. A wider
+failure that exposes personal data still requires breach assessment and the
+applicable GDPR Article 33 72-hour notification clock. FAIR/ALE is not defensible
+without storage-failure frequency and business-loss inputs. The CISO verdict is
+**SHIP WITH GUARDRAILS** after focused/full tests, a real durable backup probe, full
+CI and external production smoke.
+
 ## 15. Breaking changes
 
 None.

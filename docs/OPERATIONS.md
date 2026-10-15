@@ -628,7 +628,8 @@ operation.
 The deployment command refuses tracked uncommitted changes. Before building, it
 verifies the live container, tags its exact image for rollback and streams a
 gzip-compressed PostgreSQL dump into a mode-`0600` file. It validates the dump
-header and checksum, then builds the candidate with the Git revision, runs
+header and checksum, fsyncs both the completed file and its parent directory, then
+builds the candidate with the Git revision, runs
 Django deploy checks and refuses pending migrations. It resolves the candidate's
 immutable Docker image ID and runs the blocking Trivy audit against that exact
 image. A scan or scanner failure leaves the running container untouched. Only
