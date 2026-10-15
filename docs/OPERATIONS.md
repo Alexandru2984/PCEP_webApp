@@ -778,7 +778,13 @@ The target checks the pinned runtime, completes the build and validates required
 files and referenced HTML assets. It copies to a staging directory on the live
 filesystem, backs up the current root under BACKUP_ROOT, retains hashed assets
 from the last seven days for open tabs, then uses Linux renameat2 directory
-exchange. The complete immediately previous asset generation is always retained,
+exchange. Before that exchange, it fsyncs every staged regular file and every
+directory from the leaves upward. It separately fsyncs the complete external
+backup and its parent, then fsyncs the live parent after the exchange and after
+renaming the rollback root. A flush failure before exchange leaves the live root
+unchanged; a failure after exchange preserves the previous root and makes the
+command report that publication did not complete durably. The complete immediately
+previous asset generation is always retained,
 even after a longer deployment gap. Older generations are omitted only from the
 new staging root; the complete previous root and external backup remain available.
 Publication and retention for the same canonical live root share a target-derived,
@@ -958,7 +964,10 @@ flags, answer IDs or per-option explanations. Answers are obtained only after
 interactive submission. The generator validates that contract, builds a complete
 release beside the live tree and uses an atomic directory exchange; extraction,
 validation or rendering failures leave the prior release untouched. Concurrent
-publishers are rejected by a private lock.
+publishers are rejected by a private lock. Before exchange, every generated file
+and directory is fsynced from the leaves upward; the live parent is fsynced after
+exchange. The prior tree is removed only after that durable cutover, and its
+directory-entry removal is flushed separately.
 
 Validate and deploy the non-root, filesystem- and network-sandboxed service with:
 
@@ -1431,7 +1440,9 @@ all other dotfiles remain rejected. Before its atomic directory swap, the publis
 copies the reviewed file atomically into the currently live release. The external
 backup and immediate rollback therefore retain the disclosure channel even on the
 first deployment; an unsafe live `.well-known` symlink or non-directory aborts the
-publication. Its `Expires` value is an intentional renewal gate: update it to a UTC
+publication. The temporary disclosure file and `.well-known` directory are fsynced
+before publication continues, so a crash cannot silently remove that pointer from
+the immediate rollback generation. Its `Expires` value is an intentional renewal gate: update it to a UTC
 timestamp less than 365 days ahead, review that the private-advisory form and policy
 links still work, and deploy before the smoke's 30-day renewal window begins ahead
 of `2027-10-01T00:00:00Z`. The twice-hourly production smoke treats an expiry inside

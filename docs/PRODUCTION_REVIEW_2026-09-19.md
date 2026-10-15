@@ -3411,6 +3411,56 @@ without storage-failure frequency and business-loss inputs. The CISO verdict is
 **SHIP WITH GUARDRAILS** after focused/full tests, a real durable backup probe, full
 CI and external production smoke.
 
+### Crash-durable static publications — 2026-10-15
+
+The frontend/static publisher and the host SEO generator previously made their
+namespace changes atomically, but atomic visibility alone did not prove that newly
+copied file data and child-directory entries had reached stable storage. The SEO
+path flushed only the live parent after exchange; the general publisher did not
+flush the staged tree, backup or parent. A power loss after a reported success
+could therefore reveal an incomplete release after reboot, or remove the external
+snapshot that an operator expected to use for rollback.
+
+Both publishers now fsync every validated regular file with no symlink following,
+then every directory from the deepest child through the staged root before the
+first live-root exchange. The frontend/static publisher also flushes its complete
+external snapshot and backup root, the live parent immediately after exchange, and
+the parent again after assigning the retained rollback name. The first-deployment
+rename follows the same tree-before-parent order. The RFC 9116 disclosure seed is
+flushed before its atomic replace and its `.well-known` directory is flushed after
+it. SEO removes its old tree only after the durable cutover and separately flushes
+that cleanup. A pre-cutover flush error removes only staging and leaves the live
+root unchanged; a post-exchange error preserves the old root and reports that the
+operation did not complete durably.
+
+The top STRIDE risks are tampering/data-integrity loss through partially durable
+public bytes, denial of service when a reboot exposes a missing shell, worker or
+SEO tree, and repudiation/false recovery confidence when a command reports a
+snapshot or rollback root that storage did not retain. The direct frontend blast
+radius is one live release, one new external backup and one immediate rollback
+root consumed by two public origins. The SEO radius is one eight-file generated
+tree representing the current 308-question public corpus. Active learner-tab and
+crawler counts are not measured, so their numeric business radius is unknown.
+
+File, directory-open and fsync failures are synchronous, giving immediate machine
+and invoking-operator MTTD before cutover whenever possible. A latent storage fault
+visible only after reboot should fail the twice-hourly external public contract in
+at most 30 minutes and the hourly health publication in roughly one to three hours;
+guaranteed human MTTD remains unbounded until alert-delivery confirmation is
+completed. Response is to preserve the command, kernel and filesystem journals,
+avoid pruning either retained tree, validate both live and previous roots, republish
+the last verified snapshot, and rerun public/origin smoke. The tabletop must cover
+file fsync failure before exchange, parent fsync failure immediately after exchange,
+and power loss between cutover and rollback-root rename.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+storage or host incident exposes personal data, breach assessment and the applicable
+GDPR Article 33 72-hour notification clock remain mandatory. FAIR/ALE is not
+defensible without storage-failure frequency, active-user and business-loss inputs.
+The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full regression tests, a
+real two-generation publication probe, live SEO regeneration, full CI and external
+production smoke.
+
 ## 15. Breaking changes
 
 None.
