@@ -4,6 +4,7 @@ import argparse
 import ctypes
 import errno
 import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -12,6 +13,21 @@ import uuid
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import unquote, urlsplit
+
+
+def load_operation_lock():
+    path = Path(__file__).with_name('operation_lock.py')
+    spec = importlib.util.spec_from_file_location('pcep_operation_lock', path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError('Cannot load the operation-lock implementation.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+operation_lock = load_operation_lock()
+OperationLockError = operation_lock.OperationLockError
+exclusive_operation_lock = operation_lock.exclusive_operation_lock
 
 ASSET_RETENTION_DAYS = 7
 PYODIDE_MANIFEST = Path(__file__).resolve().parents[1] / 'frontend/scripts/pyodide.sha256'
@@ -28,6 +44,7 @@ FRONTEND_WELL_KNOWN_PATHS = frozenset({
     Path('.well-known/security.txt'),
 })
 SECURITY_TXT_PATH = Path('.well-known/security.txt')
+DEFAULT_LOCK_ROOT = None
 
 
 def load_pyodide_hashes(path=PYODIDE_MANIFEST):
@@ -173,7 +190,15 @@ def seed_rollback_security_txt(source, target):
         temporary.unlink(missing_ok=True)
 
 
-def publish(
+def release_lock_name(target):
+    # Resolve parent aliases so two lexical paths to one live root cannot use
+    # different locks. A symlink at the target itself is still rejected later.
+    target = Path(target).resolve(strict=False)
+    digest = hashlib.sha256(os.fsencode(target)).hexdigest()[:20]
+    return f'release-{digest}'
+
+
+def _publish_unlocked(
     source,
     target,
     backup_root=None,
@@ -253,6 +278,30 @@ def publish(
     finally:
         if not swapped and stage.exists():
             shutil.rmtree(stage)
+
+
+def publish(
+    source,
+    target,
+    backup_root=None,
+    kind='frontend',
+    asset_retention_days=ASSET_RETENTION_DAYS,
+    lock_root=None,
+):
+    try:
+        with exclusive_operation_lock(
+            release_lock_name(target),
+            root=lock_root if lock_root is not None else DEFAULT_LOCK_ROOT,
+        ):
+            return _publish_unlocked(
+                source,
+                target,
+                backup_root,
+                kind,
+                asset_retention_days,
+            )
+    except OperationLockError as error:
+        raise ValueError(str(error)) from error
 
 
 def main():

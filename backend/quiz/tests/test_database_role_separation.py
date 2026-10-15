@@ -18,6 +18,7 @@ def config(tmp_path):
         backup_root=tmp_path / 'backups',
         release='database-role-separation',
         public_health_url='https://invalid.local/',
+        lock_root=tmp_path / 'locks',
     )
 
 
@@ -90,6 +91,24 @@ def test_already_separated_database_is_not_mutated(tmp_path, monkeypatch):
     )
 
     assert separation.execute(config(tmp_path), 'restore-check') is None
+
+
+def test_role_separation_refuses_concurrent_backend_maintenance(
+    tmp_path, monkeypatch
+):
+    migration = config(tmp_path)
+    monkeypatch.setattr(
+        separation.restore,
+        'source_table_owner',
+        lambda *_args: pytest.fail('Locked migration must not inspect PostgreSQL.'),
+    )
+
+    with separation.release.exclusive_operation_lock(
+        'backend-maintenance',
+        root=migration.lock_root,
+    ):
+        with pytest.raises(separation.release.ReleaseError, match='already running'):
+            separation.execute(migration, 'restore-check')
 
 
 def test_partial_separation_aborts_instead_of_reapplying(tmp_path, monkeypatch):

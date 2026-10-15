@@ -3269,6 +3269,63 @@ GUARDRAILS** after shell validation, complete PostgreSQL and isolated Nginx runt
 contracts, proof that no labelled resource or temporary tree remains, full CI and a
 clean image audit.
 
+### Destructive-operation serialization — 2026-10-15
+
+Backend deployment and rollback-image retention previously validated Docker state
+independently without serializing the interval between inventory and tag/build/
+removal. Two deployments, or a deployment overlapping retention, could therefore
+act on different generations while each command believed its earlier view was
+current. The one-time database-role separation could also overlap these operations
+while changing the same role posture. Frontend publication and release-snapshot
+retention had the analogous gap around live-root exchange and recursive snapshot
+removal.
+
+The five operations now use non-blocking advisory locks in a dedicated
+`/run/lock/pcep-<uid>` directory. Backend deployment, database-role separation and
+image retention share one host-global key. Frontend publication and snapshot
+retention derive a key from the canonical live-root path, so aliases of one target
+collide while unrelated targets remain independent. The lock directory and file
+are fail-closed unless they are real, owner-matched and private (`0700`/`0600`);
+symlinks, unsafe names, concurrent holders and permissive modes are rejected before
+the protected operation. Kernel descriptor lifetime releases a lock on every
+ordinary exit, exception or killed process without treating the persistent file as
+evidence of an active holder.
+
+The top STRIDE risks are tampering when a rollback tag or snapshot changes after
+validation, denial of service when two Compose cutovers or directory exchanges
+interleave, and repudiation/recovery-integrity loss when the retained rollback no
+longer corresponds to the operation that reported it. The direct backend blast
+radius is one service with three workers, the six currently inventoried rollback
+tags and the pre-deploy copy of the 308-question database. The direct publication
+blast radius is one live release root, both public origins that consume its bounded
+assets, and the current rollback/backup generations. The control does not itself
+read or transmit learner data, credentials or backup contents.
+
+A cooperating concurrent invocation is detected synchronously before its first
+Docker or live-filesystem mutation, so machine and interactive-operator MTTD are
+effectively immediate. The refusal is written to the invoking private terminal or
+service journal. Commands that bypass these reviewed scripts remain outside the
+lock protocol; hourly operations health and twice-hourly external smoke can detect
+some resulting availability drift, while guaranteed human MTTD for an unalerted
+manual bypass remains unbounded until notification delivery is confirmed.
+
+Response is to preserve both command outputs and process inventory, identify the
+legitimate holder, allow it to finish or terminate that exact process after review,
+then rerun inventory and the refused operation. Never remove the persistent lock
+file as a concurrency workaround. The tabletop cases are two simultaneous backend
+deployments, deploy versus image retention or database-role separation, two
+frontend publishers, and publisher versus snapshot retention; automated regressions
+now prove refusal before Docker, PostgreSQL inspection or live-root access for both
+resource families.
+
+No hosted vendor, credential, subprocessor, DPA or personal-data flow is added. If
+a wider concurrency incident causes personal-data compromise, breach assessment
+and the applicable GDPR Article 33 72-hour notification clock remain mandatory.
+No defensible FAIR/ALE estimate exists without incident frequency, active-user and
+business-loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused and
+full tests, live private-lock validation, both production dry-runs, full CI and
+external production smoke.
+
 ## 15. Breaking changes
 
 None.

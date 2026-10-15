@@ -612,6 +612,15 @@ it as a shortcut; use the reviewed backend and frontend commands in this runbook
 make deploy-backend
 ```
 
+Backend deployment, the one-time database-role separation and rollback-image
+retention share the non-blocking `backend-maintenance` lock under
+`/run/lock/pcep-<uid>/`. The directory must be owned by the invoking user with mode
+`0700`; the lock must be a non-symlink regular file owned by that user with mode
+`0600`. A concurrent command is refused before Docker, database, backup or tag
+mutation begins. The kernel releases the lock if the holder exits or is killed, so
+a remaining lock file is normal and must not be deleted to bypass an active
+operation.
+
 The deployment command refuses tracked uncommitted changes. Before building, it
 verifies the live container, tags its exact image for rollback and streams a
 gzip-compressed PostgreSQL dump into a mode-`0600` file. It validates the dump
@@ -767,6 +776,11 @@ from the last seven days for open tabs, then uses Linux renameat2 directory
 exchange. The complete immediately previous asset generation is always retained,
 even after a longer deployment gap. Older generations are omitted only from the
 new staging root; the complete previous root and external backup remain available.
+Publication and retention for the same canonical live root share a target-derived,
+non-blocking lock in `/run/lock/pcep-<uid>/`. Parent-directory aliases resolve to
+the same lock. A second publisher or retention run is refused before it can copy,
+swap or remove a snapshot; operations for an unrelated release root remain
+independent.
 Copy, validation and exchange failures leave the live root intact. The previous
 root is retained beside it as `.frontend.previous-<timestamp>-<id>`.
 `FRONTEND_ROOT`, `BACKUP_ROOT`, `PYTHON` and `ASSET_RETENTION_DAYS` can be
@@ -896,7 +910,9 @@ backend/.venv/bin/python scripts/backend_image_retention.py --keep 5 --apply
 The apply path rechecks tag identity and container use before each ordinary
 `docker image rm`; it never invokes host-wide prune or force removal. Images in
 other repositories, PostgreSQL images, build cache and other applications are
-outside its allowlist.
+outside its allowlist. The dry-run and apply paths both take the same
+`backend-maintenance` lock as deployment, so their inventory cannot overlap a
+cooperating deploy/tag/rollback operation.
 Question-content migrations 0003 through 0006 update existing rows in place,
 preserve question/choice IDs and are reversible; they need no database restore
 for an application rollback. Database restoration is a separate planned

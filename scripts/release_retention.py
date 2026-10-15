@@ -149,10 +149,10 @@ def remove_snapshot(path, parent, pattern):
     shutil.rmtree(path)
 
 
-def execute(target, backup_root, keep=5, apply=False):
+def _execute_unlocked(target, backup_root, keep=5, apply=False, validator=None):
     target = Path(target).absolute()
     backup_root = Path(backup_root).absolute()
-    plan = retention_plan(target, backup_root, keep)
+    plan = retention_plan(target, backup_root, keep, validator=validator)
     removals = plan['previous']['remove'] + plan['backup']['remove']
     reclaimable = allocated_bytes(removals)
 
@@ -185,6 +185,28 @@ def execute(target, backup_root, keep=5, apply=False):
         remove_snapshot(path, backup_root, backup_pattern)
     print(f'Removed {len(removals)} reviewed release snapshots.')
     return plan
+
+
+def execute(target, backup_root, keep=5, apply=False, lock_root=None):
+    publisher = load_publish_release()
+    try:
+        with publisher.exclusive_operation_lock(
+            publisher.release_lock_name(target),
+            root=(
+                lock_root
+                if lock_root is not None
+                else publisher.DEFAULT_LOCK_ROOT
+            ),
+        ):
+            return _execute_unlocked(
+                target,
+                backup_root,
+                keep,
+                apply,
+                validator=publisher.validate_release,
+            )
+    except publisher.OperationLockError as error:
+        raise ValueError(str(error)) from error
 
 
 def main():

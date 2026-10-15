@@ -11,6 +11,11 @@ release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 
 
+@pytest.fixture(autouse=True)
+def isolated_release_lock(tmp_path, monkeypatch):
+    monkeypatch.setattr(release, 'DEFAULT_LOCK_ROOT', tmp_path / 'locks')
+
+
 def static_release(root, marker):
     for name in ['admin/css/base.css', 'admin/js/core.js']:
         path = root / name
@@ -56,6 +61,35 @@ def test_publish_swaps_complete_directory_and_retains_previous(tmp_path):
     assert next((tmp_path / 'backup').glob('*/admin/js/core.js')).read_text() == 'old'
     release.exchange_directories(previous, target)
     assert (target / 'admin/css/base.css').read_text() == 'old'
+
+
+def test_publish_refuses_a_concurrent_operation_for_the_same_target(
+    tmp_path, monkeypatch
+):
+    source = static_release(tmp_path / 'source', 'new')
+    target = static_release(tmp_path / 'live', 'old')
+    lock_root = tmp_path / 'locks'
+    monkeypatch.setattr(release, 'DEFAULT_LOCK_ROOT', lock_root)
+
+    with release.exclusive_operation_lock(
+        release.release_lock_name(target),
+        root=lock_root,
+    ):
+        with pytest.raises(ValueError, match='already running'):
+            release.publish(source, target, kind='static')
+
+    assert (target / 'admin/css/base.css').read_text() == 'old'
+
+
+def test_release_lock_collapses_parent_directory_aliases(tmp_path):
+    real_parent = tmp_path / 'real'
+    real_parent.mkdir()
+    alias = tmp_path / 'alias'
+    alias.symlink_to(real_parent, target_is_directory=True)
+
+    assert release.release_lock_name(real_parent / 'frontend') == (
+        release.release_lock_name(alias / 'frontend')
+    )
 
 
 def test_failed_copy_or_swap_keeps_live_files(tmp_path, monkeypatch):

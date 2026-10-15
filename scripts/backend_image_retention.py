@@ -3,9 +3,26 @@
 
 import argparse
 from dataclasses import dataclass
+import importlib.util
 import json
+from pathlib import Path
 import re
 import subprocess
+
+
+def load_operation_lock():
+    path = Path(__file__).with_name('operation_lock.py')
+    spec = importlib.util.spec_from_file_location('pcep_operation_lock', path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError('Cannot load the operation-lock implementation.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+operation_lock = load_operation_lock()
+OperationLockError = operation_lock.OperationLockError
+exclusive_operation_lock = operation_lock.exclusive_operation_lock
 
 
 ROLLBACK_REPOSITORY = 'pcep-backend-rollback'
@@ -259,7 +276,7 @@ def retention_plan(candidates, metadata_loader, in_use_image_ids, keep=5):
     return {'keep': retained, 'remove': removals, 'invalid': invalid}
 
 
-def execute(*, keep=5, apply=False, runner=run_command):
+def _execute_unlocked(*, keep=5, apply=False, runner=run_command):
     candidates = discover_rollback_tags(runner)
     in_use = container_image_ids(runner)
     plan = retention_plan(
@@ -302,6 +319,14 @@ def execute(*, keep=5, apply=False, runner=run_command):
         runner(['docker', 'image', 'rm', candidate.reference], timeout=120)
     print(f'Removed {len(plan["remove"])} reviewed rollback image tags.')
     return plan
+
+
+def execute(*, keep=5, apply=False, runner=run_command, lock_root=None):
+    try:
+        with exclusive_operation_lock('backend-maintenance', root=lock_root):
+            return _execute_unlocked(keep=keep, apply=apply, runner=runner)
+    except OperationLockError as error:
+        raise ImageRetentionError(str(error)) from error
 
 
 def main():

@@ -50,6 +50,7 @@ def config(tmp_path, **kwargs):
         'backup_root': tmp_path / 'backups',
         'release': 'abc123def456',
         'public_health_url': 'https://example.test/api/health/',
+        'lock_root': tmp_path / 'locks',
     }
     values.update(kwargs)
     return release.ReleaseConfig(**values)
@@ -99,6 +100,24 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
         for event in events
     )
     assert any(event[0] == 'run' and event[1][-2:] == ('migrate', '--check') for event in events)
+
+
+def test_deploy_refuses_a_concurrent_backend_maintenance_operation(
+    tmp_path, monkeypatch
+):
+    deployment = config(tmp_path)
+    monkeypatch.setattr(
+        release,
+        'run_command',
+        lambda *_args, **_kwargs: pytest.fail('A locked deployment must not start.'),
+    )
+
+    with release.exclusive_operation_lock(
+        'backend-maintenance',
+        root=deployment.lock_root,
+    ):
+        with pytest.raises(release.ReleaseError, match='already running'):
+            release.deploy(deployment)
 
 
 def test_deploy_does_not_replace_backend_when_image_scan_fails(tmp_path, monkeypatch):
