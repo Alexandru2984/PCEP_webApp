@@ -285,7 +285,10 @@ def test_installation_drift_publishes_only_generic_degraded_state(tmp_path):
         def verify_installation():
             raise RuntimeError('SENSITIVE_INSTALLATION_DETAIL')
 
-    with pytest.raises(health.OperationsHealthError, match='installation drift'):
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='installation drift.*SENSITIVE_INSTALLATION_DETAIL',
+    ):
         health.execute(
             backups,
             restore,
@@ -314,7 +317,10 @@ def test_container_drift_publishes_only_generic_degraded_state(tmp_path):
         def verify_container_runtime():
             raise RuntimeError('SENSITIVE_CONTAINER_DETAIL')
 
-    with pytest.raises(health.OperationsHealthError, match='runtime drift'):
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='runtime drift.*SENSITIVE_CONTAINER_DETAIL',
+    ):
         health.execute(
             backups,
             restore,
@@ -343,7 +349,10 @@ def test_nginx_drift_publishes_only_generic_degraded_state(tmp_path):
         def verify_installation():
             raise RuntimeError('SENSITIVE_NGINX_DETAIL')
 
-    with pytest.raises(health.OperationsHealthError, match='Nginx installation drift'):
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='Nginx installation drift.*SENSITIVE_NGINX_DETAIL',
+    ):
         health.execute(
             backups,
             restore,
@@ -356,6 +365,19 @@ def test_nginx_drift_publishes_only_generic_degraded_state(tmp_path):
 
     assert json.loads(output.read_text())['status'] == 'degraded'
     assert 'SENSITIVE_NGINX_DETAIL' not in output.read_text()
+
+
+def test_private_diagnostic_is_single_line_and_bounded():
+    diagnostic = health.private_diagnostic(
+        'Verifier failed',
+        RuntimeError('first\nsecond\x00' + ('x' * 600)),
+    )
+
+    assert diagnostic.startswith('Verifier failed: first second ')
+    assert '\n' not in diagnostic
+    assert '\x00' not in diagnostic
+    assert len(diagnostic.removeprefix('Verifier failed: ')) == 512
+    assert diagnostic.endswith('...')
 
 
 @pytest.mark.parametrize('value', [0, 337, 'invalid'])
