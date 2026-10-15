@@ -2,14 +2,44 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+probe_token="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+[[ "$probe_token" =~ ^[0-9a-f]{32}$ ]]
 config_file="$(mktemp)"
-candidate="pcep-postgres-hardening-${$}"
-volume="pcep_postgres_hardening_${$}"
+probe_label='com.pcep.postgres-hardening-check'
+candidate_name="pcep-postgres-hardening-$probe_token"
+candidate=''
+volume="pcep_postgres_hardening_$probe_token"
 
 cleanup() {
-  docker rm -f "$candidate" >/dev/null 2>&1 || true
-  docker volume rm "$volume" >/dev/null 2>&1 || true
-  rm -f "$config_file"
+  local exit_code=$?
+  local metadata resource_id owner extra
+
+  if metadata="$(
+    docker container inspect \
+      --format '{{.Id}} {{ index .Config.Labels "com.pcep.postgres-hardening-check" }}' \
+      "$candidate_name" 2>/dev/null
+  )"; then
+    read -r resource_id owner extra <<<"$metadata"
+    if [[ -z "$extra" && "$resource_id" =~ ^[0-9a-f]{64}$ \
+      && "$owner" == "$probe_token" ]]; then
+      docker rm -f "$resource_id" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if metadata="$(
+    docker volume inspect \
+      --format '{{.Name}} {{ index .Labels "com.pcep.postgres-hardening-check" }}' \
+      "$volume" 2>/dev/null
+  )"; then
+    read -r resource_id owner extra <<<"$metadata"
+    if [[ -z "$extra" && "$resource_id" == "$volume" \
+      && "$owner" == "$probe_token" ]]; then
+      docker volume rm "$volume" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  rm -f -- "$config_file"
+  return "$exit_code"
 }
 trap cleanup EXIT
 
@@ -126,9 +156,18 @@ restore_profile="$(
     --format '{{ index .Config.Labels "com.pcep.restore-profile" }}'
 )"
 test "$restore_profile" = 'pcep-postgres-16-v1'
-docker volume create "$volume" >/dev/null
-docker run -d \
-  --name "$candidate" \
+created_volume="$(
+  docker volume create --label "$probe_label=$probe_token" "$volume"
+)"
+test "$created_volume" = "$volume"
+test "$(
+  docker volume inspect \
+    --format '{{ index .Labels "com.pcep.postgres-hardening-check" }}' \
+    "$volume"
+)" = "$probe_token"
+candidate="$(docker run -d \
+  --name "$candidate_name" \
+  --label "$probe_label=$probe_token" \
   --user postgres \
   --read-only \
   --cap-drop ALL \
@@ -146,7 +185,13 @@ docker run -d \
   -e PCEP_APP_PASSWORD=hardening-app-test-only \
   -e PCEP_OWNER_ROLE=hardening_owner \
   -e PCEP_MIGRATOR_USER=hardening_migrator \
-  "$db_image" >/dev/null
+  "$db_image")"
+[[ "$candidate" =~ ^[0-9a-f]{64}$ ]]
+test "$(
+  docker container inspect \
+    --format '{{ index .Config.Labels "com.pcep.postgres-hardening-check" }}' \
+    "$candidate"
+)" = "$probe_token"
 
 wait_for_database() {
   local remaining=30

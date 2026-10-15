@@ -3217,6 +3217,40 @@ without incident-frequency and business-loss inputs. The CISO verdict is **SHIP
 WITH GUARDRAILS** after focused and full tests, live restore/cleanup verification,
 fresh healthy publication, full CI and external production smoke.
 
+### PostgreSQL audit-resource ownership — 2026-10-15
+
+The disposable PostgreSQL runtime validator previously derived its container and
+volume names from the shell PID and its exit trap attempted to remove both names
+even when creation had not been proven. A reused PID, pre-existing resource or
+interrupted create could therefore make a validation run touch an unrelated test
+resource or leave its own resource behind. Each run now generates a 128-bit token,
+places it in an explicit ownership label on both resources, captures and validates
+the full container ID, and makes the trap re-inspect label plus identity before any
+removal. The stop/start persistence test remains intact.
+
+The top STRIDE risks are tampering through deletion of a same-named foreign
+resource, denial of service from an orphan consuming host resources, and information
+disclosure from leaving the synthetic test credentials/data accessible to another
+Docker-authorized process. The direct blast radius is one unpublished container
+bounded to 512 MiB and 128 PIDs, one synthetic-data volume and one reviewed test
+image. It has no production volume, public port or production database credential,
+so the 308-question production database is outside the direct path.
+
+Standard success, failure and interrupt paths detect and clean their resources
+before the command exits, and pull-request CI reruns the complete validator. A
+`SIGKILL`, daemon loss or host crash can still leave a labelled resource, for which
+guaranteed human MTTD is unbounded. Response is to preserve Docker events, list only
+the exact ownership label, inspect label/name/ID, and remove the confirmed test
+resource without a broad prune. The incident tabletop must cover both deliberate
+name collision and interruption between daemon-side creation and client response.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+host incident exposes personal data, the existing breach assessment and applicable
+GDPR Article 33 72-hour clock remain mandatory. No defensible FAIR/ALE estimate
+exists without frequency and business-loss inputs. The CISO verdict is **SHIP WITH
+GUARDRAILS** after shell validation, a complete live disposable runtime test, proof
+that no labelled resource remains, full CI and clean image audit.
+
 ## 15. Breaking changes
 
 None.

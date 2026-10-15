@@ -53,7 +53,15 @@ permanently breaking CI. Each audit resolves the requested image to its immutabl
 ID, exports that exact image to a private temporary archive, and gives the scanner
 only the archive and its cache. Never mount the Docker daemon socket into the
 scanner: socket access is equivalent to privileged control of the host. The
-PostgreSQL runtime check builds the reviewed image,
+PostgreSQL runtime validator gives its disposable container and synthetic-data
+volume a fresh 128-bit run token and matching ownership label. Its exit trap
+re-inspects the label, validates the full container ID and exact volume name, then
+removes only those proven resources. A pre-existing same-named resource is refused,
+not deleted. The validator publishes no port and never mounts the production data
+volume; after an interrupted manual run, locate remnants only with the exact
+`com.pcep.postgres-hardening-check` label and inspect them before removal.
+
+The PostgreSQL runtime check builds the reviewed image,
 starts a disposable cluster with the production restrictions, writes data, verifies
 the kernel controls and read-only root, restarts it and verifies persistence.
 The runtime base pins both Python 3.12.14 and the official multi-architecture
