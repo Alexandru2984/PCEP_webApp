@@ -12,7 +12,8 @@ volume="pcep_postgres_hardening_$probe_token"
 
 cleanup() {
   local exit_code=$?
-  local metadata resource_id owner extra
+  local cleanup_error=0
+  local metadata resource_id owner extra remaining_containers remaining_volumes
 
   if metadata="$(
     docker container inspect \
@@ -22,7 +23,9 @@ cleanup() {
     read -r resource_id owner extra <<<"$metadata"
     if [[ -z "$extra" && "$resource_id" =~ ^[0-9a-f]{64}$ \
       && "$owner" == "$probe_token" ]]; then
-      docker rm -f "$resource_id" >/dev/null 2>&1 || true
+      docker rm -f "$resource_id" >/dev/null 2>&1 || cleanup_error=1
+    else
+      cleanup_error=1
     fi
   fi
 
@@ -34,11 +37,33 @@ cleanup() {
     read -r resource_id owner extra <<<"$metadata"
     if [[ -z "$extra" && "$resource_id" == "$volume" \
       && "$owner" == "$probe_token" ]]; then
-      docker volume rm "$volume" >/dev/null 2>&1 || true
+      docker volume rm "$volume" >/dev/null 2>&1 || cleanup_error=1
+    else
+      cleanup_error=1
     fi
   fi
 
-  rm -f -- "$config_file"
+  rm -f -- "$config_file" || cleanup_error=1
+  [[ ! -e "$config_file" ]] || cleanup_error=1
+  if remaining_containers="$(
+    docker container ls --all --quiet --no-trunc \
+      --filter "label=$probe_label=$probe_token" 2>/dev/null
+  )"; then
+    [[ -z "$remaining_containers" ]] || cleanup_error=1
+  else
+    cleanup_error=1
+  fi
+  if remaining_volumes="$(
+    docker volume ls --quiet --filter "label=$probe_label=$probe_token" 2>/dev/null
+  )"; then
+    [[ -z "$remaining_volumes" ]] || cleanup_error=1
+  else
+    cleanup_error=1
+  fi
+  if ((cleanup_error != 0)); then
+    printf 'PostgreSQL check could not prove complete disposable cleanup.\n' >&2
+    ((exit_code != 0)) || return 1
+  fi
   return "$exit_code"
 }
 trap cleanup EXIT

@@ -3217,7 +3217,7 @@ without incident-frequency and business-loss inputs. The CISO verdict is **SHIP
 WITH GUARDRAILS** after focused and full tests, live restore/cleanup verification,
 fresh healthy publication, full CI and external production smoke.
 
-### PostgreSQL audit-resource ownership — 2026-10-15
+### Disposable audit-resource ownership — 2026-10-15
 
 The disposable PostgreSQL runtime validator previously derived its container and
 volume names from the shell PID and its exit trap attempted to remove both names
@@ -3228,13 +3228,30 @@ places it in an explicit ownership label on both resources, captures and validat
 the full container ID, and makes the trap re-inspect label plus identity before any
 removal. The stop/start persistence test remains intact.
 
+The isolated Nginx contract had the complementary interruption edge: its
+long-running `--rm` container was removed by a captured ID, but an interruption
+after daemon-side creation and before shell assignment could leave it running on a
+random loopback port. It now uses a separate validated 128-bit ownership token; the
+trap lists only that exact label, validates every full ID, re-inspects the label and
+removes the proven container. Its temporary directory has a dedicated prefix and
+must be a real, non-symlink directory with the exact generated shape before
+recursive deletion.
+
+Both traps preserve the primary nonzero result on a failed contract, while emitting
+a private cleanup warning. If the contract itself passed, a removal error, unsafe
+temporary path, failed follow-up inventory or any resource still carrying the run
+token changes the final result to failure. Cleanup is therefore an asserted part of
+the validation rather than a best-effort side effect.
+
 The top STRIDE risks are tampering through deletion of a same-named foreign
 resource, denial of service from an orphan consuming host resources, and information
 disclosure from leaving the synthetic test credentials/data accessible to another
-Docker-authorized process. The direct blast radius is one unpublished container
-bounded to 512 MiB and 128 PIDs, one synthetic-data volume and one reviewed test
-image. It has no production volume, public port or production database credential,
-so the 308-question production database is outside the direct path.
+Docker-authorized process. The direct blast radius is the one unpublished
+PostgreSQL container bounded to 512 MiB and 128 PIDs, its one synthetic-data volume,
+and the isolated Nginx fixture on a random loopback port with generated certificates
+and public test assets. Neither path has a production volume, public listener or
+production database credential, so the 308-question production database is outside
+the direct path.
 
 Standard success, failure and interrupt paths detect and clean their resources
 before the command exits, and pull-request CI reruns the complete validator. A
@@ -3248,8 +3265,9 @@ No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wi
 host incident exposes personal data, the existing breach assessment and applicable
 GDPR Article 33 72-hour clock remain mandatory. No defensible FAIR/ALE estimate
 exists without frequency and business-loss inputs. The CISO verdict is **SHIP WITH
-GUARDRAILS** after shell validation, a complete live disposable runtime test, proof
-that no labelled resource remains, full CI and clean image audit.
+GUARDRAILS** after shell validation, complete PostgreSQL and isolated Nginx runtime
+contracts, proof that no labelled resource or temporary tree remains, full CI and a
+clean image audit.
 
 ## 15. Breaking changes
 

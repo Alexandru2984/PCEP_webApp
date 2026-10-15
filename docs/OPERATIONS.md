@@ -57,8 +57,10 @@ PostgreSQL runtime validator gives its disposable container and synthetic-data
 volume a fresh 128-bit run token and matching ownership label. Its exit trap
 re-inspects the label, validates the full container ID and exact volume name, then
 removes only those proven resources. A pre-existing same-named resource is refused,
-not deleted. The validator publishes no port and never mounts the production data
-volume; after an interrupted manual run, locate remnants only with the exact
+not deleted, and an otherwise successful check becomes a failure unless final label
+queries prove that no owned container or volume remains. The validator publishes no
+port and never mounts the production data volume; after an interrupted manual run,
+locate remnants only with the exact
 `com.pcep.postgres-hardening-check` label and inspect them before removal.
 
 The PostgreSQL runtime check builds the reviewed image,
@@ -1597,8 +1599,14 @@ vhost on a random loopback port. It verifies the complete Nginx-generated 413 an
 request ID and `Retry-After` on throttling. It also proves that a 7 KiB request
 header reaches the fixture while a header larger than the declared 8 KiB field
 limit is rejected at Nginx. The script uses a digest-pinned Nginx
-image, removes its container and temporary files on exit, and never contacts the
-production hostname.
+image, gives the long-running fixture a fresh 128-bit ownership label, and removes
+only full container IDs that still carry that exact token. Its generated files live
+under a fixed `/tmp/pcep-nginx-check.*` prefix; cleanup requires that shape, a real
+directory and no symlink before recursive removal. A client interruption after
+daemon-side creation is therefore still found by label even before the shell assigns
+the returned ID. The contract fails if it cannot prove both zero labelled containers
+and removal of the exact temporary tree. The check never contacts the production
+hostname.
 Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.
 The push/pull-request CI never calls production. The scheduled dependency audit
 only reads manifests and advisory services; the separate scheduled smoke workflow
