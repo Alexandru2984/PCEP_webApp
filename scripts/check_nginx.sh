@@ -119,6 +119,14 @@ grep -Fqx '    limit_req_log_level notice;' \
     "$root/nginx/pcep.micutu.com.conf"
 grep -Fqx '        error_log /var/log/nginx/pcep_error.log crit;' \
     "$root/nginx/pcep.micutu.com.conf"
+for vhost in pcep.micutu.com.conf pcep-runner.micutu.com.conf; do
+    [[ $(grep -Fc '    server_tokens off;' \
+        "$root/nginx/$vhost") -eq 2 ]]
+    [[ $(grep -Fc '    client_header_buffer_size 1k;' \
+        "$root/nginx/$vhost") -eq 2 ]]
+    [[ $(grep -Fc '    large_client_header_buffers 2 8k;' \
+        "$root/nginx/$vhost") -eq 2 ]]
+done
 assert_absent 'static filesystem alias' \
     -Fq 'alias /var/www/pcep/static/' "$root/nginx/pcep.micutu.com.conf"
 assert_absent 'media filesystem alias' \
@@ -142,6 +150,16 @@ done
 # Exercise responses generated inside Nginx. A syntax check cannot detect header
 # inheritance drift in named error locations.
 head -c 70000 /dev/zero | tr '\0' x > "$stage/oversized.json"
+{
+    printf 'Accept: '
+    head -c 7000 /dev/zero | tr '\0' x
+    printf '\n'
+} > "$stage/accept-within-limit.header"
+{
+    printf 'Accept: '
+    head -c 9000 /dev/zero | tr '\0' x
+    printf '\n'
+} > "$stage/accept-over-limit.header"
 container=$(docker run -d --rm -p 127.0.0.1::443 "${mounts[@]}" "$nginx_image")
 port=$(docker port "$container" 443/tcp)
 port=${port##*:}
@@ -171,6 +189,23 @@ assert_absent 'runner X-Frame-Options header' \
 assert_absent 'runner Set-Cookie header' \
     -Eqi '^Set-Cookie:' "$stage/runner.headers.clean"
 grep -Fq '<script src="/runner-bridge.js" defer></script>' "$stage/runner.body"
+
+# Make the per-field header boundary explicit rather than relying on Nginx's
+# build-dependent default. Requests below 8 KiB reach the upstream; larger
+# fields are rejected before consuming a Python worker.
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --header "@$stage/accept-within-limit.header" \
+    --output /dev/null --write-out '%{http_code}' \
+    "$base_url/api/stats/")
+[[ "$status" == 200 ]]
+
+status=$(curl --http1.1 --insecure --silent --show-error \
+    --resolve "pcep.micutu.com:$port:127.0.0.1" \
+    --header "@$stage/accept-over-limit.header" \
+    --output /dev/null --write-out '%{http_code}' \
+    "$base_url/api/stats/" 2>/dev/null || true)
+[[ "$status" == 400 ]]
 
 status=$(curl --http1.1 --insecure --silent --show-error \
     --resolve "pcep.micutu.com:$port:127.0.0.1" \

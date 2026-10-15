@@ -438,6 +438,14 @@ not be symlinks or writable by group/others. Unknown `pcep-*` units or drop-ins 
 closed. The offsite service and backup drop-in are valid only when both are absent
 or both are installed exactly; the verifier does not activate offsite replication.
 
+The hourly run also imports the Nginx installation verifier. Both active PCEP
+vhosts must remain root-owned mode-0644 regular files that are byte-identical to
+the repository, both `sites-enabled` entries must be root-owned symlinks to those
+exact files, and all six PCEP snippets must match. Drift degrades the same minimal
+public status without publishing a path, hash or policy detail. This detects an
+accidental or narrower origin-policy change; like every same-host verifier, it
+cannot independently attest an already compromised root account.
+
 Run `make verify-operations-installation` after every operational install and
 before/after a systemd rollback. When a reviewed unit changes, first preserve the
 currently installed file in the restricted release backup, then install the new
@@ -1344,8 +1352,12 @@ on the learner origin. A future operator interface requires a separate origin
 protected by Cloudflare Access (or
 equivalent), phishing-resistant MFA, explicit operator enrollment and a tested
 emergency access procedure before its Nginx route is enabled.
-The API has a shared 3 requests/second IP limit with a burst of 30, 64 KB body
-limit, short connection timeout and JSON 413/429 errors. Those Nginx-generated
+The API has a shared 10 requests/second IP limit with a burst of 60, 64 KB body
+limit, short connection timeout and JSON 413/429 errors. Both public vhosts declare
+a 1 KiB normal client-header buffer and at most two 8 KiB large-header buffers on
+HTTP and HTTPS; a single header larger than 8 KiB is rejected before it consumes a
+Python worker, and version tokens stay disabled on both listeners. Those
+Nginx-generated
 errors carry `Cache-Control: no-store` and the same restrictive API CSP
 (`default-src 'none'; frame-ancestors 'none'`) as proxied API responses. The analytics proxy exposes only
 GET tracker script and POST event collection; its dashboard is not routed.
@@ -1549,7 +1561,9 @@ certificates in an isolated Nginx container, and builds the hardened backend.
 `scripts/check_nginx.sh` first performs `nginx -t`, then boots that temporary TLS
 vhost on a random loopback port. It verifies the complete Nginx-generated 413 and
 429 API contracts: status, exact JSON body, no-store policy, restrictive CSP,
-request ID and `Retry-After` on throttling. The script uses a digest-pinned Nginx
+request ID and `Retry-After` on throttling. It also proves that a 7 KiB request
+header reaches the fixture while a header larger than the declared 8 KiB field
+limit is rejected at Nginx. The script uses a digest-pinned Nginx
 image, removes its container and temporary files on exit, and never contacts the
 production hostname.
 Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.

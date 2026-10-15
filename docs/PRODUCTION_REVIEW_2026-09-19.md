@@ -3094,6 +3094,47 @@ No defensible FAIR/ALE estimate exists without incident-frequency and business-l
 inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after full CI, image audit,
 controlled backend deployment and external production smoke pass.
 
+### Nginx request-boundary and drift monitoring — 2026-10-15
+
+The learner and isolated-runner vhosts now declare a 1 KiB ordinary request-header
+buffer and no more than two 8 KiB large-header buffers on both HTTP and HTTPS.
+Previously the effective single-field bound came from Nginx's platform default;
+making it repository policy prevents an image/package default or manual tuning from
+silently expanding pre-application work. The isolated contract proves that a 7 KiB
+field reaches the upstream fixture and a 9 KiB field is rejected before a Python
+worker. This complements, rather than replaces, DRF's independent 8 KiB/64-token
+content-negotiation bounds.
+
+The existing exact-file Nginx verifier is now part of the hourly operations health
+run. It requires two active vhosts, their exact root-owned activation symlinks and
+six root-owned snippets to match the reviewed repository bytes. Any import,
+permission, activation or content failure writes only the existing generic public
+`degraded` state; private details stay in the system journal. Ordinary drift is
+therefore detected within the hourly run plus the twice-hourly external poll, while
+stopping the publisher itself becomes visible after the marker's two-hour freshness
+window. Guaranteed human MTTD is still unbounded pending the owner-controlled
+notification-delivery exercise.
+
+The top STRIDE risks are denial of service through oversized/fragmented headers,
+tampering that removes an origin rate/body/header boundary, and information
+disclosure if a drifted vhost re-enables a retired or privileged route. The
+immediate blast radius is the two public origins, three backend workers and every
+active learner; static runner compromise can reach code-execution sessions in the
+isolated browser origin but has no server credential. Response is to preserve the
+active files and Nginx journal, compare them with the reviewed release, restore the
+root-owned exact copies, run syntax and isolated contracts, reload rather than
+restart Nginx, and repeat both local and external smoke. The incident tabletop must
+include a malicious vhost edit and header-flood scenario.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. A
+root-compromised host can forge both configuration and same-host health evidence,
+so independent attestation remains a residual risk. If an origin incident exposes
+personal data, the existing breach assessment and applicable GDPR Article 33
+72-hour clock remain mandatory. No defensible FAIR/ALE estimate exists without
+frequency and business-loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS**
+after full CI, backed-up root installation, isolated/live verification, Nginx reload
+and external production smoke pass.
+
 ## 15. Breaking changes
 
 None.
