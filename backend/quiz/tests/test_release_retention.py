@@ -14,13 +14,14 @@ spec.loader.exec_module(retention)
 
 
 @pytest.fixture(autouse=True)
-def use_fixture_runtime_hashes(monkeypatch):
+def use_fixture_runtime_hashes(monkeypatch, tmp_path):
     publisher = retention.load_publish_release()
     hashes = {
         name: hashlib.sha256(b'\x00asm' if name.endswith('.wasm') else b'complete').hexdigest()
         for name in publisher.PYODIDE_FILE_NAMES
     }
     monkeypatch.setattr(publisher, 'PYODIDE_SHA256', hashes)
+    monkeypatch.setattr(publisher, 'DEFAULT_LOCK_ROOT', tmp_path / 'locks')
     monkeypatch.setattr(retention, 'load_publish_release', lambda: publisher)
 
 
@@ -79,6 +80,20 @@ def test_dry_run_reports_without_removing_anything(tmp_path, capsys):
 
     assert sorted(path.name for path in target.parent.iterdir()) == before
     assert 'Nothing removed' in capsys.readouterr().out
+
+
+def test_retention_refuses_a_concurrent_publish(tmp_path):
+    target, backup_root, _ = snapshot_roots(tmp_path)
+    publisher = retention.load_publish_release()
+
+    with publisher.exclusive_operation_lock(
+        publisher.release_lock_name(target),
+        root=publisher.DEFAULT_LOCK_ROOT,
+    ):
+        with pytest.raises(ValueError, match='already running'):
+            retention.execute(target, backup_root, keep=5)
+
+    assert len(list(target.parent.glob('.frontend.previous-*'))) == 7
 
 
 def test_apply_only_removes_matching_old_frontend_snapshots(tmp_path):

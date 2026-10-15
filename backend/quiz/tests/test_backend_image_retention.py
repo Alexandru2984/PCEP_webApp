@@ -156,7 +156,7 @@ def test_container_inventory_tolerates_only_a_confirmed_disappearance():
         retention.container_image_ids(persistent_runner)
 
 
-def test_apply_rechecks_tag_identity_before_removal():
+def test_apply_rechecks_tag_identity_before_removal(tmp_path):
     images = candidates(3)
     calls = []
 
@@ -179,7 +179,29 @@ def test_apply_rechecks_tag_identity_before_removal():
             return 'untagged'
         raise AssertionError(command)
 
-    retention.execute(keep=2, apply=True, runner=runner)
+    retention.execute(
+        keep=2,
+        apply=True,
+        runner=runner,
+        lock_root=tmp_path / 'locks',
+    )
 
     assert ['docker', 'image', 'rm', images[-1].reference] in calls
     assert not any('--force' in command for command in calls)
+
+
+def test_retention_refuses_a_concurrent_backend_deployment(tmp_path):
+    lock_root = tmp_path / 'locks'
+
+    with retention.exclusive_operation_lock(
+        'backend-maintenance',
+        root=lock_root,
+    ):
+        with pytest.raises(retention.ImageRetentionError, match='already running'):
+            retention.execute(
+                keep=2,
+                runner=lambda *_args, **_kwargs: pytest.fail(
+                    'Locked retention must not inspect Docker.'
+                ),
+                lock_root=lock_root,
+            )

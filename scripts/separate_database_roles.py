@@ -168,7 +168,7 @@ ROLLBACK;
     raise release.ReleaseError('Application role unexpectedly created a table.')
 
 
-def execute(config, restore_container, fallback_image=None):
+def _execute_unlocked(config, restore_container, fallback_image=None):
     release.ensure_tracked_tree_is_clean(config.project_root)
     expected_owner = restore.source_table_owner(config.database_container)
     if expected_owner == release.DATABASE_OWNER_ROLE:
@@ -206,6 +206,17 @@ def execute(config, restore_container, fallback_image=None):
     print(f'Rollback backup: {backup}')
     print(f'Rollback backup SHA-256: {digest}')
     return backup, digest
+
+
+def execute(config, restore_container, fallback_image=None):
+    try:
+        with release.exclusive_operation_lock(
+            'backend-maintenance',
+            root=config.lock_root,
+        ):
+            return _execute_unlocked(config, restore_container, fallback_image)
+    except release.OperationLockError as error:
+        raise release.ReleaseError(str(error)) from error
 
 
 def main():

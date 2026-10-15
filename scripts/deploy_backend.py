@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,21 @@ import subprocess
 import time
 from urllib.request import Request, urlopen
 import uuid
+
+
+def load_operation_lock():
+    path = Path(__file__).with_name('operation_lock.py')
+    spec = importlib.util.spec_from_file_location('pcep_operation_lock', path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError('Cannot load the operation-lock implementation.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+operation_lock = load_operation_lock()
+OperationLockError = operation_lock.OperationLockError
+exclusive_operation_lock = operation_lock.exclusive_operation_lock
 
 
 RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
@@ -50,6 +66,7 @@ class ReleaseConfig:
     database_container: str = 'pcep_db'
     allow_migrations: bool = False
     fallback_rollback_image: str | None = None
+    lock_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -859,7 +876,7 @@ def restore_backend(config, environment, rollback_tag):
     return expected_release
 
 
-def deploy(config):
+def _deploy_unlocked(config):
     root = config.project_root
     environment = release_environment(config)
     ensure_tracked_tree_is_clean(root)
@@ -962,6 +979,17 @@ def deploy(config):
         ) from error
     verify_public_release(config)
     return ReleaseResult(rollback_tag, backup_path, backup_sha256)
+
+
+def deploy(config):
+    try:
+        with exclusive_operation_lock(
+            'backend-maintenance',
+            root=config.lock_root,
+        ):
+            return _deploy_unlocked(config)
+    except OperationLockError as error:
+        raise ReleaseError(str(error)) from error
 
 
 def main():
