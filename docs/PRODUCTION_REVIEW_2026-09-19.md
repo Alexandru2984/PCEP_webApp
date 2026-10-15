@@ -3503,6 +3503,47 @@ incident-frequency, response-time and business-loss inputs. The CISO verdict is
 **SHIP WITH GUARDRAILS** after focused/full tests, a controlled private/public
 canary, full CI, live health publication and exact-SHA external smoke.
 
+### Crash-bounded daily-backup pruning — 2026-10-15
+
+Daily retention previously unlinked a selected backup checksum before its compressed
+dump and flushed the directory only after every pair was removed. If the process,
+filesystem or host failed between those two unlinks, the large dump remained without
+its sidecar. Discovery intentionally ignores unpaired dumps to avoid deleting
+potential recovery evidence, so every such interruption could permanently move one
+large file outside the retention bound and eventually exhaust the backup filesystem.
+
+Retention now revalidates that each selected dump and checksum are regular,
+non-symlinked members of the exact private root and exact daily naming contract. It
+unlinks the large dump first and fsyncs the root before unlinking its small checksum,
+then fsyncs the root again before advancing. A crash can therefore produce either
+the original complete pair or a small orphan checksum, never a large checksum-less
+dump caused by pruning. Existing unpaired dumps remain deliberately untouched.
+
+The top STRIDE risks are denial of service through unbounded disk use, repudiation
+when a nominal retention run silently leaves untracked data, and tampering/recovery
+confusion around a partially deleted pair. Production currently has 14 complete
+daily pairs totaling 814,234 bytes; the largest is 58,318 bytes and no orphan was
+found. The configured floor is 30, so this release performs no live deletion. At
+larger future database sizes, only the currently processed old pair can be partial
+at an interruption; earlier selected pairs are already durably removed, while all
+7–365 configured newest retained pairs remain outside deletion.
+
+Unlink or fsync failure is synchronous and fails the daily oneshot, giving immediate
+machine MTTD; hourly health sees the failed scheduled service or stale newest backup,
+and external smoke sees degraded health in at most 30 minutes. Guaranteed human MTTD
+remains unbounded until notification delivery is confirmed. Response is to preserve
+the journal and directory inventory, never delete an unpaired dump automatically,
+verify all remaining complete pairs, copy important evidence off-host, restore disk
+headroom and rerun backup/restore validation. The tabletop must cover failure after
+the dump unlink, checksum unlink failure and power loss before each directory fsync.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. A wider
+incident involving personal data still requires breach assessment and the applicable
+GDPR Article 33 72-hour notification clock. FAIR/ALE is not defensible without
+backup-growth, storage-failure and business-loss inputs. The CISO verdict is
+**SHIP WITH GUARDRAILS** after failure-injection/full tests, read-only live inventory,
+full CI, healthy publication and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

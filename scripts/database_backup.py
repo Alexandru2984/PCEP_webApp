@@ -151,15 +151,38 @@ def discover_complete_backups(root):
     return sorted(complete, key=lambda pair: pair[0].name, reverse=True)
 
 
+def remove_complete_backup(root, backup, checksum):
+    """Durably remove the large dump before its small verification sidecar."""
+    root = Path(root).absolute()
+    backup = Path(backup).absolute()
+    checksum = Path(checksum).absolute()
+    if (
+        backup.parent != root
+        or checksum.parent != root
+        or DAILY_PATTERN.fullmatch(backup.name) is None
+        or checksum != checksum_path(backup)
+        or backup.is_symlink()
+        or not backup.is_file()
+        or checksum.is_symlink()
+        or not checksum.is_file()
+    ):
+        raise BackupError(f'Refusing to remove an unsafe backup pair: {backup}')
+
+    # If the process or host dies after the first durable unlink, at worst a tiny
+    # sidecar remains. Removing the sidecar first could strand a large dump that
+    # discovery deliberately treats as incomplete and would never prune later.
+    backup.unlink()
+    fsync_directory(root)
+    checksum.unlink()
+    fsync_directory(root)
+
+
 def prune_backups(root, keep):
     complete = discover_complete_backups(root)
     removed = []
     for backup, checksum in complete[keep:]:
-        checksum.unlink()
-        backup.unlink()
+        remove_complete_backup(root, backup, checksum)
         removed.append(backup)
-    if removed:
-        fsync_directory(root)
     return removed
 
 
