@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from django.core.cache import cache
 from django.db import OperationalError
+from rest_framework import negotiation
 from rest_framework.throttling import AnonRateThrottle
 
 pytestmark = pytest.mark.django_db
@@ -157,6 +158,31 @@ def test_api_body_size_is_bounded(api_client):
     assert response.status_code == 413
     assert response.json() == {'detail': 'Request body is too large.'}
     assert response['Cache-Control'] == 'no-store'
+
+
+def test_accept_header_negotiation_work_is_bounded(api_client):
+    accept = ','.join(['application/json'] * 1024)
+
+    with patch('rest_framework.negotiation._MediaType', wraps=negotiation._MediaType) as parser:
+        response = api_client.get('/api/live/', HTTP_ACCEPT=accept)
+
+    assert response.status_code == 200
+    # One parse for the configured renderer plus at most the bounded client tokens.
+    assert parser.call_count <= negotiation.DefaultContentNegotiation.max_accept_tokens + 1
+
+
+def test_non_text_json_charset_is_rejected(api_client):
+    response = api_client.generic(
+        'POST',
+        '/api/grade/',
+        b'{}',
+        content_type='application/json; charset=bz2_codec',
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        'detail': 'Unsupported charset "bz2_codec" in request Content-Type header.'
+    }
 
 
 def test_invalid_json_has_no_feedback(api_client):
