@@ -3054,6 +3054,46 @@ FAIR annual loss expectancy exists without business loss and frequency inputs. T
 CISO verdict is **SHIP WITH GUARDRAILS** only after full CI, no-restart CPU rollout,
 live runtime verification, capacity smoke and external production smoke pass.
 
+### Django REST Framework security patch — 2026-10-15
+
+The backend moves from Django REST Framework 3.18.1 to 3.18.3. Version 3.18.2
+closes three upstream advisories: unbounded work while negotiating very large
+`Accept` headers, acceptance of non-text codecs that can expand a small request
+after Django's body-size check, and ineffective deletion through `TokenProxy`.
+Version 3.18.3 also restores the 3.18.1 ordering behavior after the intervening
+bug fix. This application does not install DRF token authentication and explicitly
+disables all authentication classes, so the token-deletion advisory has no current
+application path. Content negotiation and JSON parsing do apply to every API route.
+
+The top STRIDE risks are denial of service through `Accept` negotiation, denial of
+service through post-limit codec expansion, and elevation/spoofing through a token
+that an operator believed was deleted. The first two can affect all public API
+workers and therefore every concurrently active learner; the third has a current
+blast radius of zero authentication tokens because the product creates none. The
+database scope remains the 308-question bank and recovery metadata, with no
+server-side learner account, progress, payment or health data. Regression tests now
+prove that client media-type parsing is capped at 64 tokens and that a bytes-to-bytes
+JSON charset is rejected before decoding. Binary-only, hash-locked installation
+also excludes the source distributions from the accepted artifact set.
+
+The daily dependency audit gives advisory-database detection a machine MTTD of at
+most roughly 24 hours after the advisory becomes indexable; weekly Dependabot is a
+second discovery path. Runtime regressions are covered by the twice-hourly external
+smoke and hourly operations checks, but guaranteed human MTTD remains unbounded
+until the outstanding notification-delivery exercise is acknowledged by a named
+responder. If exploitation is suspected, preserve Cloudflare/Nginx and application
+logs, temporarily block the offending request shape at the edge, deploy or roll
+back only a hash-locked image, and exercise the incident tabletop with both header
+fan-out and compressed-body scenarios.
+
+DRF and pip-tools are local open-source build/runtime components: this change adds
+no hosted vendor, credential, subprocessor, DPA requirement or personal-data flow.
+If an availability incident also exposes personal data, the existing breach
+assessment and applicable GDPR Article 33 72-hour notification clock still apply.
+No defensible FAIR/ALE estimate exists without incident-frequency and business-loss
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after full CI, image audit,
+controlled backend deployment and external production smoke pass.
+
 ## 15. Breaking changes
 
 None.
