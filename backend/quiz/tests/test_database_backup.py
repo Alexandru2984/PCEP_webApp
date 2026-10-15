@@ -98,6 +98,58 @@ def test_retention_detects_a_corrupted_complete_backup(tmp_path):
         backup.discover_complete_backups(root)
 
 
+def test_retention_durably_removes_dump_before_checksum(tmp_path, monkeypatch):
+    root = tmp_path / 'backups'
+    root.mkdir()
+    paths = [completed_backup(root, day) for day in range(1, 9)]
+    selected = paths[0]
+    selected_checksum = backup.checksum_path(selected)
+    events = []
+    original_unlink = Path.unlink
+
+    def unlink(path, *args, **kwargs):
+        events.append(('unlink', path.name))
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'unlink', unlink)
+    monkeypatch.setattr(
+        backup,
+        'fsync_directory',
+        lambda path: events.append(('fsync', Path(path).name)),
+    )
+
+    assert backup.prune_backups(root, keep=7) == [selected]
+    assert events == [
+        ('unlink', selected.name),
+        ('fsync', 'backups'),
+        ('unlink', selected_checksum.name),
+        ('fsync', 'backups'),
+    ]
+
+
+def test_checksum_unlink_failure_cannot_strand_a_large_dump(tmp_path, monkeypatch):
+    root = tmp_path / 'backups'
+    root.mkdir()
+    paths = [completed_backup(root, day) for day in range(1, 9)]
+    selected = paths[0]
+    selected_checksum = backup.checksum_path(selected)
+    original_unlink = Path.unlink
+
+    def unlink(path, *args, **kwargs):
+        if path == selected_checksum:
+            raise OSError('simulated checksum unlink failure')
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'unlink', unlink)
+
+    with pytest.raises(OSError, match='checksum unlink failure'):
+        backup.prune_backups(root, keep=7)
+
+    assert not selected.exists()
+    assert selected_checksum.is_file()
+    assert len(backup.discover_complete_backups(root)) == 7
+
+
 @pytest.mark.parametrize('value', [0, 6, 366, 'invalid'])
 def test_requires_bounded_daily_retention(value):
     with pytest.raises(Exception, match='keep'):

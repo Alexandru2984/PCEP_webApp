@@ -352,6 +352,10 @@ fsyncs the completed files, verifies every retained checksum on each run and onl
 then removes complete daily pairs beyond the newest 30. Failed dumps never trigger
 retention. Unpaired files, pre-deploy dumps, role dumps, configuration backups and
 frontend snapshots are outside its exact filename pattern and are never removed.
+For each selected complete pair, retention unlinks and directory-fsyncs the large
+dump before unlinking and flushing its small checksum. An interruption can therefore
+leave at most a checksum sidecar; it cannot strand a large dump that future discovery
+would deliberately ignore as incomplete.
 
 Install the reviewed timer after creating its only writable directory:
 
