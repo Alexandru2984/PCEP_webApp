@@ -127,10 +127,16 @@ def test_seo_flush_failure_keeps_live_tree_and_prevents_exchange(
     live.mkdir()
     marker = live / 'existing.html'
     marker.write_text('known-good', encoding='utf-8')
+    flushed = []
     monkeypatch.setattr(
         seo_pages,
         'fsync_tree',
         lambda _path: (_ for _ in ()).throw(OSError('storage failure')),
+    )
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_directory',
+        lambda path: flushed.append(Path(path)),
     )
     monkeypatch.setattr(
         seo_pages,
@@ -143,6 +149,37 @@ def test_seo_flush_failure_keeps_live_tree_and_prevents_exchange(
 
     assert marker.read_text(encoding='utf-8') == 'known-good'
     assert list(tmp_path.glob('.seo.release-*')) == []
+    assert flushed == [tmp_path]
+
+
+def test_seo_cleanup_failure_preserves_the_generation_error(
+    tmp_path, monkeypatch, capsys
+):
+    live = tmp_path / 'seo'
+    live.mkdir()
+    marker = live / 'existing.html'
+    marker.write_text('known-good', encoding='utf-8')
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_tree',
+        lambda _path: (_ for _ in ()).throw(OSError('primary storage failure')),
+    )
+    monkeypatch.setattr(
+        seo_pages,
+        'fsync_directory',
+        lambda _path: (_ for _ in ()).throw(OSError('cleanup storage failure')),
+    )
+
+    with pytest.raises(OSError, match='primary storage failure') as caught:
+        seo_pages.publish_questions(valid_questions(), live)
+
+    assert any(
+        'cleanup storage failure' in note
+        for note in getattr(caught.value, '__notes__', ())
+    )
+    assert '[pcep-seo] avertisment:' in capsys.readouterr().err
+    assert list(tmp_path.glob('.seo.release-*')) == []
+    assert marker.read_text(encoding='utf-8') == 'known-good'
 
 
 def test_seo_parent_flush_failure_after_exchange_preserves_both_generations(

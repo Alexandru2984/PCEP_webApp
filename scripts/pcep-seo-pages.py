@@ -577,6 +577,12 @@ def fsync_tree(root: pathlib.Path) -> None:
         fsync_directory(directory)
 
 
+def remove_tree_durably(path: pathlib.Path, parent: pathlib.Path) -> None:
+    """Remove a failed SEO tree and commit its directory entry removal."""
+    shutil.rmtree(path)
+    fsync_directory(parent)
+
+
 def publish_questions(questions: list[dict], target: pathlib.Path = OUT_ROOT) -> int:
     target, parent = publication_target(target)
     with publication_lock(parent):
@@ -610,9 +616,18 @@ def publish_questions(questions: list[dict], target: pathlib.Path = OUT_ROOT) ->
                         file=sys.stderr,
                     )
             return total
-        finally:
+        except BaseException as error:
             if not published and stage.exists():
-                shutil.rmtree(stage)
+                try:
+                    remove_tree_durably(stage, parent)
+                except Exception as cleanup_error:
+                    note = (
+                        f"curatarea durabila a staging-ului SEO {stage} a esuat: "
+                        f"{cleanup_error}"
+                    )
+                    error.add_note(note)
+                    print(f"[pcep-seo] avertisment: {note}", file=sys.stderr)
+            raise
 
 
 def main() -> int:

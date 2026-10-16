@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import sys
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -199,6 +200,12 @@ def fsync_tree(root):
         fsync_directory(directory)
 
 
+def remove_tree_durably(path, parent):
+    """Remove a failed release tree and commit its directory entry removal."""
+    shutil.rmtree(path)
+    fsync_directory(parent)
+
+
 def previous_asset_mtimes(target):
     """Identify every chunk built with the currently referenced entry assets."""
     index = target / 'index.html'
@@ -332,9 +339,18 @@ def _publish_unlocked(
         swapped = True
         fsync_directory(target.parent)
         return None
-    finally:
+    except BaseException as error:
         if not swapped and stage.exists():
-            shutil.rmtree(stage)
+            try:
+                remove_tree_durably(stage, target.parent)
+            except Exception as cleanup_error:
+                note = (
+                    f'Failed to durably remove release staging {stage}: '
+                    f'{cleanup_error}'
+                )
+                error.add_note(note)
+                print(f'Publication cleanup warning: {note}', file=sys.stderr)
+        raise
 
 
 def publish(

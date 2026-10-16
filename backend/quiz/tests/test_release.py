@@ -103,10 +103,16 @@ def test_publish_flushes_release_backup_and_parent_in_cutover_order(
 def test_flush_failure_keeps_live_release_and_prevents_exchange(tmp_path, monkeypatch):
     source = static_release(tmp_path / 'source', 'new')
     target = static_release(tmp_path / 'live', 'old')
+    flushed = []
     monkeypatch.setattr(
         release,
         'fsync_tree',
         lambda _path: (_ for _ in ()).throw(OSError('storage failure')),
+    )
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda path: flushed.append(Path(path)),
     )
     monkeypatch.setattr(
         release,
@@ -119,6 +125,35 @@ def test_flush_failure_keeps_live_release_and_prevents_exchange(tmp_path, monkey
 
     assert (target / 'admin/css/base.css').read_text() == 'old'
     assert not list(tmp_path.glob('.live.release-*'))
+    assert flushed == [tmp_path]
+
+
+def test_cleanup_failure_preserves_the_publication_error(
+    tmp_path, monkeypatch, capsys
+):
+    source = static_release(tmp_path / 'source', 'new')
+    target = static_release(tmp_path / 'live', 'old')
+    monkeypatch.setattr(
+        release,
+        'fsync_tree',
+        lambda _path: (_ for _ in ()).throw(OSError('primary storage failure')),
+    )
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda _path: (_ for _ in ()).throw(OSError('cleanup storage failure')),
+    )
+
+    with pytest.raises(OSError, match='primary storage failure') as caught:
+        release.publish(source, target, kind='static')
+
+    assert any(
+        'cleanup storage failure' in note
+        for note in getattr(caught.value, '__notes__', ())
+    )
+    assert 'Publication cleanup warning' in capsys.readouterr().err
+    assert not list(tmp_path.glob('.live.release-*'))
+    assert (target / 'admin/css/base.css').read_text() == 'old'
 
 
 def test_parent_flush_failure_after_exchange_preserves_both_generations(
