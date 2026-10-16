@@ -151,6 +151,73 @@ def test_public_status_refuses_an_existing_symlink(tmp_path):
     assert os.path.islink(output)
 
 
+def test_failed_public_status_write_durably_removes_its_temporary(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / 'public/status.json'
+    output.parent.mkdir(mode=0o755)
+    flushed = []
+    monkeypatch.setattr(
+        health.json,
+        'dump',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            OSError('primary status write failure')
+        ),
+    )
+    monkeypatch.setattr(
+        health,
+        'fsync_directory',
+        lambda path: flushed.append(Path(path)),
+    )
+
+    with pytest.raises(OSError, match='primary status write failure'):
+        health.write_public_status(
+            output,
+            'ok',
+            datetime(2026, 10, 16, 2, tzinfo=timezone.utc),
+        )
+
+    assert list(output.parent.glob('.status.json.partial-*')) == []
+    assert flushed == [output.parent]
+    assert not output.exists()
+
+
+def test_cleanup_failure_does_not_mask_the_public_status_error(
+    tmp_path, monkeypatch, capsys
+):
+    output = tmp_path / 'public/status.json'
+    output.parent.mkdir(mode=0o755)
+    monkeypatch.setattr(
+        health.json,
+        'dump',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            OSError('primary status write failure')
+        ),
+    )
+    monkeypatch.setattr(
+        health,
+        'fsync_directory',
+        lambda _path: (_ for _ in ()).throw(
+            OSError('cleanup directory flush failure')
+        ),
+    )
+
+    with pytest.raises(OSError, match='primary status write failure') as caught:
+        health.write_public_status(
+            output,
+            'degraded',
+            datetime(2026, 10, 16, 2, tzinfo=timezone.utc),
+        )
+
+    assert any(
+        'cleanup directory flush failure' in note
+        for note in getattr(caught.value, '__notes__', ())
+    )
+    assert 'Operations health cleanup warning' in capsys.readouterr().err
+    assert list(output.parent.glob('.status.json.partial-*')) == []
+    assert not output.exists()
+
+
 @pytest.mark.parametrize(
     'name',
     [

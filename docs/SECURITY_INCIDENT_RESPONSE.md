@@ -70,7 +70,7 @@ person receives and acknowledges it.
 | Required PR checks, CodeQL and secret scanning | unsafe change, code weakness or committed credential | block merge; triage the same day |
 | Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
 | Twice-hourly production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | technical alert normally under 1 hour |
-| Hourly external recovery attestation | missing/corrupt/stale local backup, missed restore or stopped publisher | technical alert normally under 3 hours after its freshness threshold |
+| Hourly external recovery attestation | missing/corrupt/stale local backup, missed restore or failed/stopped health-marker publisher | technical alert normally under 3 hours after its freshness threshold |
 | Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | machine signal within roughly 3 hours of staging creation; external issue within another 30 minutes |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
@@ -204,6 +204,23 @@ secrets, personal data or raw logs in a public issue.
    as a possible host/storage incident. Follow the host-compromise playbook if the
    metadata cannot be explained by a failed reviewed publication.
 
+### Operations-health marker publication failure
+
+1. Preserve the failed unit journal, the existing marker metadata and ACL, relevant
+   filesystem/kernel events and the exact primary plus cleanup diagnostics. Do not
+   republish a hand-written `ok` marker.
+2. Confirm the existing public marker still has only `schema`, `status` and
+   `checked_at`; treat it as stale evidence, not current health. Never copy its
+   private journal diagnosis into the public file or an alert issue.
+3. Inventory only exact `.status.json.partial-*` entries in the private state
+   directory. Do not remove the state directory or its last published marker, and
+   preserve a partial when storage failure or host compromise is under investigation.
+4. Fix the initiating verifier/write/storage failure first, verify the installed
+   unit and directory ownership/mode, start the reviewed service, then confirm the
+   external no-store endpoint and full production smoke contract.
+5. Escalate repeated write, unlink or directory-`fsync` failures as a storage/host
+   incident and evaluate every credential readable by that host identity.
+
 ## Recovery gates
 
 Do not close or downgrade the incident until all applicable gates pass:
@@ -274,7 +291,8 @@ Run at least twice a year and after control-plane changes. Use synthetic evidenc
 never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
-   database tampering, stale publication staging or malicious service worker.
+   database tampering, stale publication staging, failed health-marker cleanup or
+   malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.

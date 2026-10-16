@@ -465,6 +465,12 @@ the detail bounded to 512 characters; the public JSON remains the same three-fie
 document. The public exact
 route `/.well-known/pcep-operations.json` is GET-only, no-store and deny-all CSP;
 it never exposes file names, counts, hashes, ages or error details.
+The marker file is fsynced before atomic replacement and its state directory is
+fsynced after replacement. If payload creation or any pre-replace step fails, the
+mode-0600 random temporary is unlinked and the same directory is fsynced before the
+original error returns. A cleanup unlink/open/flush error is attached to, and logged
+separately from, that primary error rather than replacing its diagnosis. An existing
+public marker is never truncated in place.
 
 The same hourly run also verifies operational installation drift. It requires the
 12 reviewed PCEP service/timer files under `/etc/systemd/system` to be root-owned,
