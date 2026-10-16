@@ -71,6 +71,7 @@ person receives and acknowledges it.
 | Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
 | Twice-hourly production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | technical alert normally under 1 hour |
 | Hourly external recovery attestation | missing/corrupt/stale local backup, missed restore or stopped publisher | technical alert normally under 3 hours after its freshness threshold |
+| Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | machine signal within roughly 3 hours of staging creation; external issue within another 30 minutes |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
 
@@ -183,6 +184,26 @@ secrets, personal data or raw logs in a public issue.
 4. Review third-party build inputs, pinned action commits, npm integrity/signatures
    and Pyodide hashes before republishing.
 
+### Stale publication staging or release-disk growth
+
+1. Preserve the operations-health journal, publisher/service journal, exact directory
+   metadata, filesystem/kernel events and free-space measurements. Do not copy file
+   contents into a public issue.
+2. Confirm whether a publisher process and its reviewed non-blocking lock are active.
+   A fresh legitimate staging tree is allowed for two hours; never delete a tree
+   while its publisher may still own it.
+3. Validate the live release, the immediate rollback and the external backup before
+   changing the stale path. Inventory only exact `.frontend.release-*`,
+   `.static.release-*` and `.seo.release-*` candidates; do not use a broad wildcard
+   delete and never target `frontend`, `static` or `seo` themselves.
+4. If no publisher owns an exact stale candidate, preserve any evidence needed for
+   a storage/process investigation and use a separately reviewed exact-path cleanup.
+   Recheck free space, rerun the relevant publisher only from a verified source and
+   start operations health again.
+5. Escalate repeated residues, unsafe ownership/mode, future timestamps or I/O errors
+   as a possible host/storage incident. Follow the host-compromise playbook if the
+   metadata cannot be explained by a failed reviewed publication.
+
 ## Recovery gates
 
 Do not close or downgrade the incident until all applicable gates pass:
@@ -253,7 +274,7 @@ Run at least twice a year and after control-plane changes. Use synthetic evidenc
 never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
-   database tampering or malicious service worker.
+   database tampering, stale publication staging or malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.

@@ -440,6 +440,18 @@ missing, malformed or stale marker deliberately degrades health; this deadline d
 not upload a backup or weaken any activation gate in the offsite runbook. It prevents
 the accepted same-host-only recovery risk from expiring silently.
 
+The same run inventories the real, owner-controlled `/var/www/pcep` release parent
+read-only. It accepts only exact temporary publisher names for `frontend`, `static`
+and `seo`, requires every match to remain a real directory owned by `micu` and not
+writable by group or others, and rejects timestamps more than five minutes in the
+future. A matching directory may exist for at most two hours so an active atomic
+publication is not treated as an incident; anything older degrades health. The age
+uses the newer inode change or modification time, so copying an old source mtime
+cannot immediately age a live staging operation. This control reports and never
+deletes a tree. With the hourly publisher, stale staging reaches machine-visible
+`degraded` in at most roughly three hours after creation; the external poll sees the
+generic state within another 30 minutes.
+
 The publisher atomically creates only `schema`, `status` and `checked_at` as mode
 0600 in its systemd-managed mode-0750 state directory. After both successful and
 degraded publications,
