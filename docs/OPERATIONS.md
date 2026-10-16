@@ -795,6 +795,10 @@ command report that publication did not complete durably. The complete immediate
 previous asset generation is always retained,
 even after a longer deployment gap. Older generations are omitted only from the
 new staging root; the complete previous root and external backup remain available.
+If any pre-exchange step fails, the staging tree is removed and its parent directory
+is fsynced before the publisher returns the original error. A separate cleanup
+warning is emitted if that removal or flush fails; cleanup never replaces the
+primary publication diagnosis.
 Publication and retention for the same canonical live root share a target-derived,
 non-blocking lock in `/run/lock/pcep-<uid>/`. Parent-directory aliases resolve to
 the same lock. A second publisher or retention run is refused before it can copy,
@@ -978,7 +982,9 @@ validation or rendering failures leave the prior release untouched. Concurrent
 publishers are rejected by a private lock. Before exchange, every generated file
 and directory is fsynced from the leaves upward; the live parent is fsynced after
 exchange. The prior tree is removed only after that durable cutover, and its
-directory-entry removal is flushed separately.
+directory-entry removal is flushed separately. Failed pre-exchange staging is also
+removed and parent-fsynced. If cleanup fails, the service journal retains both a
+cleanup warning and the original generation error.
 
 Validate and deploy the non-root, filesystem- and network-sandboxed service with:
 

@@ -3592,6 +3592,53 @@ inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after failure-injection/ful
 tests, a read-only live inventory, full CI, healthy publication and exact-SHA
 external smoke.
 
+### Crash-durable failed-publication cleanup — 2026-10-16
+
+The frontend/static and SEO publishers removed their hidden staging tree after a
+pre-cutover failure but did not flush the containing directory. A successful
+command-level cleanup could therefore be lost across a host or storage reset. In
+addition, an error raised by recursive cleanup could replace the original render,
+validation or storage failure, weakening incident diagnosis while repeated hidden
+residues consumed disk outside snapshot-retention discovery.
+
+Both publishers now recursively remove failed staging and immediately `fsync` its
+exact parent before returning the primary failure. If removal or flushing itself
+fails, the original exception remains authoritative, the secondary error is
+attached as a note and a separate warning is emitted to stderr/the private service
+journal. The live tree is never selected by this cleanup, and all existing atomic
+exchange, validation, symlink and non-blocking-lock controls remain in force.
+
+The top STRIDE risks are denial of service through repeated hidden staging and disk
+exhaustion, repudiation when cleanup success or the initiating failure cannot be
+reconstructed, and tampering/recovery confusion around a partial non-live tree.
+The production inventory found zero matching staging residues. A current complete
+frontend tree is 15,108 KiB and the SEO tree is 156 KiB, so one failed run has that
+approximate direct storage radius; repeated failures were previously unbounded.
+The live release, rollback roots, backups and current 308-question database remain
+outside the failed-stage cleanup target.
+
+The initiating and cleanup failures are synchronous, giving immediate machine and
+invoking-operator MTTD; a failed scheduled SEO unit is also detected by the hourly
+operations publisher and twice-hourly external contract in roughly one to three
+hours. There is still no dedicated stale-staging inventory alert, so a residue left
+by abrupt process or host death has unbounded guaranteed machine and human MTTD
+until disk/inventory monitoring and alert delivery are confirmed.
+
+Response is to preserve the publisher, unit, filesystem and kernel journals; retain
+the primary and cleanup messages together; validate the live tree; inventory only
+the exact hidden staging patterns; recover disk headroom; and republish from a
+verified source. Never broad-delete the live parent. The tabletop must cover a
+render/validation failure followed by successful durable cleanup, recursive-delete
+failure, parent-`fsync` failure and power loss during cleanup.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+host incident exposes personal data, breach assessment and the applicable GDPR
+Article 33 72-hour notification clock remain mandatory. FAIR/ALE is not defensible
+without failure frequency, disk-growth, active-user and business-loss inputs. The
+CISO verdict is **SHIP WITH GUARDRAILS** after focused/full failure-injection tests,
+zero-residue live inventory, live SEO generation, full CI, healthy publication and
+exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
