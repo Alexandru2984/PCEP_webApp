@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import stat as stat_module
+import sys
 import uuid
 
 
@@ -291,6 +292,34 @@ def verify_offsite_freshness(path, max_age_hours, now):
     return moment
 
 
+def fsync_directory(path):
+    flags = (
+        os.O_RDONLY
+        | getattr(os, 'O_CLOEXEC', 0)
+        | getattr(os, 'O_DIRECTORY', 0)
+    )
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        if not stat_module.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise OperationsHealthError(
+                'Public status directory must remain a real directory.'
+            )
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def remove_temporary_durably(path, parent):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    fsync_directory(parent)
+    return True
+
+
 def write_public_status(path, status, now):
     if status not in {'ok', 'degraded'}:
         raise OperationsHealthError('Public operations status is invalid.')
@@ -316,10 +345,11 @@ def write_public_status(path, status, now):
         'status': status,
     }
     temporary = parent / f'.{output_path.name}.partial-{uuid.uuid4().hex}'
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_CLOEXEC', 0)
     if hasattr(os, 'O_NOFOLLOW'):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(temporary, flags, 0o600)
+    published = False
     try:
         with os.fdopen(descriptor, 'w') as output:
             json.dump(payload, output, separators=(',', ':'), sort_keys=True)
@@ -327,14 +357,21 @@ def write_public_status(path, status, now):
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, output_path)
+        published = True
         output_path.chmod(0o600)
-        directory = os.open(parent, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0))
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
-    finally:
-        temporary.unlink(missing_ok=True)
+        fsync_directory(parent)
+    except BaseException as error:
+        if not published and os.path.lexists(temporary):
+            try:
+                remove_temporary_durably(temporary, parent)
+            except Exception as cleanup_error:
+                note = (
+                    f'Failed to durably remove public status temporary '
+                    f'{temporary}: {cleanup_error}'
+                )
+                error.add_note(note)
+                print(f'Operations health cleanup warning: {note}', file=sys.stderr)
+        raise
     return payload
 
 

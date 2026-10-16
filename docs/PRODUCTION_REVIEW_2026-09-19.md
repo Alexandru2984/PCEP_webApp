@@ -3688,6 +3688,52 @@ CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, exact unit
 installation, a zero-residue live inventory, healthy publication, full CI and
 exact-SHA external smoke.
 
+### Crash-durable operations-health temporary cleanup — 2026-10-16
+
+The operations-health publisher wrote and fsynced a private random temporary before
+atomic replacement, but its unconditional failure cleanup only unlinked that path.
+It did not flush the state directory, and a cleanup error could replace the original
+verifier, serialization or storage exception. A host reset could therefore restore
+a supposedly removed partial, while the private journal lost the initiating reason
+needed to explain why the public health marker stopped advancing.
+
+Pre-replace failure cleanup now unlinks the exact random temporary and immediately
+fsyncs the validated state directory. Directory open uses close-on-exec, directory
+and no-follow flags where supported, rechecks the opened descriptor type, and always
+closes it. If unlink or flush fails, the original exception remains authoritative;
+the secondary failure is attached as a note and emitted separately to the private
+service journal. A successful replace continues to flush the same directory, and
+the existing marker is never edited in place.
+
+The top STRIDE risks are repudiation through loss of the primary health failure,
+denial of service when repeated invisible partials consume state storage or block
+publication, and tampering/recovery confusion around leftover marker material. The
+live inventory found zero matching partials. The current public marker is 63 bytes
+and contains only `schema`, `status` and `checked_at`; one in-flight temporary has
+that bounded approximate radius, is created mode 0600 inside the private state
+directory, and contains no learner, credential, backup or verifier-detail data.
+
+The service failure and separate cleanup warning are synchronous, giving immediate
+machine and invoking-operator MTTD. If the public marker cannot advance, the
+twice-hourly external contract rejects it once `checked_at` exceeds two hours, so
+external detection occurs no later than roughly two hours and 30 minutes after the
+last successful publication. Guaranteed human MTTD remains unbounded until alert
+delivery and acknowledgement are confirmed.
+
+The incident-response runbook now preserves the primary and cleanup diagnostics,
+existing marker/ACL and storage evidence; forbids a hand-written `ok` marker; and
+requires correcting the initiating failure before restarting the reviewed service.
+The tabletop must cover serialization failure before replace, unlink failure,
+directory-`fsync` failure and a stale but still publicly readable prior marker.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+host incident exposes personal data, breach assessment and the applicable GDPR
+Article 33 72-hour notification clock remain mandatory. FAIR/ALE is not defensible
+without failure frequency, response cost and business-loss inputs. The CISO verdict
+is **SHIP WITH GUARDRAILS** after focused/full failure-injection tests, zero-partial
+live inventory, exact service execution, full CI, healthy publication and exact-SHA
+external smoke.
+
 ## 15. Breaking changes
 
 None.
