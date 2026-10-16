@@ -8,13 +8,23 @@ import json
 import os
 from pathlib import Path
 import re
+import stat as stat_module
 import uuid
 
 
 DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
 DEFAULT_RESTORE_STATUS = Path('/var/lib/pcep-db-restore-check/last-success.json')
 DEFAULT_OUTPUT = Path('/var/lib/pcep-operations-health/status.json')
+DEFAULT_RELEASE_ROOT = Path('/var/www/pcep')
 BACKUP_PATTERN = re.compile(r'^pcep_db_daily_(\d{8}T\d{6}Z)\.sql\.gz$')
+RELEASE_STAGE_PATTERN = re.compile(
+    r'^\.(?:frontend|static|seo)\.release-[a-z0-9_]{8}$'
+)
+RELEASE_STAGE_PREFIXES = (
+    '.frontend.release-',
+    '.static.release-',
+    '.seo.release-',
+)
 UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 MAX_STATUS_BYTES = 256
 MAX_OFFSITE_STATUS_BYTES = 512
@@ -117,6 +127,75 @@ def require_fresh(moment, now, max_age_hours, label):
         raise OperationsHealthError(f'{label} timestamp is unexpectedly in the future.')
     if age > timedelta(hours=max_age_hours):
         raise OperationsHealthError(f'{label} is stale.')
+
+
+def release_staging_changed_at(details):
+    return datetime.fromtimestamp(
+        max(details.st_ctime, details.st_mtime),
+        tz=timezone.utc,
+    )
+
+
+def verify_release_staging(root, max_age_hours, now):
+    """Reject unsafe or old publisher staging without racing normal cutovers."""
+    release_root = Path(root).absolute()
+    try:
+        unsafe_root = (
+            release_root.is_symlink()
+            or not release_root.is_dir()
+            or release_root.resolve() != release_root
+        )
+        root_details = release_root.stat()
+    except OSError as error:
+        raise OperationsHealthError('Release root metadata failed.') from error
+    if unsafe_root:
+        raise OperationsHealthError('Release root must be a real directory.')
+    if root_details.st_uid != os.getuid() or root_details.st_mode & 0o022:
+        raise OperationsHealthError('Release root permissions are unsafe.')
+
+    try:
+        entries = list(release_root.iterdir())
+    except OSError as error:
+        raise OperationsHealthError('Release staging inventory failed.') from error
+
+    found = []
+    for entry in entries:
+        if not entry.name.startswith(RELEASE_STAGE_PREFIXES):
+            continue
+        if RELEASE_STAGE_PATTERN.fullmatch(entry.name) is None:
+            raise OperationsHealthError(
+                f'Unsafe release staging entry detected: {entry.name}'
+            )
+        try:
+            details = entry.stat(follow_symlinks=False)
+        except FileNotFoundError:
+            # A cooperating publisher may complete between listing and stat.
+            continue
+        except OSError as error:
+            raise OperationsHealthError(
+                f'Release staging metadata failed: {entry.name}'
+            ) from error
+        if (
+            not stat_module.S_ISDIR(details.st_mode)
+            or details.st_uid != os.getuid()
+            or details.st_mode & 0o022
+        ):
+            raise OperationsHealthError(
+                f'Unsafe release staging entry detected: {entry.name}'
+            )
+        changed = release_staging_changed_at(details)
+        age = now - changed
+        if age < -FUTURE_TOLERANCE:
+            raise OperationsHealthError(
+                f'Release staging timestamp is unexpectedly in the future: '
+                f'{entry.name}'
+            )
+        if age > timedelta(hours=max_age_hours):
+            raise OperationsHealthError(
+                f'Stale release staging detected: {entry.name}'
+            )
+        found.append(entry)
+    return found
 
 
 def verify_backup_freshness(backup_root, max_age_hours, now, backup_module=None):
@@ -278,6 +357,8 @@ def execute(
     nginx_installation_module=None,
     verify_container_runtime=False,
     container_runtime_module=None,
+    release_root=None,
+    release_staging_max_age_hours=2,
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
@@ -285,6 +366,9 @@ def execute(
     offsite_max_age_hours = bounded_hours(offsite_max_age_hours)
     database_security_max_age_hours = bounded_hours(
         database_security_max_age_hours
+    )
+    release_staging_max_age_hours = bounded_hours(
+        release_staging_max_age_hours
     )
     if offsite_required_after is not None:
         offsite_required_after = calendar_date(offsite_required_after)
@@ -309,6 +393,15 @@ def execute(
             verify_database_security_freshness(
                 database_security_status,
                 database_security_max_age_hours,
+                moment,
+            )
+        except OperationsHealthError as error:
+            failures.append(str(error))
+    if release_root is not None:
+        try:
+            verify_release_staging(
+                release_root,
+                release_staging_max_age_hours,
                 moment,
             )
         except OperationsHealthError as error:
@@ -406,6 +499,10 @@ def main():
     parser.add_argument(
         '--database-security-max-age-hours', type=bounded_hours, default=2
     )
+    parser.add_argument('--release-root', type=Path, default=DEFAULT_RELEASE_ROOT)
+    parser.add_argument(
+        '--release-staging-max-age-hours', type=bounded_hours, default=2
+    )
     parser.add_argument('--verify-installation', action='store_true')
     parser.add_argument('--verify-nginx-installation', action='store_true')
     parser.add_argument('--verify-container-runtime', action='store_true')
@@ -423,6 +520,10 @@ def main():
             database_security_status=args.database_security_status,
             database_security_max_age_hours=(
                 args.database_security_max_age_hours
+            ),
+            release_root=args.release_root,
+            release_staging_max_age_hours=(
+                args.release_staging_max_age_hours
             ),
             verify_installation=args.verify_installation,
             verify_nginx_installation=args.verify_nginx_installation,

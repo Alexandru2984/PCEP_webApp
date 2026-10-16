@@ -3639,6 +3639,55 @@ CISO verdict is **SHIP WITH GUARDRAILS** after focused/full failure-injection te
 zero-residue live inventory, live SEO generation, full CI, healthy publication and
 exact-SHA external smoke.
 
+### Stale publication-staging detection — 2026-10-16
+
+Crash-durable cleanup still cannot execute when a publisher process, kernel or host
+dies during recursive removal. Frontend/static and SEO staging use hidden temporary
+names that bounded snapshot retention deliberately does not select. Without an
+inventory signal, each abrupt failure could therefore leave a partial tree until a
+manual disk investigation, making machine and human MTTD unbounded.
+
+The hourly operations publisher now reads the real `/var/www/pcep` parent and
+recognizes only the exact temporary-name contracts for frontend, static and SEO.
+Every matching entry must be a current-user-owned real directory with no group or
+other write bit. The newer inode-change or modification timestamp may be no more
+than two hours old and no more than five minutes in the future. This tolerates a
+legitimate active copy, resists an old source mtime, and fails closed on malformed
+prefix matches, symlinks, files or unsafe metadata. The detector is read-only and
+never decides that a tree is safe to delete.
+
+The top STRIDE risks are denial of service through undetected disk growth,
+repudiation when failed-publication residue has no bounded signal, and tampering
+when a planted or metadata-altered staging entry is accepted as ordinary. The live
+inventory found zero matching residues. A present complete frontend and SEO tree
+measure 15,108 KiB and 156 KiB respectively; one failed run has that approximate
+storage radius, while live releases, rollback roots, external snapshots and the
+308-question database are outside the detector's write scope because it has none.
+
+After the two-hour tolerance, the hourly publisher gives machine MTTD of at most
+roughly one additional hour, or about three hours from staging creation. The
+twice-hourly external contract sees generic `degraded` within another 30 minutes.
+The private journal names the exact reviewed candidate while the public JSON stays
+at three non-sensitive fields. Guaranteed human MTTD remains unbounded until alert
+delivery and acknowledgement are confirmed. A compromised `micu`/root identity can
+refresh metadata or forge health, so this is a narrower failure detector rather
+than independent host attestation.
+
+The incident-response runbook now requires preserving journals and exact metadata,
+checking the publisher process and lock, validating live/rollback/backup trees and
+using only a separately reviewed exact-path cleanup after ownership is excluded. It
+forbids broad wildcard deletion. The tabletop must cover a legitimate fresh stage,
+a stale partial directory, a matching symlink, future metadata and an unexplained
+unsafe owner or mode.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+host incident exposes personal data, breach assessment and the applicable GDPR
+Article 33 72-hour notification clock remain mandatory. FAIR/ALE is not defensible
+without failure frequency, disk-growth, active-user and business-loss inputs. The
+CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, exact unit
+installation, a zero-residue live inventory, healthy publication, full CI and
+exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

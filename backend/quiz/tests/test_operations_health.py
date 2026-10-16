@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -148,6 +149,105 @@ def test_public_status_refuses_an_existing_symlink(tmp_path):
 
     assert target.read_text() == 'preserve'
     assert os.path.islink(output)
+
+
+@pytest.mark.parametrize(
+    'name',
+    [
+        '.frontend.release-a1_b2c3d',
+        '.static.release-12345678',
+        '.seo.release-abcdefgh',
+    ],
+)
+def test_fresh_release_staging_is_allowed(tmp_path, monkeypatch, name):
+    root = tmp_path / 'releases'
+    root.mkdir(mode=0o755)
+    stage = root / name
+    stage.mkdir(mode=0o700)
+    (root / '.frontend.previous-20261015T010000Z-deadbeef').mkdir()
+    (root / 'frontend.bak.20261015').mkdir()
+    now = datetime(2026, 10, 16, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        health,
+        'release_staging_changed_at',
+        lambda _details: datetime(2026, 10, 16, 0, 30, tzinfo=timezone.utc),
+    )
+
+    assert health.verify_release_staging(root, 2, now) == [stage]
+
+
+def test_tempfile_stage_name_matches_the_health_contract(tmp_path):
+    generated = Path(tempfile.mkdtemp(prefix='.frontend.release-', dir=tmp_path))
+
+    assert health.RELEASE_STAGE_PATTERN.fullmatch(generated.name)
+
+
+def test_stale_release_staging_publishes_only_generic_degraded_state(
+    tmp_path, monkeypatch
+):
+    backups = tmp_path / 'backups'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261016T000000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-15T23:00:00Z')
+    output = tmp_path / 'public/status.json'
+    output.parent.mkdir(mode=0o755)
+    release_root = tmp_path / 'releases'
+    release_root.mkdir(mode=0o755)
+    stage = release_root / '.frontend.release-abcdefgh'
+    stage.mkdir(mode=0o700)
+    monkeypatch.setattr(
+        health,
+        'release_staging_changed_at',
+        lambda _details: datetime(2026, 10, 15, 22, 59, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(
+        health.OperationsHealthError,
+        match=r'Stale release staging.*\.frontend\.release-abcdefgh',
+    ):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=datetime(2026, 10, 16, 1, tzinfo=timezone.utc),
+            backup_module=backup,
+            release_root=release_root,
+            release_staging_max_age_hours=2,
+        )
+
+    assert json.loads(output.read_text())['status'] == 'degraded'
+    assert stage.name not in output.read_text()
+
+
+def test_release_staging_rejects_malformed_entries_symlinks_and_future_time(
+    tmp_path, monkeypatch
+):
+    root = tmp_path / 'releases'
+    root.mkdir(mode=0o755)
+    malformed = root / '.frontend.release-not_an_expected_name'
+    malformed.mkdir()
+    now = datetime(2026, 10, 16, 1, tzinfo=timezone.utc)
+
+    with pytest.raises(health.OperationsHealthError, match='Unsafe release staging'):
+        health.verify_release_staging(root, 2, now)
+
+    malformed.rmdir()
+    unsafe = root / '.seo.release-abcdefgh'
+    unsafe.symlink_to(root, target_is_directory=True)
+    with pytest.raises(health.OperationsHealthError, match='Unsafe release staging'):
+        health.verify_release_staging(root, 2, now)
+
+    unsafe.unlink()
+    stage = root / '.static.release-12345678'
+    stage.mkdir(mode=0o700)
+    monkeypatch.setattr(
+        health,
+        'release_staging_changed_at',
+        lambda _details: datetime(2026, 10, 16, 1, 6, tzinfo=timezone.utc),
+    )
+    with pytest.raises(health.OperationsHealthError, match='unexpectedly in the future'):
+        health.verify_release_staging(root, 2, now)
 
 
 def test_offsite_deadline_fails_closed_until_a_fresh_success_exists(tmp_path):
@@ -411,10 +511,13 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
         in service
     )
     assert '--database-security-max-age-hours 2' in service
+    assert '--release-root /var/www/pcep' in service
+    assert '--release-staging-max-age-hours 2' in service
     assert '--verify-installation' in service
     assert '--verify-nginx-installation' in service
     assert '--verify-container-runtime' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
+    assert 'ReadOnlyPaths=/var/www/pcep' in service
     assert 'IPAddressDeny=any' in service
     assert 'SystemCallFilter=@system-service' in service
     assert 'SystemCallErrorNumber=EPERM' in service
