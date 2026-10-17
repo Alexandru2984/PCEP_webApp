@@ -357,6 +357,15 @@ dump before unlinking and flushing its small checksum. An interruption can there
 leave at most a checksum sidecar; it cannot strand a large dump that future discovery
 would deliberately ignore as incomplete.
 
+The shared dump implementation accepts only an exact UTC basic timestamp and a
+bounded safe filename prefix. It drains `pg_dump` stderr concurrently into a 64 KiB
+in-memory tail and includes at most its last 2,000 sanitized characters in a private
+failure, rather than creating an unbounded stderr file. If dump creation or any
+pre-publication validation fails, the exact mode-0600 partial is unlinked and the
+backup directory is fsynced. A process-stop, unlink or directory-flush failure is
+attached to and logged separately from the initiating failure instead of replacing
+it. A cleanup failure after an otherwise successful dump still blocks deployment.
+
 Install the reviewed timer after creating its only writable directory:
 
 ```bash
@@ -451,6 +460,16 @@ cannot immediately age a live staging operation. This control reports and never
 deletes a tree. With the hourly publisher, stale staging reaches machine-visible
 `degraded` in at most roughly three hours after creation; the external poll sees the
 generic state within another 30 minutes.
+
+It also inventories `/home/micu/backups/pcep` read-only for exact pre-deploy
+`.sql.gz.partial-<32 lowercase hex>` names and legacy
+`.sql.gz.stderr-<32 lowercase hex>` names. Each match must be a private regular file
+owned by `micu`, use a bounded backup prefix and exact UTC timestamp, and remain no
+more than two hours old; unsafe, future-dated or stale entries degrade health. A
+fresh match is tolerated so the hourly verifier cannot race a legitimate deployment.
+The control reports but never reads or deletes dump/error contents. The same roughly
+three-hour machine-detection bound and subsequent external generic alert apply.
+Complete backup retention is deliberately outside this temporary-artifact control.
 
 The publisher atomically creates only `schema`, `status` and `checked_at` as mode
 0600 in its systemd-managed mode-0750 state directory. After both successful and

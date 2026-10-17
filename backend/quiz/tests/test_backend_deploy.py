@@ -530,6 +530,7 @@ def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):
     class FakeProcess:
         def __init__(self):
             self.stdout = io.BytesIO(database_dump)
+            self.stderr = io.BytesIO(b'')
 
         def wait(self, timeout=None):
             return 0
@@ -555,6 +556,109 @@ def test_database_backup_is_private_atomic_and_verified(tmp_path, monkeypatch):
         assert backup.read() == database_dump
     assert fsync_types == ['file', 'directory']
     assert not list((tmp_path / 'backups').glob('.*.partial-*'))
+    assert not list((tmp_path / 'backups').glob('.*.stderr-*'))
+
+
+def test_failed_database_backup_durably_removes_its_temporary_without_stderr_file(
+    tmp_path, monkeypatch
+):
+    events = []
+
+    class FailedProcess:
+        def __init__(self):
+            self.stdout = io.BytesIO(b'incomplete dump')
+            self.stderr = io.BytesIO(b'pg_dump diagnostic')
+
+        def wait(self, timeout=None):
+            return 1
+
+        def poll(self):
+            return 1
+
+    monkeypatch.setattr(
+        release.subprocess,
+        'Popen',
+        lambda *_args, **_kwargs: FailedProcess(),
+    )
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda path: events.append(('fsync', Path(path))),
+    )
+
+    with pytest.raises(release.ReleaseError, match=r'pg_dump failed \(1\)'):
+        release.backup_database(config(tmp_path), '20261018T010203Z')
+
+    root = tmp_path / 'backups'
+    assert events == [('fsync', root)]
+    assert list(root.glob('.*.partial-*')) == []
+    assert list(root.glob('.*.stderr-*')) == []
+
+
+def test_database_backup_stderr_tail_is_bounded():
+    state = {}
+    stream = io.BytesIO(
+        b'early-sensitive-diagnostic' + (b'x' * 128) + b'last-diagnostic'
+    )
+
+    release.drain_bounded_stream_tail(stream, 64, state)
+
+    assert len(state['tail']) == 64
+    assert b'early-sensitive-diagnostic' not in state['tail']
+    assert state['tail'].endswith(b'last-diagnostic')
+    assert 'error' not in state
+
+
+def test_database_backup_diagnostic_is_single_line_and_bounded():
+    diagnostic = release.bounded_process_diagnostic(
+        b'early\n\x00\x1b[31m' + (b'x' * 2100) + b' final'
+    )
+
+    assert len(diagnostic) == 2000
+    assert '\n' not in diagnostic
+    assert '\x00' not in diagnostic
+    assert '\x1b' not in diagnostic
+    assert diagnostic.endswith(' final')
+
+
+def test_backup_cleanup_failure_does_not_mask_the_dump_error(
+    tmp_path, monkeypatch, capsys
+):
+    class FailedProcess:
+        def __init__(self):
+            self.stdout = io.BytesIO(b'incomplete dump')
+            self.stderr = io.BytesIO(b'pg_dump diagnostic')
+
+        def wait(self, timeout=None):
+            return 2
+
+        def poll(self):
+            return 2
+
+    monkeypatch.setattr(
+        release.subprocess,
+        'Popen',
+        lambda *_args, **_kwargs: FailedProcess(),
+    )
+    monkeypatch.setattr(
+        release,
+        'fsync_directory',
+        lambda _path: (_ for _ in ()).throw(
+            OSError('cleanup directory flush failure')
+        ),
+    )
+
+    with pytest.raises(release.ReleaseError, match=r'pg_dump failed \(2\)') as caught:
+        release.backup_database(config(tmp_path), '20261018T010204Z')
+
+    assert any(
+        'cleanup directory flush failure' in note
+        for note in getattr(caught.value, '__notes__', ())
+    )
+    assert 'Backend deploy cleanup warning' in capsys.readouterr().err
+    root = tmp_path / 'backups'
+    assert list(root.glob('.*.partial-*')) == []
+    assert list(root.glob('.*.stderr-*')) == []
 
 
 def test_database_backup_rejects_unsafe_filename_prefix(tmp_path, monkeypatch):
@@ -570,6 +674,21 @@ def test_database_backup_rejects_unsafe_filename_prefix(tmp_path, monkeypatch):
             '20261005T010203Z',
             filename_prefix='../daily',
         )
+
+
+@pytest.mark.parametrize(
+    'stamp',
+    ['', '2026-10-18T01:02:03Z', '../escape', '20261018T010203Z/escape'],
+)
+def test_database_backup_rejects_unsafe_timestamp(tmp_path, monkeypatch, stamp):
+    monkeypatch.setattr(
+        release.subprocess,
+        'Popen',
+        lambda *_args, **_kwargs: pytest.fail('pg_dump must not run.'),
+    )
+
+    with pytest.raises(release.ReleaseError, match='UTC basic timestamp'):
+        release.backup_database(config(tmp_path), stamp)
 
 
 @pytest.mark.parametrize('value', ['', 'dirty release', '../escape', 'x' * 65])

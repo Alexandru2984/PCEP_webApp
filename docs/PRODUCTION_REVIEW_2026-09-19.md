@@ -3734,6 +3734,62 @@ is **SHIP WITH GUARDRAILS** after focused/full failure-injection tests, zero-par
 live inventory, exact service execution, full CI, healthy publication and exact-SHA
 external smoke.
 
+### Bounded pre-deploy backup diagnostics and residue detection — 2026-10-18
+
+The shared deployment dump previously wrote `pg_dump` stderr to a private but
+unbounded temporary file. Its finalizer unlinked both dump and error temporaries
+without flushing the backup directory, and any process-stop or unlink error could
+replace the original dump/validation failure. A process or host crash could also
+leave those hidden entries indefinitely because backup discovery intentionally
+ignores incomplete material and operations health did not inventory this root.
+
+The dump now accepts only a bounded prefix and exact UTC basic timestamp, creates
+its mode-0600 partial with exclusive/no-follow and close-on-exec flags, and drains
+stderr concurrently into a fixed 64 KiB in-memory tail. Only the final 2,000 sanitized
+characters enter the private exception, and no new stderr file is created. Failed
+partial deletion is followed by a validated directory `fsync`; secondary process,
+unlink or flush failures are attached to and logged separately from the primary
+error. A cleanup failure after successful publication still blocks deployment.
+
+Operations health now inventories the deployment backup root read-only. Only exact
+current partial and legacy stderr names enter scope; matches must be private regular
+files owned by the service user with a valid timestamp. Fresh matches are tolerated
+for two hours to avoid racing a real deploy, while malformed, unsafe, future-dated
+or stale entries degrade the same three-field public marker. The verifier neither
+opens nor deletes their contents.
+
+The top STRIDE risks are denial of service through unbounded stderr or repeated
+hidden partial dumps, repudiation when cleanup replaces the initiating failure, and
+information disclosure if private database/error material remains after a crash.
+The live inventory found zero matching temporaries. There are 35 complete root-level
+database dumps totaling 2,008,322 bytes; the largest current dump is 58,320 bytes.
+One in-flight compressed partial can approach the database dump size as the database
+grows, while the new stderr memory radius is exactly 64 KiB and its logged tail at
+most 2,000 characters. Complete-backup retention requires a separate reviewed policy
+and is intentionally not changed or deleted by this control.
+
+A normal cleanup failure is synchronous, giving immediate machine and invoking-
+operator MTTD. Crash residue becomes unhealthy after two hours and the hourly timer
+with bounded jitter detects it in roughly three hours from creation; twice-hourly
+external smoke then observes only generic degradation within another 30 minutes.
+Guaranteed human MTTD remains unbounded until alert delivery and acknowledgement
+are confirmed.
+
+The incident runbook preserves journals, exact metadata, storage evidence and lock
+ownership; forbids broad wildcard deletion and public copying of dump/error content;
+and requires verifying a complete backup plus isolated restore before retry. The
+tabletop must cover an oversized stderr producer, dump failure plus directory-fsync
+failure, process death before cleanup and a stale malformed/symlinked entry.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. The current
+database contains the reconstructible question bank rather than learner accounts;
+if future scope introduces personal data, exposure requires breach assessment and
+the applicable GDPR Article 33 72-hour notification decision. FAIR/ALE cannot be
+defended without database-growth, failure-frequency, response-cost and business-loss
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full failure-
+injection tests, zero-residue live inventory, exact unit installation, full CI,
+healthy publication and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
