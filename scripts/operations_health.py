@@ -17,6 +17,7 @@ DEFAULT_BACKUP_ROOT = Path('/home/micu/backups/pcep/daily')
 DEFAULT_RESTORE_STATUS = Path('/var/lib/pcep-db-restore-check/last-success.json')
 DEFAULT_OUTPUT = Path('/var/lib/pcep-operations-health/status.json')
 DEFAULT_RELEASE_ROOT = Path('/var/www/pcep')
+DEFAULT_DEPLOYMENT_BACKUP_ROOT = Path('/home/micu/backups/pcep')
 BACKUP_PATTERN = re.compile(r'^pcep_db_daily_(\d{8}T\d{6}Z)\.sql\.gz$')
 RELEASE_STAGE_PATTERN = re.compile(
     r'^\.(?:frontend|static|seo)\.release-[a-z0-9_]{8}$'
@@ -25,6 +26,14 @@ RELEASE_STAGE_PREFIXES = (
     '.frontend.release-',
     '.static.release-',
     '.seo.release-',
+)
+DEPLOYMENT_BACKUP_TEMP_PATTERN = re.compile(
+    r'^\.[a-z0-9][a-z0-9_-]{0,31}_\d{8}T\d{6}Z\.sql\.gz\.'
+    r'(?:partial|stderr)-[0-9a-f]{32}$'
+)
+DEPLOYMENT_BACKUP_TEMP_MARKERS = (
+    '.sql.gz.partial-',
+    '.sql.gz.stderr-',
 )
 UTC_TIMESTAMP_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 MAX_STATUS_BYTES = 256
@@ -194,6 +203,76 @@ def verify_release_staging(root, max_age_hours, now):
         if age > timedelta(hours=max_age_hours):
             raise OperationsHealthError(
                 f'Stale release staging detected: {entry.name}'
+            )
+        found.append(entry)
+    return found
+
+
+def verify_deployment_backup_temporaries(root, max_age_hours, now):
+    """Reject unsafe or old pre-deploy backup temporaries without deleting evidence."""
+    backup_root = Path(root).absolute()
+    try:
+        unsafe_root = (
+            backup_root.is_symlink()
+            or not backup_root.is_dir()
+            or backup_root.resolve() != backup_root
+        )
+        root_details = backup_root.stat()
+    except OSError as error:
+        raise OperationsHealthError(
+            'Deployment backup root metadata failed.'
+        ) from error
+    if unsafe_root:
+        raise OperationsHealthError(
+            'Deployment backup root must be a real directory.'
+        )
+    if root_details.st_uid != os.getuid() or root_details.st_mode & 0o077:
+        raise OperationsHealthError(
+            'Deployment backup root permissions are unsafe.'
+        )
+
+    try:
+        entries = list(backup_root.iterdir())
+    except OSError as error:
+        raise OperationsHealthError(
+            'Deployment backup temporary inventory failed.'
+        ) from error
+
+    found = []
+    for entry in entries:
+        if not any(marker in entry.name for marker in DEPLOYMENT_BACKUP_TEMP_MARKERS):
+            continue
+        if DEPLOYMENT_BACKUP_TEMP_PATTERN.fullmatch(entry.name) is None:
+            raise OperationsHealthError(
+                f'Unsafe deployment backup temporary detected: {entry.name}'
+            )
+        try:
+            details = entry.stat(follow_symlinks=False)
+        except FileNotFoundError:
+            # A cooperating deploy may complete between listing and stat.
+            continue
+        except OSError as error:
+            raise OperationsHealthError(
+                f'Deployment backup temporary metadata failed: {entry.name}'
+            ) from error
+        if (
+            not stat_module.S_ISREG(details.st_mode)
+            or details.st_uid != os.getuid()
+            or stat_module.S_IMODE(details.st_mode) != 0o600
+        ):
+            raise OperationsHealthError(
+                f'Unsafe deployment backup temporary detected: {entry.name}'
+            )
+        changed = release_staging_changed_at(details)
+        age = now - changed
+        if age < -FUTURE_TOLERANCE:
+            raise OperationsHealthError(
+                'Deployment backup temporary timestamp is unexpectedly in the '
+                f'future: {entry.name}'
+            )
+        if age > timedelta(hours=max_age_hours):
+            raise OperationsHealthError(
+                f'Stale deployment backup temporary detected: {entry.name}'
             )
         found.append(entry)
     return found
@@ -396,6 +475,8 @@ def execute(
     container_runtime_module=None,
     release_root=None,
     release_staging_max_age_hours=2,
+    deployment_backup_root=None,
+    deployment_backup_temporary_max_age_hours=2,
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
@@ -406,6 +487,9 @@ def execute(
     )
     release_staging_max_age_hours = bounded_hours(
         release_staging_max_age_hours
+    )
+    deployment_backup_temporary_max_age_hours = bounded_hours(
+        deployment_backup_temporary_max_age_hours
     )
     if offsite_required_after is not None:
         offsite_required_after = calendar_date(offsite_required_after)
@@ -439,6 +523,15 @@ def execute(
             verify_release_staging(
                 release_root,
                 release_staging_max_age_hours,
+                moment,
+            )
+        except OperationsHealthError as error:
+            failures.append(str(error))
+    if deployment_backup_root is not None:
+        try:
+            verify_deployment_backup_temporaries(
+                deployment_backup_root,
+                deployment_backup_temporary_max_age_hours,
                 moment,
             )
         except OperationsHealthError as error:
@@ -540,6 +633,16 @@ def main():
     parser.add_argument(
         '--release-staging-max-age-hours', type=bounded_hours, default=2
     )
+    parser.add_argument(
+        '--deployment-backup-root',
+        type=Path,
+        default=DEFAULT_DEPLOYMENT_BACKUP_ROOT,
+    )
+    parser.add_argument(
+        '--deployment-backup-temporary-max-age-hours',
+        type=bounded_hours,
+        default=2,
+    )
     parser.add_argument('--verify-installation', action='store_true')
     parser.add_argument('--verify-nginx-installation', action='store_true')
     parser.add_argument('--verify-container-runtime', action='store_true')
@@ -561,6 +664,10 @@ def main():
             release_root=args.release_root,
             release_staging_max_age_hours=(
                 args.release_staging_max_age_hours
+            ),
+            deployment_backup_root=args.deployment_backup_root,
+            deployment_backup_temporary_max_age_hours=(
+                args.deployment_backup_temporary_max_age_hours
             ),
             verify_installation=args.verify_installation,
             verify_nginx_installation=args.verify_nginx_installation,

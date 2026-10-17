@@ -72,6 +72,7 @@ person receives and acknowledges it.
 | Twice-hourly production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | technical alert normally under 1 hour |
 | Hourly external recovery attestation | missing/corrupt/stale local backup, missed restore or failed/stopped health-marker publisher | technical alert normally under 3 hours after its freshness threshold |
 | Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | machine signal within roughly 3 hours of staging creation; external issue within another 30 minutes |
+| Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | machine signal within roughly 3 hours of creation; external issue within another 30 minutes |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
 
@@ -221,6 +222,26 @@ secrets, personal data or raw logs in a public issue.
 5. Escalate repeated write, unlink or directory-`fsync` failures as a storage/host
    incident and evaluate every credential readable by that host identity.
 
+### Stale pre-deploy backup temporary
+
+1. Preserve the deployment and operations-health journals, exact entry metadata,
+   filesystem/kernel events, free-space measurements and maintenance-lock state.
+   Never publish or attach dump/error contents to a GitHub issue.
+2. Inventory only exact `.sql.gz.partial-<32 lowercase hex>` and legacy
+   `.sql.gz.stderr-<32 lowercase hex>` matches directly under the private deployment
+   backup root. Reject a symlink, non-regular entry, unsafe mode/owner, malformed
+   timestamp or future time as possible tampering; do not traverse it.
+3. Confirm whether the reviewed backend deployment or role-separation operation is
+   still running and owns the maintenance lock. A valid temporary younger than two
+   hours is allowed; never remove it from under an active operation.
+4. If no operation owns an exact stale path, preserve any evidence required for a
+   storage/host investigation, verify the latest complete backup and isolated
+   restore, then use a separately reviewed exact-path cleanup and re-run operations
+   health. Never use a broad wildcard or delete a completed dump as cleanup.
+5. Treat repeated residues, cleanup `fsync` failures or unexpected stderr growth as
+   a storage/host incident. Review database-container integrity and every credential
+   available to the deployment identity before retrying deployment.
+
 ## Recovery gates
 
 Do not close or downgrade the incident until all applicable gates pass:
@@ -291,8 +312,8 @@ Run at least twice a year and after control-plane changes. Use synthetic evidenc
 never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
-   database tampering, stale publication staging, failed health-marker cleanup or
-   malicious service worker.
+   database tampering, stale publication staging, stale pre-deploy backup temporary,
+   failed health-marker cleanup or malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.

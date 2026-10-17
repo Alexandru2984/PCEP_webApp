@@ -317,6 +317,111 @@ def test_release_staging_rejects_malformed_entries_symlinks_and_future_time(
         health.verify_release_staging(root, 2, now)
 
 
+@pytest.mark.parametrize('kind', ['partial', 'stderr'])
+def test_fresh_deployment_backup_temporary_is_allowed(
+    tmp_path, monkeypatch, kind
+):
+    root = tmp_path / 'deployment-backups'
+    root.mkdir(mode=0o700)
+    temporary = root / (
+        f'.pcep_db_20261018T010203Z.sql.gz.{kind}-' + ('a' * 32)
+    )
+    temporary.write_bytes(b'private in-flight evidence')
+    temporary.chmod(0o600)
+    (root / 'pcep_db_20261017T010203Z.sql.gz').write_bytes(b'complete')
+    now = datetime(2026, 10, 18, 2, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        health,
+        'release_staging_changed_at',
+        lambda _details: datetime(2026, 10, 18, 1, 30, tzinfo=timezone.utc),
+    )
+
+    assert health.verify_deployment_backup_temporaries(root, 2, now) == [
+        temporary
+    ]
+
+
+def test_stale_deployment_backup_temporary_publishes_generic_degraded_state(
+    tmp_path, monkeypatch
+):
+    backups = tmp_path / 'daily'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261018T010000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-18T01:00:00Z')
+    output = tmp_path / 'public/status.json'
+    output.parent.mkdir(mode=0o755)
+    deployment = tmp_path / 'deployment-backups'
+    deployment.mkdir(mode=0o700)
+    temporary = deployment / (
+        '.pcep_db_20261017T220000Z.sql.gz.partial-' + ('b' * 32)
+    )
+    temporary.write_bytes(b'private partial dump canary')
+    temporary.chmod(0o600)
+    monkeypatch.setattr(
+        health,
+        'release_staging_changed_at',
+        lambda _details: datetime(2026, 10, 17, 22, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(
+        health.OperationsHealthError,
+        match=r'Stale deployment backup temporary.*\.partial-',
+    ):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=datetime(2026, 10, 18, 2, 1, tzinfo=timezone.utc),
+            backup_module=backup,
+            deployment_backup_root=deployment,
+            deployment_backup_temporary_max_age_hours=2,
+        )
+
+    assert json.loads(output.read_text())['status'] == 'degraded'
+    assert temporary.name not in output.read_text()
+    assert 'private partial dump canary' not in output.read_text()
+
+
+def test_deployment_backup_temporary_rejects_malformed_symlink_and_future_time(
+    tmp_path, monkeypatch
+):
+    root = tmp_path / 'deployment-backups'
+    root.mkdir(mode=0o700)
+    malformed = root / '.pcep_db_bad.sql.gz.partial-not-a-uuid'
+    malformed.write_bytes(b'unsafe')
+    now = datetime(2026, 10, 18, 2, tzinfo=timezone.utc)
+
+    with pytest.raises(health.OperationsHealthError, match='Unsafe deployment'):
+        health.verify_deployment_backup_temporaries(root, 2, now)
+
+    malformed.unlink()
+    name = '.pcep_db_20261018T010203Z.sql.gz.stderr-' + ('c' * 32)
+    public = root / name
+    public.write_bytes(b'unsafe permissions')
+    public.chmod(0o640)
+    with pytest.raises(health.OperationsHealthError, match='Unsafe deployment'):
+        health.verify_deployment_backup_temporaries(root, 2, now)
+
+    public.unlink()
+    unsafe = root / name
+    unsafe.symlink_to(root / 'target')
+    with pytest.raises(health.OperationsHealthError, match='Unsafe deployment'):
+        health.verify_deployment_backup_temporaries(root, 2, now)
+
+    unsafe.unlink()
+    future = root / name
+    future.write_bytes(b'private stderr')
+    future.chmod(0o600)
+    monkeypatch.setattr(
+        health,
+        'release_staging_changed_at',
+        lambda _details: datetime(2026, 10, 18, 2, 6, tzinfo=timezone.utc),
+    )
+    with pytest.raises(health.OperationsHealthError, match='unexpectedly in the future'):
+        health.verify_deployment_backup_temporaries(root, 2, now)
+
+
 def test_offsite_deadline_fails_closed_until_a_fresh_success_exists(tmp_path):
     backups = tmp_path / 'backups'
     backups.mkdir(mode=0o700)
@@ -580,11 +685,14 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert '--database-security-max-age-hours 2' in service
     assert '--release-root /var/www/pcep' in service
     assert '--release-staging-max-age-hours 2' in service
+    assert '--deployment-backup-root /home/micu/backups/pcep' in service
+    assert '--deployment-backup-temporary-max-age-hours 2' in service
     assert '--verify-installation' in service
     assert '--verify-nginx-installation' in service
     assert '--verify-container-runtime' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
     assert 'ReadOnlyPaths=/var/www/pcep' in service
+    assert 'ReadOnlyPaths=/home/micu/backups/pcep' in service
     assert 'IPAddressDeny=any' in service
     assert 'SystemCallFilter=@system-service' in service
     assert 'SystemCallErrorNumber=EPERM' in service

@@ -13,7 +13,10 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import stat
 import subprocess
+import sys
+import threading
 import time
 from urllib.request import Request, urlopen
 import uuid
@@ -41,6 +44,7 @@ BACKEND_IMAGE = 'pcep_webapp-backend:latest'
 APP_DATABASE_ROLE = 'pcep_user'
 DATABASE_OWNER_ROLE = 'pcep_owner'
 DATABASE_MIGRATOR_ROLE = 'pcep_migrator'
+MAX_DATABASE_BACKUP_ERROR_BYTES = 64 * 1024
 SENSITIVE_IMAGE_ENV_PREFIXES = (
     'CORS_',
     'DATABASE_',
@@ -610,19 +614,79 @@ def snapshot_running_backend(config, stamp):
 
 
 def fsync_directory(path):
-    flags = os.O_RDONLY
-    if hasattr(os, 'O_DIRECTORY'):
-        flags |= os.O_DIRECTORY
+    flags = (
+        os.O_RDONLY
+        | getattr(os, 'O_CLOEXEC', 0)
+        | getattr(os, 'O_DIRECTORY', 0)
+    )
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags)
     try:
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise ReleaseError('Backup root must remain a real directory.')
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
 
 
+def remove_backup_temporaries_durably(paths, parent):
+    removed = False
+    failures = []
+    for path in paths:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            continue
+        except BaseException as error:
+            failures.append(error)
+        else:
+            removed = True
+    if removed:
+        try:
+            fsync_directory(parent)
+        except BaseException as error:
+            failures.append(error)
+    if failures:
+        primary = failures[0]
+        for failure in failures[1:]:
+            primary.add_note(f'Additional backup cleanup failure: {failure}')
+        raise primary
+    return removed
+
+
+def drain_bounded_stream_tail(stream, limit, state):
+    tail = bytearray()
+    try:
+        while chunk := stream.read(64 * 1024):
+            tail.extend(chunk)
+            if len(tail) > limit:
+                del tail[:-limit]
+    except BaseException as error:
+        state['error'] = error
+    finally:
+        try:
+            stream.close()
+        except BaseException as error:
+            state.setdefault('error', error)
+    state['tail'] = bytes(tail)
+
+
+def bounded_process_diagnostic(value, limit=2000):
+    decoded = value.decode(errors='replace')
+    printable = ''.join(
+        character if character.isprintable() else ' '
+        for character in decoded
+    )
+    detail = ' '.join(printable.split()) or 'no diagnostic output'
+    return detail[-limit:]
+
+
 def backup_database(config, stamp, filename_prefix='pcep_db'):
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,31}', filename_prefix):
         raise ReleaseError('Database backup prefix must be a bounded safe label.')
+    if not re.fullmatch(r'\d{8}T\d{6}Z', stamp):
+        raise ReleaseError('Database backup timestamp must be a UTC basic timestamp.')
     backup_root = config.backup_root.absolute()
     if backup_root.is_symlink():
         raise ReleaseError('Backup root must not be a symlink.')
@@ -633,16 +697,23 @@ def backup_database(config, stamp, filename_prefix='pcep_db'):
     if final_path.exists():
         raise ReleaseError(f'Backup already exists: {final_path}')
     partial_path = backup_root / f'.{final_path.name}.partial-{uuid.uuid4().hex}'
-    error_path = backup_root / f'.{final_path.name}.stderr-{uuid.uuid4().hex}'
     process = None
+    stderr_thread = None
+    stderr_state = {}
+    primary_error = None
     try:
-        descriptor = os.open(partial_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        error_descriptor = os.open(
-            error_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, 'O_CLOEXEC', 0)
         )
+        if hasattr(os, 'O_NOFOLLOW'):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(partial_path, flags, 0o600)
         with os.fdopen(descriptor, 'wb') as raw_output, gzip.GzipFile(
             filename='', mode='wb', fileobj=raw_output, mtime=0
-        ) as compressed, os.fdopen(error_descriptor, 'wb') as errors:
+        ) as compressed:
             process = subprocess.Popen(
                 [
                     'docker', 'exec', config.database_container, 'sh', '-c',
@@ -650,13 +721,36 @@ def backup_database(config, stamp, filename_prefix='pcep_db'):
                 ],
                 cwd=config.project_root,
                 stdout=subprocess.PIPE,
-                stderr=errors,
+                stderr=subprocess.PIPE,
             )
+            if process.stdout is None or process.stderr is None:
+                raise ReleaseError('pg_dump output pipes were not created.')
+            stderr_thread = threading.Thread(
+                target=drain_bounded_stream_tail,
+                args=(
+                    process.stderr,
+                    MAX_DATABASE_BACKUP_ERROR_BYTES,
+                    stderr_state,
+                ),
+                name='pcep-pg-dump-stderr',
+                daemon=True,
+            )
+            stderr_thread.start()
             shutil.copyfileobj(process.stdout, compressed, length=1024 * 1024)
             process.stdout.close()
             return_code = process.wait()
+            stderr_thread.join(timeout=5)
+            if stderr_thread.is_alive():
+                raise ReleaseError('Timed out draining bounded pg_dump stderr.')
+            if 'error' in stderr_state:
+                raise ReleaseError(
+                    f'Failed to read bounded pg_dump stderr: '
+                    f'{stderr_state["error"]}'
+                )
         if return_code:
-            message = error_path.read_text(errors='replace')[-2000:].strip()
+            message = bounded_process_diagnostic(
+                stderr_state.get('tail', b'')
+            )
             raise ReleaseError(f'pg_dump failed ({return_code}): {message}')
 
         with gzip.open(partial_path, 'rb') as backup:
@@ -675,16 +769,54 @@ def backup_database(config, stamp, filename_prefix='pcep_db'):
         fsync_directory(backup_root)
         digest = digest_builder.hexdigest()
         return final_path, digest
+    except BaseException as error:
+        primary_error = error
+        raise
     finally:
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
-        partial_path.unlink(missing_ok=True)
-        error_path.unlink(missing_ok=True)
+        cleanup_failures = []
+        try:
+            if process is not None and process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+            if stderr_thread is not None and stderr_thread.is_alive():
+                stderr_thread.join(timeout=5)
+                if stderr_thread.is_alive():
+                    raise ReleaseError(
+                        'Timed out cleaning up the bounded pg_dump stderr reader.'
+                    )
+        except BaseException as error:
+            cleanup_failures.append(error)
+        try:
+            remove_backup_temporaries_durably(
+                (partial_path,),
+                backup_root,
+            )
+        except BaseException as error:
+            cleanup_failures.append(error)
+        if cleanup_failures:
+            if primary_error is None:
+                cleanup_error = cleanup_failures[0]
+                for failure in cleanup_failures[1:]:
+                    cleanup_error.add_note(
+                        f'Additional database backup cleanup failure: {failure}'
+                    )
+                raise cleanup_error
+            for cleanup_error in cleanup_failures:
+                note = f'Database backup cleanup also failed: {cleanup_error}'
+                primary_error.add_note(note)
+                try:
+                    print(
+                        f'Backend deploy cleanup warning: {note}',
+                        file=sys.stderr,
+                    )
+                except BaseException as warning_error:
+                    primary_error.add_note(
+                        f'Failed to emit backup cleanup warning: {warning_error}'
+                    )
 
 
 def wait_for_backend(config):
