@@ -69,10 +69,10 @@ person receives and acknowledges it.
 | --- | --- | --- |
 | Required PR checks, CodeQL and secret scanning | unsafe change, code weakness or committed credential | block merge; triage the same day |
 | Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
-| Twice-hourly production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | technical alert normally under 1 hour |
-| Hourly external recovery attestation | missing/corrupt/stale local backup, missed restore or failed/stopped health-marker publisher | technical alert normally under 3 hours after its freshness threshold |
-| Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | machine signal within roughly 3 hours of staging creation; external issue within another 30 minutes |
-| Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | machine signal within roughly 3 hours of creation; external issue within another 30 minutes |
+| Twice-hourly-target production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | best effort; GitHub schedule delays/drops mean no guaranteed external MTTD |
+| Hourly local recovery attestation consumed by external smoke | missing/corrupt/stale local backup, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
+| Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
+| Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
 
@@ -171,6 +171,23 @@ secrets, personal data or raw logs in a public issue.
    and question invariants.
 5. Rebuild production and re-run the exact role-posture verifier, migration check,
    question audit and public smoke contract before allowing traffic.
+
+### Isolated restore-check readiness failure
+
+1. Preserve the restore-check and operations-health journals, immutable image ID,
+   newest backup/checksum names, exact failure time and disposable-container
+   ownership metadata. Never rerun against the live database.
+2. Distinguish an initialization race from corruption: `database system is starting
+   up` immediately after container creation can be transient, while checksum,
+   decompression, SQL, ownership or invariant failures remain recovery incidents.
+3. Confirm no disposable container remains. If one exists, require the exact
+   ownership token, image and immutable container ID before removal; never delete a
+   same-named foreign container.
+4. Rerun the reviewed networkless drill once. Close the alert only after the full
+   restore, invariant validation, private success marker, operations health and
+   external public contract all pass.
+5. Escalate a repeated startup timeout or any restore/invariant failure as a
+   database/image/storage incident; do not normalize it as a readiness race.
 
 ### Malicious frontend or browser-origin incident
 
@@ -312,8 +329,9 @@ Run at least twice a year and after control-plane changes. Use synthetic evidenc
 never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
-   database tampering, stale publication staging, stale pre-deploy backup temporary,
-   failed health-marker cleanup or malicious service worker.
+   database tampering, restore-readiness race, stale publication staging, stale
+   pre-deploy backup temporary, failed health-marker cleanup or malicious service
+   worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.

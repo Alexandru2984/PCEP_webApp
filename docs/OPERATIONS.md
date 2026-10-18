@@ -279,6 +279,14 @@ existing issue. The next completely successful run closes the matching issue. Th
 push/pull-request CI remains independent of production availability, so a transient
 Internet or production outage cannot block code review.
 
+The cron expresses a twice-hourly target, not a guaranteed polling interval. GitHub
+can delay or drop scheduled workflow events; during the 2026-10-18 restore-readiness
+incident the first external failure arrived 3 hours 49 minutes after the local
+service failed, and observed scheduled-run gaps exceeded four hours. Local hourly
+health publication remains the first machine signal, while guaranteed external and
+human MTTD are unbounded until an independently scheduled monitor and acknowledged
+notification path exist. Use manual dispatch for recovery verification.
+
 The technical alert path was exercised again after named-responder routing was
 installed on 2026-10-13: the real contract passed, a synthetic final step opened
 sanitized issue #68 assigned to and explicitly mentioning the repository owner, and
@@ -426,6 +434,15 @@ removing anything. Inspect runs with
 `journalctl -u pcep-db-restore-check.service`. Repeat the drill directly after
 backup-code, PostgreSQL or schema changes; never test a restore over the live
 database.
+
+Readiness deliberately does not trust `pg_isready` during first boot. The reviewed
+PostgreSQL entrypoint starts a temporary server while initializing the data
+directory, then stops it and execs the final server as PID 1; a probe can otherwise
+win that transition and the next command can receive `database system is starting
+up`. The drill waits until `/proc/1/comm` is exactly `postgres` and then requires a
+successful, no-password `SELECT 1` before role preparation or restore begins. Both
+checks retry inside the existing 60-second deadline; timeout remains a hard failure
+with bounded private container logs.
 
 `pcep-database-security.timer` runs hourly at `:07`, with up to five minutes of
 randomized delay. Its networkless, capability-free oneshot uses only the existing

@@ -266,8 +266,10 @@ The review has read-only repository access, neither comments on the PR nor grant
 write permission, and deliberately does not enforce a license allowlist until the
 project adopts a reviewed license policy. Protected `main` also requires all four
 CI jobs, an up-to-date PR branch, resolved conversations and linear history.
-The separate **Production smoke** workflow runs every six hours and on manual
-dispatch. It uses bounded read-only requests to verify the public shell and its
+The separate **Production smoke** workflow requests runs at minutes 7 and 37 of
+every hour and supports manual dispatch. GitHub does not guarantee scheduled start
+time or delivery, so this is a best-effort external signal rather than a bounded
+MTTD claim. It uses bounded read-only requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,
 security/cache headers,
 all aggregate matrices, answer secrecy across quiz, daily, detail and search
