@@ -512,8 +512,8 @@ publication is not treated as an incident; anything older degrades health. The a
 uses the newer inode change or modification time, so copying an old source mtime
 cannot immediately age a live staging operation. This control reports and never
 deletes a tree. With the hourly publisher, stale staging reaches machine-visible
-`degraded` in at most roughly three hours after creation; the external poll sees the
-generic state within another 30 minutes.
+`degraded` in at most roughly three hours after creation. GitHub's requested
+twice-hourly external poll is best effort and has no guaranteed delivery bound.
 
 It also inventories `/home/micu/backups/pcep` read-only for exact pre-deploy
 `.sql.gz.partial-<32 lowercase hex>` names and legacy
@@ -522,10 +522,28 @@ owned by `micu`, use a bounded backup prefix and exact UTC timestamp, and remain
 more than two hours old; unsafe, future-dated or stale entries degrade health. A
 fresh match is tolerated so the hourly verifier cannot race a legitimate deployment.
 The control reports but never reads or deletes dump/error contents. The same roughly
-three-hour machine-detection bound and subsequent external generic alert apply.
+three-hour machine-detection bound applies; external delivery remains best effort.
 Complete backup retention is deliberately outside this temporary-artifact control.
 The deploy-time bounded policy above owns only completed exact modern names; this
 hourly health inventory remains non-destructive and limited to temporary residue.
+
+The hourly run also inventories finalized frontend snapshots under both roots. Only
+exact `.frontend.previous-<UTC-basic>-<8 lowercase hex>` rollback names and
+`frontend.<UTC-basic>-<8 lowercase hex>` backup names enter this control; legacy
+`frontend.bak.*`, static/SEO copies, database dumps and every other child remain out
+of scope. Both parents must be real owner-controlled directories, the backup parent
+must remain private, and every traversed entry must be owned by `micu`, a regular file
+or directory, and not world-writable. Symlinks, special files and malformed names
+using either reserved prefix degrade health. A cooperating retention run may remove
+a tree during the read-only walk without producing a false unsafe-entry diagnosis.
+
+Each location permits at most 10 finalized snapshots and at most 512 MiB of allocated
+blocks. Crossing either bound becomes machine-visible on the next successful hourly
+run; guaranteed external and human acknowledgement remain unbounded. The verifier
+never reads file contents and never renames, chmods or deletes an artifact. Preserve
+the private journal and exact metadata, run `make release-retention` without apply,
+validate the live and retained releases, then use `--apply` only after reviewing every
+exact selected path. A healthy rerun must precede incident closure.
 
 The publisher atomically creates only `schema`, `status` and `checked_at` as mode
 0600 in its systemd-managed mode-0750 state directory. After both successful and

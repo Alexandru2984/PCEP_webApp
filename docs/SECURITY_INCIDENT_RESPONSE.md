@@ -72,6 +72,7 @@ person receives and acknowledges it.
 | Twice-hourly-target production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | best effort; GitHub schedule delays/drops mean no guaranteed external MTTD |
 | Hourly local recovery attestation consumed by external smoke | missing/corrupt/stale local backup, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
 | Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
+| Hourly finalized-release snapshot inventory via the public recovery attestation | more than 10 frontend rollback/external snapshots, more than 512 MiB allocated per location, or an unsafe reserved-prefix tree | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
 | Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
@@ -239,6 +240,26 @@ secrets, personal data or raw logs in a public issue.
 5. Escalate repeated write, unlink or directory-`fsync` failures as a storage/host
    incident and evaluate every credential readable by that host identity.
 
+### Excessive or unsafe finalized release snapshots
+
+1. Preserve the operations-health and publisher/retention journals, exact parent and
+   candidate metadata, free-space measurements and the current non-blocking lock
+   state. The public marker intentionally contains no names, counts or sizes.
+2. Inventory only direct exact `.frontend.previous-<UTC-basic>-<8 lowercase hex>`
+   and `frontend.<UTC-basic>-<8 lowercase hex>` children. Treat a malformed reserved-
+   prefix name, symlink, special entry, wrong owner or world-writable descendant as
+   possible tampering; never traverse or normalize it merely to make health green.
+3. Validate the live frontend plus at least two complete rollback and backup copies.
+   Keep legacy `frontend.bak.*`, static/SEO copies, database dumps and unrelated
+   artifacts outside this incident's deletion scope.
+4. Run `make release-retention` in its default preview mode. Review every exact path,
+   validation result and allocated-space total, then apply only that reviewed plan
+   when no publisher/retention process owns the lock. Never use a wildcard, recursive
+   parent cleanup or filesystem age alone.
+5. Recheck free space, rerun operations health and the full public smoke contract,
+   and retain the evidence. Escalate unexplained unsafe metadata, repeated growth or
+   I/O failure to the host-compromise playbook.
+
 ### Stale pre-deploy backup temporary
 
 1. Preserve the deployment and operations-health journals, exact entry metadata,
@@ -350,8 +371,8 @@ never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
    database tampering, restore-readiness race, stale publication staging, stale
-   pre-deploy backup temporary, retention target replacement, failed health-marker
-   cleanup or malicious service worker.
+   pre-deploy backup temporary, excessive/unsafe finalized snapshots, retention
+   target replacement, failed health-marker cleanup or malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.
