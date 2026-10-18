@@ -374,6 +374,43 @@ backup directory is fsynced. A process-stop, unlink or directory-flush failure i
 attached to and logged separately from the initiating failure instead of replacing
 it. A cleanup failure after an otherwise successful dump still blocks deployment.
 
+Pre-deploy dumps have an independent bounded policy because deploy frequency is not
+the daily recovery-point policy. After a new dump is fully verified and before any
+backend build or cutover, deployment validates every exact modern
+`pcep_db_<UTC-basic>.sql.gz` match and durably retains the newest 10. A match must
+be a private regular file owned by the invoking user, no more than five minutes in
+the future, fully decompressible and contain the PostgreSQL dump header. Any unsafe
+or corrupt exact match refuses retention and aborts deployment before it can change
+the live service. Deletion reopens and rehashes each reviewed candidate, checks its
+device/inode/size/mtime and SHA-256 identity, unlinks oldest first and directory-
+`fsync`s after every file. An interruption therefore preserves the newest recovery
+set. A candidate with multiple hard links is refused. The private root, shared lock
+and immediate identity/content revalidation close accidental and cooperating races;
+a process already running as the backup owner is a host-identity compromise, not an
+independent trust boundary, and requires the incident playbook rather than cleanup.
+
+Legacy timestamps, role-separation/pre-foundation dumps, daily backup pairs,
+configuration backups and every other filename are outside the exact allowlist.
+Preview the real plan under the shared backend-maintenance lock with:
+
+```bash
+make predeploy-backup-retention
+```
+
+After reviewing every exact path and digest, apply it with:
+
+```bash
+make predeploy-backup-retention PREDEPLOY_BACKUP_RETENTION_FLAGS=--apply
+```
+
+`PREDEPLOY_BACKUP_KEEP` may be set from 2 through 100 for a reviewed exception; the
+deploy and standalone command use the same value and lock. Never replace this
+command with a wildcard or host-wide cleanup.
+
+Ten pre-deploy copies cover twice the five-image backend rollback window, while the
+separate checksummed daily policy retains 30 copies and remains the authoritative
+time-based recovery history.
+
 Install the reviewed timer after creating its only writable directory:
 
 ```bash
@@ -487,6 +524,8 @@ fresh match is tolerated so the hourly verifier cannot race a legitimate deploym
 The control reports but never reads or deletes dump/error contents. The same roughly
 three-hour machine-detection bound and subsequent external generic alert apply.
 Complete backup retention is deliberately outside this temporary-artifact control.
+The deploy-time bounded policy above owns only completed exact modern names; this
+hourly health inventory remains non-destructive and limited to temporary residue.
 
 The publisher atomically creates only `schema`, `status` and `checked_at` as mode
 0600 in its systemd-managed mode-0750 state directory. After both successful and

@@ -37,6 +37,21 @@ OperationLockError = operation_lock.OperationLockError
 exclusive_operation_lock = operation_lock.exclusive_operation_lock
 
 
+def load_deployment_backup_retention():
+    path = Path(__file__).with_name('deployment_backup_retention.py')
+    spec = importlib.util.spec_from_file_location(
+        'pcep_deployment_backup_retention', path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError('Cannot load the deployment-backup retention implementation.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+deployment_backup_retention = load_deployment_backup_retention()
+
+
 RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 IMAGE_ID_PATTERN = re.compile(r'sha256:[0-9a-f]{64}')
 IMAGE_REFERENCE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}')
@@ -71,6 +86,7 @@ class ReleaseConfig:
     allow_migrations: bool = False
     fallback_rollback_image: str | None = None
     lock_root: Path | None = None
+    database_backup_keep: int = deployment_backup_retention.DEFAULT_KEEP
 
 
 @dataclass(frozen=True)
@@ -1033,6 +1049,22 @@ def _deploy_unlocked(config):
     backup_path, backup_sha256 = backup_database(config, stamp)
     print(f'Rollback image retained: {rollback_tag}', flush=True)
     print(f'Verified database backup: {backup_path} ({backup_sha256})', flush=True)
+    try:
+        backup_retention = deployment_backup_retention.apply_retention(
+            config.backup_root,
+            config.database_backup_keep,
+        )
+    except (
+        deployment_backup_retention.DeploymentBackupRetentionError,
+        OSError,
+        ValueError,
+    ) as error:
+        raise ReleaseError(f'Pre-deploy backup retention refused: {error}') from error
+    print(
+        f'Pre-deploy backups retained: {len(backup_retention["keep"])}; '
+        f'removed: {len(backup_retention["remove"])}',
+        flush=True,
+    )
 
     run_command(['docker', 'compose', 'build', 'backend'], cwd=root, env=environment)
     candidate_image = capture_command(
@@ -1147,6 +1179,11 @@ def main():
     )
     parser.add_argument('--health-timeout', type=int, default=60)
     parser.add_argument(
+        '--database-backup-keep',
+        type=deployment_backup_retention.keep_count,
+        default=deployment_backup_retention.DEFAULT_KEEP,
+    )
+    parser.add_argument(
         '--allow-migrations', action='store_true',
         help='Show and allow reviewed pending migrations; otherwise refuse them.',
     )
@@ -1171,6 +1208,7 @@ def main():
         health_timeout=args.health_timeout,
         allow_migrations=args.allow_migrations,
         fallback_rollback_image=args.fallback_rollback_image,
+        database_backup_keep=args.database_backup_keep,
     )
     try:
         result = deploy(config)

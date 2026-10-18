@@ -26,6 +26,11 @@ def isolated_database_role_check(monkeypatch):
     monkeypatch.setattr(release, 'verify_database_roles', lambda *_args: {})
     monkeypatch.setattr(release, 'verify_backend_runtime', lambda *_args: {})
     monkeypatch.setattr(release, 'database_admin_sql', lambda *_args: '')
+    monkeypatch.setattr(
+        release.deployment_backup_retention,
+        'apply_retention',
+        lambda *_args: {'keep': [], 'remove': []},
+    )
 
 
 def candidate_capture(args):
@@ -81,6 +86,11 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
         'backup_database',
         lambda *_args: events.append(('backup',)) or (tmp_path / 'backup.sql.gz', 'digest'),
     )
+    monkeypatch.setattr(
+        release.deployment_backup_retention,
+        'apply_retention',
+        lambda *_args: events.append(('retention',)) or {'keep': [], 'remove': []},
+    )
     monkeypatch.setattr(release, 'wait_for_backend', lambda *_: events.append(('healthy',)))
     monkeypatch.setattr(release, 'verify_public_release', lambda *_: events.append(('public',)))
 
@@ -89,7 +99,12 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
     build = ('run', ('docker', 'compose', 'build', 'backend'))
     scan = ('run', ('make', 'audit-image', f'BACKEND_IMAGE={CANDIDATE_IMAGE}'))
     up = ('run', ('docker', 'compose', 'up', '-d', '--no-deps', 'backend'))
-    assert events.index(('snapshot',)) < events.index(('backup',)) < events.index(build)
+    assert (
+        events.index(('snapshot',))
+        < events.index(('backup',))
+        < events.index(('retention',))
+        < events.index(build)
+    )
     assert events.index(build) < events.index(scan) < events.index(up)
     assert events.index(up) < events.index(('healthy',))
     assert events[-1] == ('public',)
@@ -101,6 +116,43 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
         for event in events
     )
     assert any(event[0] == 'run' and event[1][-2:] == ('migrate', '--check') for event in events)
+
+
+def test_deploy_refuses_retention_failure_before_build_or_cutover(
+    tmp_path, monkeypatch
+):
+    commands = []
+    monkeypatch.setattr(
+        release,
+        'run_command',
+        lambda args, **_kwargs: commands.append(tuple(args)),
+    )
+    monkeypatch.setattr(
+        release,
+        'capture_command',
+        lambda args, **_kwargs: candidate_capture(args),
+    )
+    monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: 'rollback:test')
+    monkeypatch.setattr(
+        release,
+        'backup_database',
+        lambda *_: (tmp_path / 'backup.sql.gz', 'digest'),
+    )
+    monkeypatch.setattr(
+        release.deployment_backup_retention,
+        'apply_retention',
+        lambda *_args: (_ for _ in ()).throw(
+            release.deployment_backup_retention.DeploymentBackupRetentionError(
+                'unsafe matching backup'
+            )
+        ),
+    )
+
+    with pytest.raises(release.ReleaseError, match='unsafe matching backup'):
+        release.deploy(config(tmp_path))
+
+    assert ('docker', 'compose', 'build', 'backend') not in commands
+    assert ('docker', 'compose', 'up', '-d', '--no-deps', 'backend') not in commands
 
 
 def test_deploy_refuses_a_concurrent_backend_maintenance_operation(
