@@ -298,6 +298,12 @@ checksummed logical backup every day and retains 30 successful daily copies; use
 newest verified daily copy into a network-isolated, disposable database and checks
 its schema, ownership and question invariants; run the same drill with
 `make verify-database-restore`.
+The hourly operations-health publisher also inventories finalized frontend release
+snapshots read-only. More than 10 rollback roots or 10 external copies, more than
+512 MiB allocated in either location, an unsafe exact-prefix name, symlink, special
+entry, wrong owner or world-writable content produces only the existing generic
+public `degraded` state. It never removes a snapshot; cleanup remains an explicit
+reviewed `make release-retention` operation.
 A separate least-privilege timer enforces 180-day retention for only the verified
 `pcep.micutu.com` Umami website. It validates both the UUID and domain before a
 transaction can commit and records counts, never analytics payloads, in its journal.

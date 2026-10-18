@@ -3900,6 +3900,52 @@ cost and downtime inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after foc
 and full tests, reviewed live dry-run, green CI, applied exact-path inventory,
 successful isolated restore and exact-SHA external smoke.
 
+### Finalized frontend snapshot health inventory — 2026-10-19
+
+The reviewed retention preview found eight exact finalized frontend rollback roots
+and eight matching external copies. Six exact paths—three in each location—were
+removed only through the reviewed retention utility, reclaiming about 98.7 MiB; no
+legacy tree, live release, database artifact or unrelated host image was selected.
+The post-cleanup inventory contains five rollback roots and five backup copies. Each
+location currently accounts for exactly 73,003,008 allocated bytes (about 69.6 MiB).
+
+Operations health now walks those two finalized inventories read-only every hour.
+It accepts only the exact current names, real owner-controlled parent directories,
+owned regular files/directories and no world-writable entries. Malformed reserved-
+prefix names, symlinks, special files, more than 10 snapshots or more than 512 MiB
+allocated in either location publish the existing three-field generic `degraded`
+marker and a bounded private diagnosis. The detector does not validate release
+contents, acquire deletion authority or replace the existing explicit preview/apply
+retention path.
+
+The top STRIDE risks are denial of service from silent disk growth, tampering through
+a symlink/special or reserved-prefix impostor, and repudiation when operators cannot
+reconstruct which finalized set existed at detection time. The maximum direct blast
+radius in the reviewed live state is a read-only metadata walk of 10 trees totaling
+146,006,016 allocated bytes across the two locations, plus replacement of one
+three-field health marker. The configured guardrails degrade at 11 trees or more than
+512 MiB per location. The control cannot delete or alter a snapshot, live frontend,
+database, container, legacy release or unrelated backup. A process already running
+as `micu` remains inside the same host-control boundary and can forge this local
+signal.
+
+Threshold crossing becomes machine-visible on the next hourly health run. GitHub's
+external schedule is best effort and observed delays have exceeded four hours, while
+delivery to and acknowledgement by a named human remain unverified; guaranteed
+external and human MTTD are therefore unbounded. Response preserves journals and
+metadata, previews exact retention, validates live plus retained releases, forbids
+wildcards and closes only after healthy local publication and public smoke. The
+tabletop must cover count growth, oversized allocation, malformed prefix, symlink or
+special entry, a concurrent retention disappearance and an unexplained owner/mode
+change.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If future
+snapshot handling exposes personal data, the GDPR Article 33 72-hour assessment is
+still mandatory. FAIR/ALE cannot be defended without release frequency, disk-loss,
+downtime, response-cost and incident-frequency inputs. The CISO verdict is **SHIP
+WITH GUARDRAILS** after focused/full tests, exact unit installation, healthy live
+publication, green CI and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

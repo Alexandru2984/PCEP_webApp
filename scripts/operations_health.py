@@ -27,6 +27,14 @@ RELEASE_STAGE_PREFIXES = (
     '.static.release-',
     '.seo.release-',
 )
+RELEASE_ROLLBACK_PATTERN = re.compile(
+    r'^\.frontend\.previous-\d{8}T\d{6}Z-[0-9a-f]{8}$'
+)
+RELEASE_BACKUP_PATTERN = re.compile(
+    r'^frontend\.\d{8}T\d{6}Z-[0-9a-f]{8}$'
+)
+RELEASE_ROLLBACK_PREFIX = '.frontend.previous-'
+RELEASE_BACKUP_PREFIX = 'frontend.'
 DEPLOYMENT_BACKUP_TEMP_PATTERN = re.compile(
     r'^\.[a-z0-9][a-z0-9_-]{0,31}_\d{8}T\d{6}Z\.sql\.gz\.'
     r'(?:partial|stderr)-[0-9a-f]{32}$'
@@ -42,6 +50,8 @@ MAX_PRIVATE_DIAGNOSTIC_CHARS = 512
 FUTURE_TOLERANCE = timedelta(minutes=5)
 OFFSITE_REMOTE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
 SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
+DEFAULT_RELEASE_SNAPSHOT_MAXIMUM = 10
+DEFAULT_RELEASE_SNAPSHOT_MAX_ALLOCATED_MIB = 512
 
 
 class OperationsHealthError(RuntimeError):
@@ -206,6 +216,144 @@ def verify_release_staging(root, max_age_hours, now):
             )
         found.append(entry)
     return found
+
+
+def snapshot_allocated_bytes(path):
+    """Measure one owned release tree without following unsafe entries."""
+    root = Path(path).absolute()
+    seen = set()
+    allocated = 0
+    pending = [root]
+    while pending:
+        current = pending.pop()
+        try:
+            details = current.stat(follow_symlinks=False)
+        except FileNotFoundError:
+            # A cooperating retention run may remove a reviewed tree while the
+            # read-only health inventory is walking it.
+            return None
+        except OSError as error:
+            raise OperationsHealthError(
+                f'Release snapshot metadata failed: {root.name}'
+            ) from error
+        if (
+            details.st_uid != os.getuid()
+            # The established publisher preserves a source's group-write bit;
+            # the dedicated micu group has no other members. World-writable
+            # content is never an acceptable finalized release artifact.
+            or details.st_mode & 0o002
+            or not (
+                stat_module.S_ISDIR(details.st_mode)
+                or stat_module.S_ISREG(details.st_mode)
+            )
+        ):
+            raise OperationsHealthError(
+                f'Unsafe release snapshot entry detected: {root.name}'
+            )
+        identity = (details.st_dev, details.st_ino)
+        if identity not in seen:
+            seen.add(identity)
+            allocated += details.st_blocks * 512
+        if stat_module.S_ISDIR(details.st_mode):
+            try:
+                with os.scandir(current) as entries:
+                    pending.extend(Path(entry.path) for entry in entries)
+            except FileNotFoundError:
+                return None
+            except OSError as error:
+                raise OperationsHealthError(
+                    f'Release snapshot inventory failed: {root.name}'
+                ) from error
+    return allocated
+
+
+def discover_release_snapshots(root, prefix, pattern, label):
+    parent = Path(root).absolute()
+    try:
+        unsafe_root = (
+            parent.is_symlink()
+            or not parent.is_dir()
+            or parent.resolve() != parent
+        )
+        details = parent.stat()
+    except OSError as error:
+        raise OperationsHealthError(
+            f'{label} snapshot root metadata failed.'
+        ) from error
+    forbidden_mode = 0o077 if label == 'Backup' else 0o022
+    if (
+        unsafe_root
+        or details.st_uid != os.getuid()
+        or details.st_mode & forbidden_mode
+    ):
+        raise OperationsHealthError(f'{label} snapshot root is unsafe.')
+    try:
+        entries = list(parent.iterdir())
+    except OSError as error:
+        raise OperationsHealthError(
+            f'{label} snapshot inventory failed.'
+        ) from error
+
+    snapshots = []
+    for entry in entries:
+        if not entry.name.startswith(prefix):
+            continue
+        if pattern.fullmatch(entry.name) is None:
+            raise OperationsHealthError(
+                f'Unsafe {label.lower()} snapshot detected: {entry.name}'
+            )
+        allocated = snapshot_allocated_bytes(entry)
+        if allocated is not None:
+            snapshots.append((entry, allocated))
+    return snapshots
+
+
+def verify_release_snapshot_inventory(
+    release_root,
+    backup_root,
+    maximum=DEFAULT_RELEASE_SNAPSHOT_MAXIMUM,
+    max_allocated_mib=DEFAULT_RELEASE_SNAPSHOT_MAX_ALLOCATED_MIB,
+):
+    """Bound exact finalized snapshots without deleting recovery artifacts."""
+    maximum = bounded_snapshot_count(maximum)
+    max_allocated_mib = bounded_snapshot_mebibytes(max_allocated_mib)
+    groups = (
+        (
+            discover_release_snapshots(
+                release_root,
+                RELEASE_ROLLBACK_PREFIX,
+                RELEASE_ROLLBACK_PATTERN,
+                'Rollback',
+            ),
+            'rollback',
+        ),
+        (
+            discover_release_snapshots(
+                backup_root,
+                RELEASE_BACKUP_PREFIX,
+                RELEASE_BACKUP_PATTERN,
+                'Backup',
+            ),
+            'backup',
+        ),
+    )
+    byte_limit = max_allocated_mib * 1024 * 1024
+    result = {}
+    for snapshots, label in groups:
+        allocated = sum(size for _path, size in snapshots)
+        if len(snapshots) > maximum:
+            raise OperationsHealthError(
+                f'Frontend {label} snapshot count exceeds the reviewed maximum.'
+            )
+        if allocated > byte_limit:
+            raise OperationsHealthError(
+                f'Frontend {label} snapshot allocation exceeds the reviewed maximum.'
+            )
+        result[label] = {
+            'count': len(snapshots),
+            'allocated_bytes': allocated,
+        }
+    return result
 
 
 def verify_deployment_backup_temporaries(root, max_age_hours, now):
@@ -477,6 +625,10 @@ def execute(
     release_staging_max_age_hours=2,
     deployment_backup_root=None,
     deployment_backup_temporary_max_age_hours=2,
+    release_snapshot_maximum=DEFAULT_RELEASE_SNAPSHOT_MAXIMUM,
+    release_snapshot_max_allocated_mib=(
+        DEFAULT_RELEASE_SNAPSHOT_MAX_ALLOCATED_MIB
+    ),
 ):
     moment = current_utc(now)
     backup_max_age_hours = bounded_hours(backup_max_age_hours)
@@ -490,6 +642,12 @@ def execute(
     )
     deployment_backup_temporary_max_age_hours = bounded_hours(
         deployment_backup_temporary_max_age_hours
+    )
+    release_snapshot_maximum = bounded_snapshot_count(
+        release_snapshot_maximum
+    )
+    release_snapshot_max_allocated_mib = bounded_snapshot_mebibytes(
+        release_snapshot_max_allocated_mib
     )
     if offsite_required_after is not None:
         offsite_required_after = calendar_date(offsite_required_after)
@@ -533,6 +691,16 @@ def execute(
                 deployment_backup_root,
                 deployment_backup_temporary_max_age_hours,
                 moment,
+            )
+        except OperationsHealthError as error:
+            failures.append(str(error))
+    if release_root is not None and deployment_backup_root is not None:
+        try:
+            verify_release_snapshot_inventory(
+                release_root,
+                deployment_backup_root,
+                release_snapshot_maximum,
+                release_snapshot_max_allocated_mib,
             )
         except OperationsHealthError as error:
             failures.append(str(error))
@@ -597,6 +765,34 @@ def bounded_hours(value):
     return hours
 
 
+def bounded_snapshot_count(value):
+    try:
+        count = int(value)
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError(
+            'snapshot maximum must be an integer'
+        ) from error
+    if not 5 <= count <= 100:
+        raise argparse.ArgumentTypeError(
+            'snapshot maximum must be between 5 and 100'
+        )
+    return count
+
+
+def bounded_snapshot_mebibytes(value):
+    try:
+        size = int(value)
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError(
+            'snapshot allocation must be an integer number of MiB'
+        ) from error
+    if not 64 <= size <= 10240:
+        raise argparse.ArgumentTypeError(
+            'snapshot allocation must be between 64 and 10240 MiB'
+        )
+    return size
+
+
 def calendar_date(value):
     if isinstance(value, date) and not isinstance(value, datetime):
         return value
@@ -643,6 +839,16 @@ def main():
         type=bounded_hours,
         default=2,
     )
+    parser.add_argument(
+        '--release-snapshot-maximum',
+        type=bounded_snapshot_count,
+        default=DEFAULT_RELEASE_SNAPSHOT_MAXIMUM,
+    )
+    parser.add_argument(
+        '--release-snapshot-max-allocated-mib',
+        type=bounded_snapshot_mebibytes,
+        default=DEFAULT_RELEASE_SNAPSHOT_MAX_ALLOCATED_MIB,
+    )
     parser.add_argument('--verify-installation', action='store_true')
     parser.add_argument('--verify-nginx-installation', action='store_true')
     parser.add_argument('--verify-container-runtime', action='store_true')
@@ -668,6 +874,10 @@ def main():
             deployment_backup_root=args.deployment_backup_root,
             deployment_backup_temporary_max_age_hours=(
                 args.deployment_backup_temporary_max_age_hours
+            ),
+            release_snapshot_maximum=args.release_snapshot_maximum,
+            release_snapshot_max_allocated_mib=(
+                args.release_snapshot_max_allocated_mib
             ),
             verify_installation=args.verify_installation,
             verify_nginx_installation=args.verify_nginx_installation,

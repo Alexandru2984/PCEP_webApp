@@ -55,6 +55,16 @@ def database_security_status(path, completed_at):
     path.chmod(0o600)
 
 
+def release_snapshot(root, name, payload=b'reviewed release asset'):
+    snapshot = root / name
+    snapshot.mkdir(mode=0o755)
+    asset = snapshot / 'assets' / 'index.js'
+    asset.parent.mkdir(mode=0o755)
+    asset.write_bytes(payload)
+    asset.chmod(0o644)
+    return snapshot
+
+
 def test_healthy_recovery_attestation_is_minimal_atomic_and_publicly_readable(tmp_path):
     backups = tmp_path / 'backups'
     backups.mkdir(mode=0o700)
@@ -315,6 +325,156 @@ def test_release_staging_rejects_malformed_entries_symlinks_and_future_time(
     )
     with pytest.raises(health.OperationsHealthError, match='unexpectedly in the future'):
         health.verify_release_staging(root, 2, now)
+
+
+def test_release_snapshot_inventory_accepts_only_bounded_finalized_trees(tmp_path):
+    release_root = tmp_path / 'releases'
+    release_root.mkdir(mode=0o755)
+    backup_root = tmp_path / 'deployment-backups'
+    backup_root.mkdir(mode=0o700)
+    for index in range(5):
+        release_snapshot(
+            release_root,
+            f'.frontend.previous-2026101{index}T010203Z-{index:08x}',
+        )
+        release_snapshot(
+            backup_root,
+            f'frontend.2026101{index}T010203Z-{index:08x}',
+        )
+    (release_root / 'frontend.bak.20260620-010654').mkdir()
+    (backup_root / 'pcep_db_pre_review.sql.gz').write_bytes(b'out of scope')
+
+    inventory = health.verify_release_snapshot_inventory(
+        release_root,
+        backup_root,
+    )
+
+    assert inventory['rollback']['count'] == 5
+    assert inventory['backup']['count'] == 5
+    assert inventory['rollback']['allocated_bytes'] > 0
+    assert inventory['backup']['allocated_bytes'] > 0
+
+
+@pytest.mark.parametrize('location', ['rollback', 'backup'])
+def test_release_snapshot_inventory_rejects_excess_count(tmp_path, location):
+    release_root = tmp_path / 'releases'
+    release_root.mkdir(mode=0o755)
+    backup_root = tmp_path / 'deployment-backups'
+    backup_root.mkdir(mode=0o700)
+    root = release_root if location == 'rollback' else backup_root
+    prefix = '.frontend.previous-' if location == 'rollback' else 'frontend.'
+    for index in range(6):
+        release_snapshot(
+            root,
+            f'{prefix}2026101{index}T010203Z-{index:08x}',
+        )
+
+    with pytest.raises(
+        health.OperationsHealthError,
+        match=rf'Frontend {location} snapshot count exceeds',
+    ):
+        health.verify_release_snapshot_inventory(
+            release_root,
+            backup_root,
+            maximum=5,
+        )
+
+
+def test_release_snapshot_inventory_rejects_malformed_and_unsafe_entries(
+    tmp_path,
+):
+    release_root = tmp_path / 'releases'
+    release_root.mkdir(mode=0o755)
+    backup_root = tmp_path / 'deployment-backups'
+    backup_root.mkdir(mode=0o700)
+    malformed = release_root / '.frontend.previous-not-a-reviewed-snapshot'
+    malformed.mkdir()
+
+    with pytest.raises(health.OperationsHealthError, match='Unsafe rollback'):
+        health.verify_release_snapshot_inventory(release_root, backup_root)
+
+    malformed.rmdir()
+    unsafe = (
+        release_root / '.frontend.previous-20261019T010203Z-deadbeef'
+    )
+    unsafe.symlink_to(release_root, target_is_directory=True)
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='Unsafe release snapshot entry',
+    ):
+        health.verify_release_snapshot_inventory(release_root, backup_root)
+
+    unsafe.unlink()
+    snapshot = release_snapshot(
+        release_root,
+        '.frontend.previous-20261019T010203Z-deadbeef',
+    )
+    asset = snapshot / 'assets/index.js'
+    asset.chmod(0o666)
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='Unsafe release snapshot entry',
+    ):
+        health.verify_release_snapshot_inventory(release_root, backup_root)
+
+
+def test_release_snapshot_inventory_rejects_excess_allocation(
+    tmp_path, monkeypatch
+):
+    release_root = tmp_path / 'releases'
+    release_root.mkdir(mode=0o755)
+    backup_root = tmp_path / 'deployment-backups'
+    backup_root.mkdir(mode=0o700)
+    for index in range(2):
+        release_snapshot(
+            release_root,
+            f'.frontend.previous-2026101{index}T010203Z-{index:08x}',
+        )
+    monkeypatch.setattr(
+        health,
+        'snapshot_allocated_bytes',
+        lambda _path: 40 * 1024 * 1024,
+    )
+
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='rollback snapshot allocation exceeds',
+    ):
+        health.verify_release_snapshot_inventory(
+            release_root,
+            backup_root,
+            max_allocated_mib=64,
+        )
+
+
+def test_unsafe_release_snapshot_publishes_only_generic_degraded_state(tmp_path):
+    backups = tmp_path / 'daily'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261019T080000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-19T08:00:00Z')
+    output = tmp_path / 'public/status.json'
+    output.parent.mkdir(mode=0o755)
+    release_root = tmp_path / 'releases'
+    release_root.mkdir(mode=0o755)
+    deployment_root = tmp_path / 'deployment-backups'
+    deployment_root.mkdir(mode=0o700)
+    sensitive_name = '.frontend.previous-private-incident-evidence'
+    (release_root / sensitive_name).mkdir()
+
+    with pytest.raises(health.OperationsHealthError, match=sensitive_name):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=datetime(2026, 10, 19, 9, tzinfo=timezone.utc),
+            backup_module=backup,
+            release_root=release_root,
+            deployment_backup_root=deployment_root,
+        )
+
+    assert json.loads(output.read_text())['status'] == 'degraded'
+    assert sensitive_name not in output.read_text()
 
 
 @pytest.mark.parametrize('kind', ['partial', 'stderr'])
@@ -658,6 +818,18 @@ def test_freshness_windows_are_bounded(value):
         health.bounded_hours(value)
 
 
+@pytest.mark.parametrize('value', [4, 101, 'invalid'])
+def test_release_snapshot_count_is_bounded(value):
+    with pytest.raises(Exception, match='snapshot maximum'):
+        health.bounded_snapshot_count(value)
+
+
+@pytest.mark.parametrize('value', [63, 10241, 'invalid'])
+def test_release_snapshot_allocation_is_bounded(value):
+    with pytest.raises(Exception, match='snapshot allocation'):
+        health.bounded_snapshot_mebibytes(value)
+
+
 def test_systemd_grants_only_nginx_an_explicit_read_acl():
     service = (
         PROJECT_ROOT / 'ops/systemd/pcep-operations-health.service'
@@ -687,6 +859,8 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert '--release-staging-max-age-hours 2' in service
     assert '--deployment-backup-root /home/micu/backups/pcep' in service
     assert '--deployment-backup-temporary-max-age-hours 2' in service
+    assert '--release-snapshot-maximum 10' in service
+    assert '--release-snapshot-max-allocated-mib 512' in service
     assert '--verify-installation' in service
     assert '--verify-nginx-installation' in service
     assert '--verify-container-runtime' in service
