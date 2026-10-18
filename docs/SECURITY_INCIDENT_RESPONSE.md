@@ -259,6 +259,26 @@ secrets, personal data or raw logs in a public issue.
    a storage/host incident. Review database-container integrity and every credential
    available to the deployment identity before retrying deployment.
 
+### Pre-deploy backup retention refusal
+
+1. Stop backend deployment before build or cutover and preserve the exact retention
+   output, matching-file metadata, filesystem/kernel events and maintenance-lock
+   state. Do not rename, chmod, decompress or delete a suspect match in place.
+2. Inventory only direct children matching current
+   `pcep_db_<UTC-basic>.sql.gz`. Legacy timestamps, named intervention dumps, the
+   `daily/` tree and configuration/frontend artifacts are out of scope even when
+   they are old.
+3. Treat a symlink, wrong owner/mode, future timestamp, gzip/header failure or
+   identity change as possible storage tampering until explained. Verify a recent
+   daily checksum and isolated restore before considering cleanup.
+4. Run `make predeploy-backup-retention` without apply and review every exact path
+   and SHA-256. Use the reviewed `--apply` path only after evidence preservation;
+   never use a wildcard, recursive removal or an unreviewed filesystem-age rule.
+5. After partial apply or directory-`fsync` failure, repeat discovery from disk. The
+   command removes oldest first and flushes each unlink, but the journal/output is
+   not authoritative over the current directory. Escalate repeated failure as a
+   host/storage incident.
+
 ## Recovery gates
 
 Do not close or downgrade the incident until all applicable gates pass:
@@ -330,8 +350,8 @@ never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
    database tampering, restore-readiness race, stale publication staging, stale
-   pre-deploy backup temporary, failed health-marker cleanup or malicious service
-   worker.
+   pre-deploy backup temporary, retention target replacement, failed health-marker
+   cleanup or malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.

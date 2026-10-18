@@ -10,6 +10,8 @@ FRONTEND_ROOT ?= /var/www/pcep/frontend
 BACKUP_ROOT ?= /home/micu/backups/pcep
 DATABASE_BACKUP_ROOT ?= $(BACKUP_ROOT)/daily
 DATABASE_BACKUP_KEEP ?= 30
+PREDEPLOY_BACKUP_KEEP ?= 10
+PREDEPLOY_BACKUP_RETENTION_FLAGS ?=
 DATABASE_CONTAINER ?= pcep_db
 DATABASE_RESTORE_CONTAINER ?= pcep_db_restore_check
 DATABASE_RESTORE_FALLBACK_IMAGE ?= pcep_webapp-postgres:16.15-alpine3.24
@@ -33,7 +35,7 @@ CAPACITY_DURATION ?= 20
 CAPACITY_RATE ?= 15
 CAPACITY_CONCURRENCY ?= 6
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation verify-container-runtime build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation verify-container-runtime build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend predeploy-backup-retention backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -57,6 +59,7 @@ help:
 		'  capacity-smoke   Run a bounded read-only test against local origin only' \
 		'  compose-build    Rebuild the backend image with its release revision' \
 		'  deploy-backend   Backup, validate and deploy one backend release' \
+		'  predeploy-backup-retention Preview obsolete pre-deploy DB backups' \
 		'  backup-database  Create and retain a verified daily-style DB backup' \
 		'  verify-database-restore Restore the newest daily backup in isolation' \
 		'  separate-database-roles One-time, backup-gated least-privilege migration' \
@@ -154,7 +157,10 @@ compose-build:
 	PCEP_RELEASE="$(RELEASE)" $(COMPOSE) build backend
 
 deploy-backend:
-	"$(PYTHON_BIN)" scripts/deploy_backend.py --backup-root "$(BACKUP_ROOT)" --release "$(RELEASE)" $(BACKEND_DEPLOY_FLAGS)
+	"$(PYTHON_BIN)" scripts/deploy_backend.py --backup-root "$(BACKUP_ROOT)" --database-backup-keep "$(PREDEPLOY_BACKUP_KEEP)" --release "$(RELEASE)" $(BACKEND_DEPLOY_FLAGS)
+
+predeploy-backup-retention:
+	"$(PYTHON_BIN)" scripts/deployment_backup_retention.py --backup-root "$(BACKUP_ROOT)" --keep "$(PREDEPLOY_BACKUP_KEEP)" $(PREDEPLOY_BACKUP_RETENTION_FLAGS)
 
 backup-database:
 	"$(PYTHON_BIN)" scripts/database_backup.py --backup-root "$(DATABASE_BACKUP_ROOT)" --keep "$(DATABASE_BACKUP_KEEP)"

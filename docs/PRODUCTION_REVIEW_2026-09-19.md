@@ -3847,6 +3847,59 @@ inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, a
 networkless restore, healthy local publication, full CI and exact-SHA external
 smoke.
 
+### Bounded pre-deploy database-backup retention — 2026-10-18
+
+The root deployment-backup directory contained 36 `.sql.gz` files. Twenty-one
+matched the exact current pre-deploy contract; 15 legacy or explicitly named
+intervention/role backups plus the separate checksummed `daily/` tree were outside
+scope. The current exact set totaled 1,218,636 bytes and grew on every backend
+deployment without a success-file retention bound.
+
+The deployment now validates retention immediately after publishing a fresh verified
+dump and before backend build, migration or cutover. It retains the newest 10 exact
+`pcep_db_<UTC-basic>.sql.gz` files. Matching candidates must be owned by the invoking
+user, private regular files, not future-dated, fully gzip-readable and contain the
+PostgreSQL dump header. Removal reopens and rehashes the exact candidate, compares
+device, inode, size, modification time and SHA-256 with the reviewed record, deletes
+oldest first and durably flushes the parent after each unlink. Any unsafe match or
+validation failure aborts before a live-service change. A standalone dry-run/apply
+path uses the same `backend-maintenance` lock and never traverses subdirectories or
+uses globs. The 10-file floor covers twice the five-image application rollback
+window; the independent checksummed daily policy retains 30 recovery points.
+
+The top STRIDE risks are tampering/path substitution that redirects a destructive
+unlink, denial of service when a corrupt or attacker-created exact match blocks a
+release, and repudiation when a broad age-based cleanup cannot prove which recovery
+artifacts it removed. Exact path containment, owner/mode/type checks, no-follow open,
+content and identity revalidation, a narrow filename allowlist, oldest-first durable
+unlink and fail-closed locking address those risks. This does not pretend that a
+malicious process already running as the backup-owning UID is a separate security
+boundary; suspected owner compromise remains a host incident.
+
+The reviewed live plan selects 11 oldest exact files totaling 635,917 bytes and
+retains 10 exact files totaling 582,719 bytes. Its maximum authorized deletion blast
+radius in this run is those 11 named files only. It cannot select the 15 legacy or
+named dumps, `daily/`, configuration/frontend artifacts, the live database or a
+running container. The current database remains the reconstructible question bank,
+not learner-account data.
+
+Future accumulation or retention failure is detected synchronously on the next
+backend deployment, before build/cutover; with no deployment, no new pre-deploy dump
+is created and the set cannot grow through this path. Operator-visible MTTD is the
+command runtime, while guaranteed acknowledgement remains unbounded. Response must
+preserve the plan and filesystem evidence, verify the daily checksum plus isolated
+restore, and forbid wildcard cleanup. The tabletop now covers a replaced inode
+between plan/apply, corrupt exact gzip, future timestamp, concurrent deployment and
+power loss or directory-`fsync` failure after a partial oldest-first apply.
+
+No vendor, credential, subprocessor, DPA or data flow is added. If future backups
+contain personal data and retention handling exposes or destroys it outside policy,
+the GDPR Article 33 72-hour assessment remains mandatory. FAIR/ALE cannot be
+defended without recovery-value, storage-failure, deployment-frequency, response-
+cost and downtime inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused
+and full tests, reviewed live dry-run, green CI, applied exact-path inventory,
+successful isolated restore and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

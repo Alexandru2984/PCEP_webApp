@@ -286,7 +286,10 @@ Make deploy/build targets inject the current Git revision automatically.
 
 `make deploy-backend` snapshots the running image and creates a verified private
 database dump before it can replace the local image tag, then checks and deploys
-only the backend service. Schema changes run in a separate, one-shot hardened
+only the backend service. Each successful dump also validates the exact modern
+pre-deploy set and durably retains the newest 10; named recovery/role backups and
+legacy filename formats remain outside the deletion allowlist. Schema changes run
+in a separate, one-shot hardened
 container through a normally disabled migration login; the long-lived Django role
 has DML access but cannot own or create database objects. A separate hardened
 systemd timer creates a private,
