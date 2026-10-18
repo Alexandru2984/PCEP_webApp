@@ -3790,6 +3790,63 @@ inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full failure-
 injection tests, zero-residue live inventory, exact unit installation, full CI,
 healthy publication and exact-SHA external smoke.
 
+### Final-PostgreSQL readiness after restore alert — 2026-10-18
+
+The scheduled isolated restore failed at `2026-10-18T00:33:20Z` after
+`pg_isready` returned success against the temporary PostgreSQL server used by the
+official entrypoint during first-boot initialization. That server then stopped so
+the entrypoint could exec the final server, and the immediately following `psql`
+role-preparation command received `FATAL: the database system is starting up`. The
+drill correctly preserved its previous success marker, removed its owned disposable
+container and left production data untouched, but the service remained failed and
+operations health correctly published generic `degraded`.
+
+Three scheduled public-smoke runs failed on that state and the first opened
+deduplicated issue #100. A controlled rerun completed the full restore at
+`2026-10-18T13:17:50Z`; health returned to `ok`, external run `39130932755` passed
+and automatically closed the issue. This was a real monitoring/control failure, not
+a learner-origin or production-database outage.
+
+The readiness gate no longer accepts `pg_isready` alone. It validates the bounded
+container name, waits until `/proc/1/comm` is exactly `postgres`—proving the
+entrypoint has execed the final PID 1—and then requires a no-password `SELECT 1`
+with `ON_ERROR_STOP` before role preparation or restore. Both probes retry inside
+the existing 60-second deadline. A timeout still fails closed and includes only the
+existing bounded private container-log tail; checksum, decompression, SQL, ownership
+and invariant failures are never retried or reclassified as startup races.
+
+The top STRIDE risks are denial of service against recovery assurance and alert
+attention through a false failed-state, repudiation when a coarse readiness probe
+misstates which PostgreSQL instance was ready, and tampering risk if repeated false
+positives train an operator to dismiss a genuine restore-integrity failure. The
+direct blast radius was one networkless, volume-free disposable container and the
+private restore success marker. No live database connection, production write,
+learner record, credential disclosure or public diagnostic detail occurred; the
+public surface exposed only the existing three-field generic degraded status.
+
+Local service failure was synchronous, but the first GitHub alert run began 3 hours
+49 minutes later. Although the workflow requests runs twice hourly, observed gaps
+exceeded four hours: GitHub scheduled workflows can be delayed or dropped. This
+incident therefore supersedes earlier hard external-MTTD claims. Local hourly health
+remains the bounded machine signal; guaranteed external and human MTTD are unbounded
+until an independently scheduled monitor and acknowledged notification path exist.
+
+The incident runbook now distinguishes the narrow startup signature from checksum,
+restore and invariant failures; preserves journals/image/ownership evidence; permits
+one reviewed networkless rerun; and requires full restore, health and external-smoke
+recovery before closure. The tabletop must cover the temporary-to-final server
+transition, a final PID 1 that never becomes `postgres`, a SQL probe timeout and a
+real corrupted dump that must not be normalized as readiness noise.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. GitHub's
+existing best-effort schedule is now documented honestly; no vendor MTTD guarantee
+is inferred. If a future restore incident involves personal data exposure, the
+applicable GDPR Article 33 72-hour assessment remains mandatory. FAIR/ALE cannot be
+defended without downtime, alert-fatigue, response-cost and incident-frequency
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, a real
+networkless restore, healthy local publication, full CI and exact-SHA external
+smoke.
+
 ## 15. Breaking changes
 
 None.

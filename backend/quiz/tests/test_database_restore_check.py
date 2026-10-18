@@ -206,6 +206,75 @@ def test_restore_container_command_is_ephemeral_and_isolated():
     assert not {'--publish', '-p', '--volume', '-v'} & set(command)
 
 
+def test_readiness_waits_for_final_postgres_and_a_successful_sql_probe():
+    calls = []
+    process_names = iter(['docker-entrypoint.sh', 'postgres', 'postgres'])
+    probe_results = iter(
+        [
+            SimpleNamespace(
+                returncode=1,
+                stdout='',
+                stderr='the database system is starting up',
+            ),
+            SimpleNamespace(returncode=0, stdout='1\n', stderr=''),
+        ]
+    )
+    sleeps = []
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        if command[-2:] == ['cat', '/proc/1/comm']:
+            return SimpleNamespace(
+                returncode=0,
+                stdout=f'{next(process_names)}\n',
+                stderr='',
+            )
+        if command[-2:] == ['--command', 'SELECT 1']:
+            return next(probe_results)
+        raise AssertionError(command)
+
+    restore.wait_for_database(
+        'pcep_db_restore_check',
+        runner=runner,
+        clock=lambda: 0,
+        sleeper=lambda seconds: sleeps.append(seconds),
+    )
+
+    assert sleeps == [1, 1]
+    assert sum(call[-2:] == ['cat', '/proc/1/comm'] for call in calls) == 3
+    assert sum(call[-2:] == ['--command', 'SELECT 1'] for call in calls) == 2
+    assert all('pg_isready' not in call for call in calls)
+
+
+def test_readiness_timeout_includes_bounded_container_logs():
+    moments = iter([0, 0, 2])
+
+    def runner(command, **_kwargs):
+        if command[:2] == ['docker', 'logs']:
+            return SimpleNamespace(
+                returncode=0,
+                stdout='',
+                stderr='final startup diagnostic',
+            )
+        return SimpleNamespace(
+            returncode=0,
+            stdout='docker-entrypoint.sh\n',
+            stderr='',
+        )
+
+    with pytest.raises(
+        restore.RestoreCheckError,
+        match='final startup diagnostic',
+    ):
+        restore.wait_for_database(
+            'pcep_db_restore_check',
+            timeout_seconds=1,
+            runner=runner,
+            clock=lambda: next(moments),
+            sleeper=lambda _seconds: None,
+        )
+
+
 def test_disposable_container_is_removed_after_a_failed_check():
     calls = []
     image_id = f"sha256:{'c' * 64}"

@@ -486,33 +486,62 @@ def disposable_restore_container(
         )
 
 
-def container_logs(container):
-    result = run_command(
+def container_logs(container, runner=run_command):
+    result = runner(
         ['docker', 'logs', container], timeout=30, check=False
     )
     return (result.stderr or result.stdout).strip()[-4000:]
 
 
-def wait_for_database(container, timeout_seconds=60):
-    deadline = time.monotonic() + timeout_seconds
-    command = [
+def wait_for_database(
+    container,
+    timeout_seconds=60,
+    runner=run_command,
+    clock=time.monotonic,
+    sleeper=time.sleep,
+):
+    validate_container_name(container, 'restore')
+    deadline = clock() + timeout_seconds
+    process_command = [
         'docker',
         'exec',
         '--user',
         'postgres',
         container,
-        'pg_isready',
+        'cat',
+        '/proc/1/comm',
+    ]
+    probe_command = [
+        'docker',
+        'exec',
+        '--user',
+        'postgres',
+        container,
+        'psql',
         '--username',
         RESTORE_ADMIN,
         '--dbname',
         RESTORE_DATABASE,
+        '--no-password',
+        '--no-psqlrc',
+        '--tuples-only',
+        '--no-align',
+        '--quiet',
+        '--set',
+        'ON_ERROR_STOP=on',
+        '--command',
+        'SELECT 1',
     ]
-    while time.monotonic() < deadline:
-        if run_command(command, timeout=10, check=False).returncode == 0:
-            return
-        time.sleep(1)
+    while clock() < deadline:
+        process = runner(process_command, timeout=10, check=False)
+        if process.returncode == 0 and process.stdout.strip() == 'postgres':
+            probe = runner(probe_command, timeout=10, check=False)
+            if probe.returncode == 0 and probe.stdout.strip() == '1':
+                return
+        sleeper(1)
     raise RestoreCheckError(
-        f'Disposable PostgreSQL did not become ready: {container_logs(container)}'
+        f'Disposable PostgreSQL did not become ready: '
+        f'{container_logs(container, runner)}'
     )
 
 
