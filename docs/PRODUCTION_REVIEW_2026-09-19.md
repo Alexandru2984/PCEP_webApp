@@ -4134,6 +4134,34 @@ FAIR/ALE is not defensible without outage frequency, co-tenant impact and busine
 loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests,
 one live preflight dry proof without reboot, full CI and exact-SHA external smoke.
 
+### Pinned Trivy scanner refresh — 2026-10-20
+
+The repository's secret and container-image scanner moved from Trivy `0.75.0` to
+the official `0.76.0` multi-architecture OCI index at the reviewed immutable digest
+`sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222`.
+The upstream release declares no breaking change and includes scanner hardening and
+additional cryptographic analysis. All three executable defaults use the same
+tag-and-digest pair so a caller cannot silently receive different scanner bytes by
+choosing a different Make target.
+
+The relevant STRIDE risks are supplier tampering of the scanner, repudiation from
+inconsistent pins and denial of service from a scanner regression. Digest binding,
+GitHub Actions SHA pinning and clean secret/image/misconfiguration scans limit those
+risks; a compromised upstream image at that reviewed digest could still affect the
+ephemeral scanner container and its read-only repository view. It cannot write the
+worktree, production data or images being inspected. A failed scan is synchronous
+in CI and local validation, so machine MTTD is immediate; human acknowledgement
+still depends on the existing GitHub notification gate. Response is to preserve the
+failed run, compare the upstream release and registry manifest, revert all three
+pins atomically and repeat the scans.
+
+No hosted vendor, credential, subprocessor, DPA or personal-data flow is added.
+The existing Aqua Security/GHCR supply-chain dependency is refreshed rather than
+expanded. A broader incident involving personal data retains the GDPR Article 33
+72-hour assessment requirement. FAIR/ALE remains indefensible without incident
+frequency and business-loss inputs. The CISO verdict for this bounded tool refresh
+is **SHIP** after scanner regression checks and full CI.
+
 ## 15. Breaking changes
 
 None.
