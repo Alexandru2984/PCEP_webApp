@@ -2741,11 +2741,12 @@ by impact, are:
 | 2 — high | **Tampering/information disclosure after host compromise:** root on the shared host can read application/database secrets, alter frontend/API bytes and forge the public recovery status. The current database blast radius is the question bank/schema rather than learner accounts; malicious frontend publication could affect every active learner tab. | Release hashes, SRI, request/release IDs, external smoke, CodeQL, secret scanning and least-privilege containers reduce or detect narrower failures. They do not independently attest a root-compromised host. Incident steps and credential rotation exist; the prior application credential exposure was contained and rotation-tested. | Accept only while the no-account/no-PII scope holds. Revisit before storing any learner identity or private server data, and move the attestation or audit evidence off-host before relying on it for compromise detection. |
 | 3 — medium | **Supply-chain/browser runtime tampering:** a compromised dependency, analytics byte stream or Python runtime could reach all active browser sessions. | Hashed Python locks, script-free npm installation, exact lifecycle allowlisting, registry signatures/attestations, pinned images/actions/runtime hashes, consent-gated analytics and tracker SRI fail closed in CI/E2E/public smoke. | Residual vendor compromise remains. Continue scheduled advisory scans and require full review for every pin/digest change. |
 
-Technical detection time for a failure covered by the public contract is at most
-about 30 minutes plus workflow execution. Recovery-status staleness is detected by
-the same external job after its two-hour freshness window. These are machine MTTD
-claims only: guaranteed human MTTD remains unbounded until the repository owner
-confirms that an exercised issue reaches a human-controlled email/mobile channel.
+The workflow requests the public contract twice hourly, but GitHub can delay or drop
+scheduled runs, so external detection has no guaranteed upper bound. Local hourly
+operations health remains the bounded same-host machine signal for its configured
+freshness windows. Guaranteed human MTTD remains unbounded until the repository
+owner confirms that an exercised issue reaches a human-controlled email/mobile
+channel.
 The post-install exercise opened issue #68 assigned to and explicitly mentioning the
 repository owner; the next healthy run closed it after the full contract passed.
 This proves the technical GitHub-side creation, routing and recovery path but not
@@ -4037,6 +4038,54 @@ FAIR/ALE cannot be defended without backup value, failure frequency, outage,
 response-cost and loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after
 failure-injection/full tests, exact unit installation, one real successful backup,
 healthy local publication, green CI and exact-SHA external smoke.
+
+### Durable analytics-retention success attestation — 2026-10-19
+
+The PCEP-scoped Umami retention transaction already matched one canonical website
+UUID and domain, bounded its statements and lock waits, and rolled previews back.
+Its only recurring detection evidence, however, was the systemd failed state. An
+explicit reset or reboot could erase that state without proving that the published
+180-day policy had been applied successfully.
+
+An applied run now atomically publishes a base-mode-0600 two-field success marker
+only after the database transaction commits. A dry-run is structurally refused
+marker publication. The dedicated `umami` account owns both marker and base-
+mode-0700 state directory; two post-success ACLs give `micu` only directory traversal
+and marker read, without exposing the Umami environment or granting a write. Because
+POSIX ACL masks appear in group mode bits, operations health requires the effective
+0710/0640 modes and the complete numeric ACL sets: `umami` owner, one named `micu`
+entry, empty owning-group and `other` permissions, and no extra entry. It also checks
+the schema and 26-hour age through a read-only mount. The daily timer moves from
+02:47 to 02:17 plus at most 15 minutes of jitter, leaving the normal 02:47 health
+invocation outside the publication window.
+
+The top STRIDE risks are repudiation when a preview or reset failed state is mistaken
+for applied retention, information disclosure if monitoring gains access to Umami
+credentials or rows, and denial of service/compliance failure if expired data remains
+indefinitely. The destructive blast radius is unchanged: only expired rows for the
+single configured PCEP website across the six allowlisted table operations inside
+one transaction. The new write radius is one private JSON file below 256 bytes plus
+two named read/traverse ACLs. It adds no table, website, credential, remote endpoint
+or broader database privilege.
+
+Transaction, marker or ACL failure is synchronous in the oneshot and visible through
+its failed state. Independently, the prior marker becomes unhealthy after 26 hours
+and the next hourly run gives a marker-based upper bound of roughly 27 hours from the
+last committed success. GitHub schedule and human acknowledgement remain unbounded.
+Response preserves private journals/ACLs, previews the exact scoped transaction,
+forbids hand-written markers and broad SQL, and closes only after an applied rerun
+and healthy public contract. The tabletop must cover database timeout/rollback,
+commit followed by marker failure, preview marker refusal, wrong owner/mode, ACL
+failure, stale prior success and a reset systemd failed state.
+
+No new vendor, subprocessor, DPA, credential or personal-data category is added;
+this control enforces the already published self-hosted Umami retention period. A
+breach involving analytics identifiers or events still requires the applicable GDPR
+Article 33 72-hour assessment. FAIR/ALE cannot be defended without retained-row
+volume, violation duration, response-cost, regulatory and incident-frequency inputs.
+The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, exact unit
+installation, one real applied retention run, healthy local publication, green CI
+and exact-SHA external smoke.
 
 ## 15. Breaking changes
 

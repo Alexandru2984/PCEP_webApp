@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -121,6 +122,77 @@ def test_apply_commits_only_after_domain_identity_matches():
     assert connection.rollbacks == 0
 
 
+def test_only_an_applied_transaction_can_publish_a_private_success_marker(
+    tmp_path,
+):
+    status_root = tmp_path / 'state'
+    status_root.mkdir(mode=0o700)
+    status = status_root / 'last-success.json'
+    preview = retention.enforce_retention(
+        FakeConnection(),
+        WEBSITE_ID,
+        'pcep.micutu.com',
+        180,
+        now=datetime(2026, 10, 19, 2, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(
+        retention.AnalyticsRetentionError,
+        match='preview must not publish',
+    ):
+        retention.record_applied_success(preview, status)
+    assert not status.exists()
+
+    applied = retention.enforce_retention(
+        FakeConnection(),
+        WEBSITE_ID,
+        'pcep.micutu.com',
+        180,
+        apply=True,
+        now=datetime(2026, 10, 19, 2, tzinfo=timezone.utc),
+    )
+    retention.record_applied_success(
+        applied,
+        status,
+        now=datetime(2026, 10, 19, 2, 1, tzinfo=timezone.utc),
+    )
+
+    assert json.loads(status.read_text()) == {
+        'completed_at': '2026-10-19T02:01:00Z',
+        'schema': 1,
+    }
+    assert status.stat().st_mode & 0o777 == 0o600
+    assert list(status_root.glob('.last-success.json.partial-*')) == []
+
+
+def test_failed_status_write_durably_removes_its_temporary(
+    tmp_path, monkeypatch
+):
+    status_root = tmp_path / 'state'
+    status_root.mkdir(mode=0o700)
+    status = status_root / 'last-success.json'
+    flushed = []
+    monkeypatch.setattr(
+        retention.json,
+        'dump',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            OSError('simulated analytics marker write failure')
+        ),
+    )
+    monkeypatch.setattr(
+        retention,
+        'fsync_directory',
+        lambda path: flushed.append(Path(path)),
+    )
+
+    with pytest.raises(OSError, match='marker write failure'):
+        retention.write_success_status(status)
+
+    assert list(status_root.glob('.last-success.json.partial-*')) == []
+    assert flushed == [status_root]
+    assert not status.exists()
+
+
 def test_domain_mismatch_fails_closed_and_rolls_back():
     connection = FakeConnection(('PCEP', 'another.example'))
 
@@ -145,6 +217,7 @@ def test_missing_database_url_fails_without_connection(monkeypatch):
 
 def test_systemd_sandbox_exposes_the_uv_runtime_behind_the_virtualenv_symlink():
     service = (PROJECT_ROOT / 'ops/systemd/pcep-analytics-retention.service').read_text()
+    timer = (PROJECT_ROOT / 'ops/systemd/pcep-analytics-retention.timer').read_text()
 
     assert 'ProtectHome=tmpfs' in service
     assert 'BindReadOnlyPaths=/home/micu/.local/share/uv/python\n' in service
@@ -153,3 +226,18 @@ def test_systemd_sandbox_exposes_the_uv_runtime_behind_the_virtualenv_symlink():
         'ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python '
         '/home/micu/PCEP_webApp/scripts/analytics_retention.py '
     ) in service
+    assert 'StateDirectory=pcep-analytics-retention' in service
+    assert 'StateDirectoryMode=0700' in service
+    assert (
+        '--status-file /var/lib/pcep-analytics-retention/last-success.json'
+        in service
+    )
+    assert (
+        'ExecStartPost=/usr/bin/setfacl --modify user:micu:--x '
+        '/var/lib/pcep-analytics-retention'
+    ) in service
+    assert (
+        'ExecStartPost=/usr/bin/setfacl --modify user:micu:r-- '
+        '/var/lib/pcep-analytics-retention/last-success.json'
+    ) in service
+    assert 'OnCalendar=*-*-* 02:17:00' in timer

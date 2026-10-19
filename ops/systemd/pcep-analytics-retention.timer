@@ -2,7 +2,7 @@
 Description=Remove expired PCEP analytics every day
 
 [Timer]
-OnCalendar=*-*-* 02:47:00
+OnCalendar=*-*-* 02:17:00
 Persistent=true
 RandomizedDelaySec=15m
 AccuracySec=1m
