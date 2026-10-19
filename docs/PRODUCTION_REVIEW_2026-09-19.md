@@ -3444,10 +3444,10 @@ crawler counts are not measured, so their numeric business radius is unknown.
 
 File, directory-open and fsync failures are synchronous, giving immediate machine
 and invoking-operator MTTD before cutover whenever possible. A latent storage fault
-visible only after reboot should fail the twice-hourly external public contract in
-at most 30 minutes and the hourly health publication in roughly one to three hours;
-guaranteed human MTTD remains unbounded until alert-delivery confirmation is
-completed. Response is to preserve the command, kernel and filesystem journals,
+visible only after reboot should fail the next external public contract, but GitHub's
+requested twice-hourly schedule can be delayed or dropped, so guaranteed external
+and human MTTD remain unbounded. Response is to preserve the command, kernel and
+filesystem journals,
 avoid pruning either retained tree, validate both live and previous roots, republish
 the last verified snapshot, and rerun public/origin smoke. The tabletop must cover
 file fsync failure before exchange, parent fsync failure immediately after exchange,
@@ -3529,10 +3529,12 @@ at an interruption; earlier selected pairs are already durably removed, while al
 7–365 configured newest retained pairs remain outside deletion.
 
 Unlink or fsync failure is synchronous and fails the daily oneshot, giving immediate
-machine MTTD; hourly health sees the failed scheduled service or stale newest backup,
-and external smoke sees degraded health in at most 30 minutes. Guaranteed human MTTD
-remains unbounded until notification delivery is confirmed. Response is to preserve
-the journal and directory inventory, never delete an unpaired dump automatically,
+local machine state. Operations health does not inspect a unit's failed state; it
+degrades only if subsequent failures let the newest verified backup exceed 26 hours.
+The next external smoke can then observe generic degradation, but its GitHub schedule
+has no guaranteed delivery bound, and human MTTD remains unbounded until notification
+delivery is confirmed. Response is to preserve the journal and directory inventory,
+never delete an unpaired dump automatically,
 verify all remaining complete pairs, copy important evidence off-host, restore disk
 headroom and rerun backup/restore validation. The tabletop must cover failure after
 the dump unlink, checksum unlink failure and power loss before each directory fsync.
@@ -3666,12 +3668,13 @@ storage radius, while live releases, rollback roots, external snapshots and the
 
 After the two-hour tolerance, the hourly publisher gives machine MTTD of at most
 roughly one additional hour, or about three hours from staging creation. The
-twice-hourly external contract sees generic `degraded` within another 30 minutes.
-The private journal names the exact reviewed candidate while the public JSON stays
-at three non-sensitive fields. Guaranteed human MTTD remains unbounded until alert
-delivery and acknowledgement are confirmed. A compromised `micu`/root identity can
-refresh metadata or forge health, so this is a narrower failure detector rather
-than independent host attestation.
+requested twice-hourly external contract sees generic `degraded` only when GitHub
+actually starts it; scheduled runs can be delayed or dropped, so external MTTD has no
+guaranteed upper bound. The private journal names the exact reviewed candidate while
+the public JSON stays at three non-sensitive fields. Guaranteed human MTTD remains
+unbounded until alert delivery and acknowledgement are confirmed. A compromised
+`micu`/root identity can refresh metadata or forge health, so this is a narrower
+failure detector rather than independent host attestation.
 
 The incident-response runbook now requires preserving journals and exact metadata,
 checking the publisher process and lock, validating live/rollback/backup trees and
@@ -3770,10 +3773,10 @@ and is intentionally not changed or deleted by this control.
 
 A normal cleanup failure is synchronous, giving immediate machine and invoking-
 operator MTTD. Crash residue becomes unhealthy after two hours and the hourly timer
-with bounded jitter detects it in roughly three hours from creation; twice-hourly
-external smoke then observes only generic degradation within another 30 minutes.
-Guaranteed human MTTD remains unbounded until alert delivery and acknowledgement
-are confirmed.
+with bounded jitter detects it in roughly three hours from creation. The requested
+twice-hourly external smoke observes only generic degradation when GitHub actually
+starts it; external delivery has no guaranteed upper bound. Guaranteed human MTTD
+remains unbounded until alert delivery and acknowledgement are confirmed.
 
 The incident runbook preserves journals, exact metadata, storage evidence and lock
 ownership; forbids broad wildcard deletion and public copying of dump/error content;
