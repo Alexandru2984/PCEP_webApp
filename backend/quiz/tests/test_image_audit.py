@@ -1,7 +1,24 @@
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+TRIVY_REFERENCE = re.compile(
+    r'ghcr\.io/aquasecurity/trivy:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}'
+)
+
+
+def test_trivy_defaults_are_immutable_and_synchronized():
+    sources = (
+        (ROOT / 'Makefile').read_text(),
+        (ROOT / 'scripts' / 'audit_docker_image.sh').read_text(),
+        (ROOT / 'scripts' / 'check_tracked_secrets.sh').read_text(),
+    )
+
+    references = [TRIVY_REFERENCE.findall(source) for source in sources]
+
+    assert all(len(matches) == 1 for matches in references)
+    assert len({matches[0] for matches in references}) == 1
 
 
 def test_image_scanner_never_receives_the_docker_socket():

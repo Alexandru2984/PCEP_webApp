@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-DEFAULT_TRIVY_IMAGE='ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa'
+DEFAULT_TRIVY_IMAGE='ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222'
 ROOT="${PCEP_REPOSITORY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 TRIVY_IMAGE="${TRIVY_IMAGE:-$DEFAULT_TRIVY_IMAGE}"
 scan_uid="$(id -u)"
