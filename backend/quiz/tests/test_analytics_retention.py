@@ -240,4 +240,9 @@ def test_systemd_sandbox_exposes_the_uv_runtime_behind_the_virtualenv_symlink():
         'ExecStartPost=/usr/bin/setfacl --modify user:micu:r-- '
         '/var/lib/pcep-analytics-retention/last-success.json'
     ) in service
+    assert service.index(
+        'user:micu:r-- /var/lib/pcep-analytics-retention/last-success.json'
+    ) < service.index(
+        'user:micu:--x /var/lib/pcep-analytics-retention'
+    )
     assert 'OnCalendar=*-*-* 02:17:00' in timer
