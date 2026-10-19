@@ -5,7 +5,9 @@ import argparse
 from datetime import datetime, timedelta, timezone
 import json
 import os
+from pathlib import Path
 import re
+import sys
 import uuid
 
 import psycopg2
@@ -71,6 +73,106 @@ WHERE current_session.website_id = %s
 
 class AnalyticsRetentionError(RuntimeError):
     pass
+
+
+def fsync_directory(path):
+    flags = os.O_RDONLY | getattr(os, 'O_CLOEXEC', 0)
+    if hasattr(os, 'O_DIRECTORY'):
+        flags |= os.O_DIRECTORY
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def remove_temporary_durably(path, parent):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    fsync_directory(parent)
+    return True
+
+
+def write_success_status(path, now=None):
+    status = Path(path).absolute()
+    parent = status.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise AnalyticsRetentionError(
+            'Analytics retention status directory must be a real directory.'
+        )
+    parent_details = parent.stat()
+    if parent_details.st_uid != os.getuid() or parent_details.st_mode & 0o022:
+        raise AnalyticsRetentionError(
+            'Analytics retention status directory must be owned by the invoking '
+            'user and not writable by group or others.'
+        )
+    if status.exists() or status.is_symlink():
+        if status.is_symlink() or not status.is_file():
+            raise AnalyticsRetentionError(
+                'Existing analytics retention status must be a real file.'
+            )
+        if status.stat().st_uid != os.getuid():
+            raise AnalyticsRetentionError(
+                'Existing analytics retention status has the wrong owner.'
+            )
+
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        raise AnalyticsRetentionError(
+            'Analytics retention completion time must include a timezone.'
+        )
+    payload = {
+        'completed_at': moment.astimezone(timezone.utc).strftime(
+            '%Y-%m-%dT%H:%M:%SZ'
+        ),
+        'schema': 1,
+    }
+    temporary = parent / f'.{status.name}.partial-{uuid.uuid4().hex}'
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_CLOEXEC', 0)
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(temporary, flags, 0o600)
+    published = False
+    try:
+        with os.fdopen(descriptor, 'w') as output:
+            json.dump(payload, output, separators=(',', ':'), sort_keys=True)
+            output.write('\n')
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, status)
+        published = True
+        status.chmod(0o600)
+        fsync_directory(parent)
+    except BaseException as error:
+        if not published and os.path.lexists(temporary):
+            try:
+                remove_temporary_durably(temporary, parent)
+            except Exception as cleanup_error:
+                note = (
+                    'Failed to durably remove analytics retention status '
+                    f'temporary {temporary}: {cleanup_error}'
+                )
+                error.add_note(note)
+                print(
+                    f'Analytics retention cleanup warning: {note}',
+                    file=sys.stderr,
+                )
+        raise
+    return payload
+
+
+def record_applied_success(result, status_file, now=None):
+    if status_file is None:
+        return None
+    if not isinstance(result, dict) or result.get('applied') is not True:
+        raise AnalyticsRetentionError(
+            'A retention preview must not publish an applied-success marker.'
+        )
+    return write_success_status(status_file, now=now)
 
 
 def validate_inputs(website_id, expected_domain, retention_days):
@@ -186,6 +288,7 @@ def main():
         action='store_true',
         help='Commit deletions. Without this flag the transaction is rolled back.',
     )
+    parser.add_argument('--status-file', type=Path)
     args = parser.parse_args()
     try:
         with database_connection() as connection:
@@ -196,6 +299,7 @@ def main():
                 args.retention_days,
                 apply=args.apply,
             )
+        record_applied_success(result, args.status_file)
         print(json.dumps(result, sort_keys=True))
     except (AnalyticsRetentionError, psycopg2.Error) as error:
         parser.exit(1, f'Analytics retention refused: {error}\n')

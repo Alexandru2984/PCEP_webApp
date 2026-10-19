@@ -71,6 +71,7 @@ person receives and acknowledges it.
 | Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
 | Twice-hourly-target production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | best effort; GitHub schedule delays/drops mean no guaranteed external MTTD |
 | Hourly local recovery attestation consumed by external smoke | missing/corrupt/stale local backup, stale full-job success marker, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run after its age threshold; external delivery has no guaranteed upper bound |
+| Hourly analytics-retention success attestation | missed/failed applied retention, stale marker, unsafe owner/mode or broken reader ACL | local machine signal on the next hourly run after the 26-hour threshold; external delivery has no guaranteed upper bound |
 | Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
 | Hourly finalized-release snapshot inventory via the public recovery attestation | more than 10 frontend rollback/external snapshots, more than 512 MiB allocated per location, or an unsafe reserved-prefix tree | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
 | Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
@@ -191,6 +192,26 @@ secrets, personal data or raw logs in a public issue.
 5. If personal data may have been lost, exposed or made unrecoverable, start the
    documented breach assessment and applicable GDPR Article 33 72-hour decision
    clock; backup recovery work does not pause that clock.
+
+### Stale or failed analytics retention
+
+1. Preserve the analytics-retention and operations-health journals, marker metadata
+   and ACLs, the configured website identity/domain and database audit evidence. Do
+   not export event/session rows or the database URL into an issue or chat.
+2. Treat a missing, wrongly owned, public, malformed or inexplicably replaced marker
+   as possible host/control tampering. A dry-run cannot refresh success and must not
+   be reclassified as an applied retention run.
+3. Preview the exact PCEP-scoped transaction through the documented transient unit.
+   Confirm the configured UUID/domain and deletion counts before any retry with
+   `--apply`; never issue broad manual table deletes as alert cleanup.
+4. After the reviewed applied service succeeds, require a new `umami`-owned marker
+   with no group/other ACL access except the exact named read-only `micu` entry, the
+   exact traverse-only directory ACL, healthy operations publication and the public
+   smoke contract before closure.
+5. Determine the earliest missed retention date and whether data exceeded the
+   published 180-day period. Record the controller decision, data-subject impact and
+   any required response; start the GDPR Article 33 72-hour assessment if the facts
+   also indicate a personal-data breach.
 
 ### Isolated restore-check readiness failure
 
@@ -408,7 +429,8 @@ Run at least twice a year and after control-plane changes. Use synthetic evidenc
 never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
-   database tampering, failed backup after dump publication, restore-readiness race,
+   database tampering, failed backup after dump publication, stale analytics
+   retention, restore-readiness race,
    stale publication staging, stale
    pre-deploy backup temporary, excessive/unsafe finalized snapshots, rollback-image
    retention refusal, retention target replacement, failed health-marker cleanup or
