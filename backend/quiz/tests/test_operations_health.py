@@ -1053,6 +1053,11 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert 'StateDirectoryMode=0750' in service
     assert 'Group=www-data' in service
     assert (
+        'After=pcep-db-backup.service pcep-db-restore-check.service '
+        'pcep-database-security.service pcep-analytics-retention.service'
+        in service
+    )
+    assert (
         'ExecStartPost=/usr/bin/setfacl --modify user:www-data:r-- '
         '/var/lib/pcep-operations-health/status.json'
     ) in service

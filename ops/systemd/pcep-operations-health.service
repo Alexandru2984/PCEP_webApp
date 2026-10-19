@@ -1,6 +1,6 @@
 [Unit]
 Description=Publish minimal PCEP recovery and database security health
-After=pcep-db-backup.service pcep-db-restore-check.service pcep-database-security.service
+After=pcep-db-backup.service pcep-db-restore-check.service pcep-database-security.service pcep-analytics-retention.service
 ConditionPathIsDirectory=/home/micu/PCEP_webApp
 ConditionPathIsDirectory=/home/micu/backups/pcep/daily
 
