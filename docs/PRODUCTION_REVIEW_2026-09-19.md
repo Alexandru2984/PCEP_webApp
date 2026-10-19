@@ -4087,6 +4087,53 @@ The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, exact uni
 installation, one real applied retention run, healthy local publication, green CI
 and exact-SHA external smoke.
 
+### Host patch/reboot recovery proof — 2026-10-19
+
+The shared host was running kernel `7.0.0-29-generic` while the trusted installed
+same-flavour inventory already contained `7.0.0-38-generic`, and
+`/var/run/reboot-required` named kernel and libc updates. `needrestart` also reported
+Docker among the services using superseded components. A reboot is host-wide and
+can affect unrelated projects, so neither repository automation nor a PCEP agent is
+authorized to perform package installation, service restarts or the reboot without
+a reviewed co-tenant window and recovery-console access.
+
+The new two-phase proof is read-only against production. Preflight requires clean,
+exact `main`; exact installed Nginx/systemd/runtime policy; healthy Nginx, Docker and
+Cloudflared; six quiescent non-failed PCEP oneshots; and the complete external
+production contract. It derives the newest installed kernel only from root-owned,
+non-writable, real `/boot/vmlinuz-*` files matching the running kernel flavour. It
+then atomically creates one caller-selected, non-existing mode-`0600` JSON evidence
+file in an owner-controlled non-writable-by-peers directory. Postflight accepts only
+that bounded schema and proves a changed kernel boot ID, the exact expected kernel,
+the same reviewed commit, cleared reboot-required state and every live check before
+atomically marking the record complete.
+
+The top STRIDE risks are denial of service when Nginx, Cloudflared, Docker or the
+database does not recover; repudiation when an operator assumes that a reboot or
+new kernel happened without durable proof; and tampering through a replaced state
+file, unsafe kernel candidate or drifted installation. A compromised `micu` or root
+identity remains able to forge same-host evidence. The checker itself writes one
+private JSON file below 4 KiB and performs no package, service, timer, container,
+database or public-data mutation. The maintenance event can temporarily affect all
+active PCEP learners and every same-host project; PCEP learner progress remains in
+the browser and the 308-question bank remains reconstructible.
+
+Gate failures are synchronous, so operator MTTD during the window is immediate.
+The twice-hourly external workflow and hourly local publisher remain recovery
+signals afterward, but scheduled GitHub execution and human acknowledgement have no
+guaranteed upper bound. Response preserves the evidence and relevant journals,
+uses provider-console kernel rollback when boot fails, changes only an identified
+failed dependency and repeats postflight. The tabletop scenarios are unchanged boot
+ID, old-kernel boot, Docker recovery failure, a timer/oneshot race, replaced or
+permissive evidence and a healthy homepage with degraded operations state.
+
+No vendor, credential, subprocessor, DPA or personal-data category is added. If a
+wider maintenance incident risks personal-data confidentiality, integrity or
+availability, the applicable GDPR Article 33 72-hour assessment remains mandatory.
+FAIR/ALE is not defensible without outage frequency, co-tenant impact and business-
+loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests,
+one live preflight dry proof without reboot, full CI and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

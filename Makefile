@@ -35,7 +35,7 @@ CAPACITY_DURATION ?= 20
 CAPACITY_RATE ?= 15
 CAPACITY_CONCURRENCY ?= 6
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation verify-container-runtime build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend predeploy-backup-retention backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation verify-container-runtime host-maintenance-preflight host-maintenance-postflight build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend predeploy-backup-retention backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -52,6 +52,8 @@ help:
 		'  verify-nginx-installation Verify active PCEP vhosts and snippets' \
 		'  verify-operations-installation Verify installed systemd/SEO policy' \
 		'  verify-container-runtime Verify live Docker isolation and topology' \
+		'  host-maintenance-preflight Prove readiness and record private pre-reboot evidence' \
+		'  host-maintenance-postflight Prove reboot, kernel activation and full recovery' \
 		'  build            Build the frontend production bundle' \
 		'  compose-build-frontend Build frontend through the pinned container' \
 		'  django-check     Run Django production deploy checks' \
@@ -128,6 +130,14 @@ verify-operations-installation:
 
 verify-container-runtime:
 	"$(PYTHON_BIN)" scripts/verify_container_runtime.py
+
+host-maintenance-preflight:
+	@test -n "$(HOST_MAINTENANCE_STATE)" || { printf '%s\n' 'HOST_MAINTENANCE_STATE is required.'; exit 1; }
+	"$(PYTHON_BIN)" scripts/host_maintenance_check.py preflight --state-file "$(HOST_MAINTENANCE_STATE)"
+
+host-maintenance-postflight:
+	@test -n "$(HOST_MAINTENANCE_STATE)" || { printf '%s\n' 'HOST_MAINTENANCE_STATE is required.'; exit 1; }
+	"$(PYTHON_BIN)" scripts/host_maintenance_check.py postflight --state-file "$(HOST_MAINTENANCE_STATE)"
 
 build: build-frontend
 
