@@ -516,6 +516,13 @@ missing, malformed or stale marker deliberately degrades health; this deadline d
 not upload a backup or weaken any activation gate in the offsite runbook. It prevents
 the accepted same-host-only recovery risk from expiring silently.
 
+The same hourly run requires the last committed analytics-retention success marker
+to be private, owned by the dedicated `umami` account and at most 26 hours old. The
+retention service runs at 02:17 local time with up to 15 minutes of jitter, before
+the 02:47 health window, so ACL publication cannot race the normal health run. A
+missing, unreadable, malformed, wrongly owned or stale marker degrades only the same
+generic public status.
+
 The same run inventories the real, owner-controlled `/var/www/pcep` release parent
 read-only. It accepts only exact temporary publisher names for `frontend`, `static`
 and `seo`, requires every match to remain a real directory owned by `micu` and not
@@ -1712,6 +1719,10 @@ database before deleting anything. It scopes every statement by website ID, remo
 dependent rows before sessions, preserves a session referenced by recent data,
 uses bounded lock/statement timeouts and rolls back unless `--apply` is explicit.
 Output contains only deletion counts and the cutoff, never events or session data.
+A preview is forbidden from writing success state. Only after the applied database
+transaction commits does the service atomically publish a private two-field UTC
+success marker in its systemd state directory; pre-replacement failure preserves
+the prior marker.
 
 Preview the exact current effect through a transient systemd unit. Omitting
 `--apply` is intentional:
@@ -1744,9 +1755,14 @@ systemctl status pcep-analytics-retention.service \
 journalctl -u pcep-analytics-retention.service -n 20 --no-pager
 ```
 
-The service runs as the existing unprivileged `umami` account, receives its database
-URL from the root-managed Umami environment file, can connect only to localhost and
-has no writable host path. Its private mount namespace hides the rest of every home
+The service runs daily at 02:17 local time as the existing unprivileged `umami`
+account, receives its database URL from the root-managed Umami environment file,
+can connect only to localhost and can write only its private systemd state directory.
+After a successful applied run it grants `micu` traverse-only access to that
+directory and read-only access to the marker; it does not grant access to the Umami
+environment or database. Operations health independently validates the marker's
+`umami` ownership, mode, exact shape and age. Its private mount namespace hides the
+rest of every home
 directory and exposes only the exact retention script, virtual environment and the
 read-only uv-managed Python runtime to which that environment's interpreter symlink
 resolves. Roll back by disabling the timer and removing these two units; if

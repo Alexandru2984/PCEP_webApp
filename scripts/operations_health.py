@@ -7,8 +7,10 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import pwd
 import re
 import stat as stat_module
+import subprocess
 import sys
 import uuid
 
@@ -50,6 +52,7 @@ MAX_PRIVATE_DIAGNOSTIC_CHARS = 512
 FUTURE_TOLERANCE = timedelta(minutes=5)
 OFFSITE_REMOTE_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
 SHA256_PATTERN = re.compile(r'^[0-9a-f]{64}$')
+ACCOUNT_PATTERN = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
 DEFAULT_RELEASE_SNAPSHOT_MAXIMUM = 10
 DEFAULT_RELEASE_SNAPSHOT_MAX_ALLOCATED_MIB = 512
 
@@ -455,13 +458,14 @@ def verify_backup_job_freshness(path, max_age_hours, now):
     return moment
 
 
-def read_success_status(path, label, private=False):
+def read_success_status(path, label, private=False, expected_uid=None):
     status = Path(path).absolute()
     if status.is_symlink() or not status.is_file():
         raise OperationsHealthError(f'{label} status is unavailable.')
     stat = status.stat()
     forbidden_mode = 0o077 if private else 0o022
-    if stat.st_uid != os.getuid() or stat.st_mode & forbidden_mode:
+    owner_uid = os.getuid() if expected_uid is None else expected_uid
+    if stat.st_uid != owner_uid or stat.st_mode & forbidden_mode:
         raise OperationsHealthError(f'{label} status permissions are unsafe.')
     if stat.st_size > MAX_STATUS_BYTES:
         raise OperationsHealthError(f'{label} status is oversized.')
@@ -489,6 +493,131 @@ def verify_restore_freshness(path, max_age_hours, now):
 def verify_database_security_freshness(path, max_age_hours, now):
     moment = read_success_status(path, 'Database security success', private=True)
     require_fresh(moment, now, max_age_hours, 'Last database security check')
+    return moment
+
+
+def account_uid(account):
+    if not isinstance(account, str) or ACCOUNT_PATTERN.fullmatch(account) is None:
+        raise OperationsHealthError('Analytics retention status owner is invalid.')
+    try:
+        return pwd.getpwnam(account).pw_uid
+    except KeyError as error:
+        raise OperationsHealthError(
+            'Analytics retention status owner is unavailable.'
+        ) from error
+
+
+def read_posix_acl(path):
+    try:
+        result = subprocess.run(
+            [
+                '/usr/bin/getfacl',
+                '--absolute-names',
+                '--omit-header',
+                '--numeric',
+                str(path),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding='utf-8',
+            errors='strict',
+            env={'LC_ALL': 'C'},
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError) as error:
+        raise OperationsHealthError(
+            'Analytics retention status ACL is unavailable.'
+        ) from error
+    if result.returncode != 0 or len(result.stdout) > 1024:
+        raise OperationsHealthError(
+            'Analytics retention status ACL is unavailable.'
+        )
+    entries = tuple(line for line in result.stdout.splitlines() if line)
+    if len(entries) != len(set(entries)):
+        raise OperationsHealthError('Analytics retention status ACL is unsafe.')
+    return frozenset(entries)
+
+
+def require_analytics_retention_acl(
+    path,
+    owner_uid,
+    reader_uid,
+    acl_reader=None,
+):
+    status = Path(path).absolute()
+    parent = status.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise OperationsHealthError(
+            'Analytics retention status directory is unavailable.'
+        )
+    if status.is_symlink() or not status.is_file():
+        raise OperationsHealthError(
+            'Analytics retention success status is unavailable.'
+        )
+    parent_details = parent.stat()
+    status_details = status.stat()
+    if (
+        parent_details.st_uid != owner_uid
+        or stat_module.S_IMODE(parent_details.st_mode) != 0o710
+        or status_details.st_uid != owner_uid
+        or stat_module.S_IMODE(status_details.st_mode) != 0o640
+    ):
+        raise OperationsHealthError(
+            'Analytics retention success status permissions are unsafe.'
+        )
+    read_acl = acl_reader or read_posix_acl
+    expected_directory_acl = frozenset(
+        {
+            'user::rwx',
+            f'user:{reader_uid}:--x',
+            'group::---',
+            'mask::--x',
+            'other::---',
+        }
+    )
+    expected_status_acl = frozenset(
+        {
+            'user::rw-',
+            f'user:{reader_uid}:r--',
+            'group::---',
+            'mask::r--',
+            'other::---',
+        }
+    )
+    if (
+        read_acl(parent) != expected_directory_acl
+        or read_acl(status) != expected_status_acl
+    ):
+        raise OperationsHealthError(
+            'Analytics retention success status ACL is unsafe.'
+        )
+
+
+def verify_analytics_retention_freshness(
+    path,
+    max_age_hours,
+    now,
+    expected_uid,
+    reader_uid=None,
+    acl_reader=None,
+):
+    reader_uid = os.getuid() if reader_uid is None else reader_uid
+    require_analytics_retention_acl(
+        path,
+        expected_uid,
+        reader_uid,
+        acl_reader=acl_reader,
+    )
+    moment = read_success_status(
+        path,
+        'Analytics retention success',
+        private=False,
+        expected_uid=expected_uid,
+    )
+    require_fresh(moment, now, max_age_hours, 'Last analytics retention')
     return moment
 
 
@@ -623,6 +752,11 @@ def execute(
     database_security_max_age_hours=2,
     backup_job_status=None,
     backup_job_max_age_hours=26,
+    analytics_retention_status=None,
+    analytics_retention_max_age_hours=26,
+    analytics_retention_owner='umami',
+    analytics_retention_reader_uid=None,
+    analytics_retention_acl_reader=None,
     verify_installation=False,
     installation_module=None,
     verify_nginx_installation=False,
@@ -646,6 +780,9 @@ def execute(
         database_security_max_age_hours
     )
     backup_job_max_age_hours = bounded_hours(backup_job_max_age_hours)
+    analytics_retention_max_age_hours = bounded_hours(
+        analytics_retention_max_age_hours
+    )
     release_staging_max_age_hours = bounded_hours(
         release_staging_max_age_hours
     )
@@ -673,6 +810,18 @@ def execute(
                 backup_job_status,
                 backup_job_max_age_hours,
                 moment,
+            )
+        except OperationsHealthError as error:
+            failures.append(str(error))
+    if analytics_retention_status is not None:
+        try:
+            verify_analytics_retention_freshness(
+                analytics_retention_status,
+                analytics_retention_max_age_hours,
+                moment,
+                account_uid(analytics_retention_owner),
+                reader_uid=analytics_retention_reader_uid,
+                acl_reader=analytics_retention_acl_reader,
             )
         except OperationsHealthError as error:
             failures.append(str(error))
@@ -839,6 +988,13 @@ def main():
     parser.add_argument(
         '--backup-job-max-age-hours', type=bounded_hours, default=26
     )
+    parser.add_argument('--analytics-retention-status', type=Path)
+    parser.add_argument(
+        '--analytics-retention-max-age-hours',
+        type=bounded_hours,
+        default=26,
+    )
+    parser.add_argument('--analytics-retention-owner', default='umami')
     parser.add_argument('--restore-max-age-hours', type=bounded_hours, default=170)
     parser.add_argument('--offsite-status', type=Path)
     parser.add_argument('--offsite-required-after', type=calendar_date)
@@ -891,6 +1047,11 @@ def main():
             ),
             backup_job_status=args.backup_job_status,
             backup_job_max_age_hours=args.backup_job_max_age_hours,
+            analytics_retention_status=args.analytics_retention_status,
+            analytics_retention_max_age_hours=(
+                args.analytics_retention_max_age_hours
+            ),
+            analytics_retention_owner=args.analytics_retention_owner,
             release_root=args.release_root,
             release_staging_max_age_hours=(
                 args.release_staging_max_age_hours

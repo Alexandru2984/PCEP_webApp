@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import pwd
 import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -56,6 +57,13 @@ def database_security_status(path, completed_at):
 
 
 def backup_job_status(path, completed_at):
+    path.write_text(
+        json.dumps({'schema': 1, 'completed_at': completed_at}) + '\n'
+    )
+    path.chmod(0o600)
+
+
+def analytics_retention_status(path, completed_at):
     path.write_text(
         json.dumps({'schema': 1, 'completed_at': completed_at}) + '\n'
     )
@@ -764,6 +772,151 @@ def test_backup_job_marker_is_required_private_and_fresh(tmp_path):
     }
 
 
+def test_analytics_retention_marker_requires_the_exact_owner_and_freshness(
+    tmp_path,
+):
+    backups = tmp_path / 'backups'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261019T110000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-19T10:00:00Z')
+    retention_state = tmp_path / 'analytics-retention'
+    retention_state.mkdir(mode=0o710)
+    retention_marker = retention_state / 'last-success.json'
+    output = tmp_path / 'public' / 'status.json'
+    output.parent.mkdir(mode=0o755)
+    now = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
+    current_account = pwd.getpwuid(os.getuid()).pw_name
+    reader_uid = os.getuid() + 1000
+
+    def exact_acl(path):
+        if Path(path) == retention_state:
+            return frozenset(
+                {
+                    'user::rwx',
+                    f'user:{reader_uid}:--x',
+                    'group::---',
+                    'mask::--x',
+                    'other::---',
+                }
+            )
+        return frozenset(
+            {
+                'user::rw-',
+                f'user:{reader_uid}:r--',
+                'group::---',
+                'mask::r--',
+                'other::---',
+            }
+        )
+
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='Analytics retention.*unavailable',
+    ):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=now,
+            backup_module=backup,
+            analytics_retention_status=retention_marker,
+            analytics_retention_owner=current_account,
+            analytics_retention_reader_uid=reader_uid,
+            analytics_retention_acl_reader=exact_acl,
+        )
+    assert json.loads(output.read_text())['status'] == 'degraded'
+
+    analytics_retention_status(retention_marker, '2026-10-19T11:00:00Z')
+    retention_marker.chmod(0o640)
+    with pytest.raises(health.OperationsHealthError, match='permissions'):
+        health.verify_analytics_retention_freshness(
+            retention_marker,
+            26,
+            now,
+            os.getuid() + 1,
+            reader_uid=reader_uid,
+            acl_reader=exact_acl,
+        )
+    assert health.execute(
+        backups,
+        restore,
+        output,
+        now=now,
+        backup_module=backup,
+        analytics_retention_status=retention_marker,
+        analytics_retention_owner=current_account,
+        analytics_retention_reader_uid=reader_uid,
+        analytics_retention_acl_reader=exact_acl,
+    )['status'] == 'ok'
+
+    analytics_retention_status(retention_marker, '2026-10-18T09:59:59Z')
+    retention_marker.chmod(0o640)
+    with pytest.raises(
+        health.OperationsHealthError,
+        match='analytics retention.*stale',
+    ):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=now,
+            backup_module=backup,
+            analytics_retention_status=retention_marker,
+            analytics_retention_owner=current_account,
+            analytics_retention_reader_uid=reader_uid,
+            analytics_retention_acl_reader=exact_acl,
+        )
+    assert json.loads(output.read_text())['status'] == 'degraded'
+
+
+@pytest.mark.parametrize('account', ['', 'UMAMI', '../umami'])
+def test_analytics_retention_owner_is_bounded(account):
+    with pytest.raises(health.OperationsHealthError, match='owner is invalid'):
+        health.account_uid(account)
+
+
+def test_analytics_retention_acl_rejects_any_broader_entry(tmp_path):
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o710)
+    marker = state / 'last-success.json'
+    analytics_retention_status(marker, '2026-10-19T11:00:00Z')
+    marker.chmod(0o640)
+    owner_uid = os.getuid()
+    reader_uid = owner_uid + 1000
+
+    def unsafe_acl(path):
+        if Path(path) == state:
+            return frozenset(
+                {
+                    'user::rwx',
+                    f'user:{reader_uid}:--x',
+                    'group::---',
+                    'mask::--x',
+                    'other::---',
+                }
+            )
+        return frozenset(
+            {
+                'user::rw-',
+                f'user:{reader_uid}:r--',
+                'group::r--',
+                'mask::r--',
+                'other::---',
+            }
+        )
+
+    with pytest.raises(health.OperationsHealthError, match='ACL is unsafe'):
+        health.verify_analytics_retention_freshness(
+            marker,
+            26,
+            datetime(2026, 10, 19, 12, tzinfo=timezone.utc),
+            owner_uid,
+            reader_uid=reader_uid,
+            acl_reader=unsafe_acl,
+        )
+
+
 def test_installation_drift_publishes_only_generic_degraded_state(tmp_path):
     backups = tmp_path / 'backups'
     backups.mkdir(mode=0o700)
@@ -913,6 +1066,12 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
         in service
     )
     assert '--backup-job-max-age-hours 26' in service
+    assert (
+        '--analytics-retention-status '
+        '/var/lib/pcep-analytics-retention/last-success.json'
+    ) in service
+    assert '--analytics-retention-max-age-hours 26' in service
+    assert '--analytics-retention-owner umami' in service
     assert '--offsite-required-after 2026-10-27' in service
     assert '--offsite-max-age-hours 24' in service
     assert 'ReadOnlyPaths=-/var/lib/pcep-db-offsite' in service
@@ -932,6 +1091,7 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert '--verify-container-runtime' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-backup' in service
+    assert 'ReadOnlyPaths=/var/lib/pcep-analytics-retention' in service
     assert 'ReadOnlyPaths=/var/www/pcep' in service
     assert 'ReadOnlyPaths=/home/micu/backups/pcep' in service
     assert 'IPAddressDeny=any' in service
