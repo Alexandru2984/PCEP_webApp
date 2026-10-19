@@ -365,6 +365,14 @@ dump before unlinking and flushing its small checksum. An interruption can there
 leave at most a checksum sidecar; it cannot strand a large dump that future discovery
 would deliberately ignore as incomplete.
 
+After dump publication, checksum verification, bounded retention and a final
+inventory of every retained pair all succeed, the scheduled service atomically
+replaces `/var/lib/pcep-db-backup/last-success.json` with only schema version and UTC
+completion time. The marker and its systemd-managed directory are private and
+durably flushed. A dump, checksum, retention, inventory or pre-publication marker
+failure preserves the prior success marker; no failure path writes `ok` or fabricates
+a completion time.
+
 The shared dump implementation accepts only an exact UTC basic timestamp and a
 bounded safe filename prefix. It drains `pg_dump` stderr concurrently into a 64 KiB
 in-memory tail and includes at most its last 2,000 sanitized characters in a private
@@ -441,9 +449,11 @@ systemctl status pcep-db-backup.timer pcep-db-backup.service \
 The timer runs daily at 01:17 local time with up to 15 minutes of randomized delay
 and catches up after downtime. The oneshot runs as `micu`, receives no database
 credential file, reaches PostgreSQL only through the existing Docker Unix socket,
-and has a read-only host view except for the daily backup directory. Inspect recent
-runs with `journalctl -u pcep-db-backup.service` and verify a sidecar from inside the
-daily directory with `sha256sum --check <backup>.sha256`.
+and has a read-only host view except for the daily backup directory and its private
+systemd state directory. Inspect recent runs with
+`journalctl -u pcep-db-backup.service`, inspect the marker without editing it, and
+verify a sidecar from inside the daily directory with
+`sha256sum --check <backup>.sha256`.
 
 The restore timer runs each Sunday at 03:17 local time with up to 30 minutes of
 randomized delay and catches up after downtime. `make verify-database-restore`
@@ -495,8 +505,11 @@ attest a host or operator account that is already compromised.
 `pcep-operations-health.timer` runs hourly after the scheduled backup/restore and
 database-security windows. Its networkless, unprivileged service verifies all
 retained local backup checksums, requires the newest verified backup to be at most
-26 hours old, the last successful isolated restore to be at most 170 hours old and
-the last successful database-role audit to be at most two hours old. Beginning at
+26 hours old, independently requires the last fully completed backup job marker to
+be private, exact and at most 26 hours old, requires the last successful isolated
+restore to be at most 170 hours old and the last successful database-role audit to
+be at most two hours old. Thus a newly published dump cannot mask a later retention,
+inventory or marker-publication failure. Beginning at
 `2026-10-27T00:00:00Z`, it also requires the private offsite success marker to have
 the exact reviewed shape, safe ownership/mode and an age of at most 24 hours. A
 missing, malformed or stale marker deliberately degrades health; this deadline does
@@ -597,7 +610,9 @@ or if a networkless service loses its IP deny.
 The installation verifier also rejects a failed state on every installed scheduled
 PCEP service except the operations-health service currently executing it. This
 prevents an active timer from masking a failed analytics-retention, backup, restore,
-database-security, SEO-generation or activated offsite oneshot. The private journal
+database-security, SEO-generation or activated offsite oneshot. The backup success
+marker additionally preserves end-to-end evidence across a systemd failed-state
+reset or reboot and ages out independently of dump freshness. The private journal
 retains the service-specific failure, exact mismatched reviewed path or sanitized
 runtime-policy diagnostic; the public status remains only `degraded`.
 After a denied syscall, preserve the unit journal, identify the exact `EPERM`, test a

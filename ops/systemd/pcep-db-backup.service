@@ -10,7 +10,9 @@ User=micu
 Group=micu
 UMask=0077
 WorkingDirectory=/home/micu/PCEP_webApp
-ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_backup.py --backup-root /home/micu/backups/pcep/daily --container pcep_db --keep 30
+StateDirectory=pcep-db-backup
+StateDirectoryMode=0700
+ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/database_backup.py --backup-root /home/micu/backups/pcep/daily --container pcep_db --keep 30 --status-file /var/lib/pcep-db-backup/last-success.json
 
 NoNewPrivileges=true
 PrivateDevices=true

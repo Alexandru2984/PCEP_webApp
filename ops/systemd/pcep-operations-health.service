@@ -12,7 +12,7 @@ UMask=0077
 WorkingDirectory=/home/micu/PCEP_webApp
 StateDirectory=pcep-operations-health
 StateDirectoryMode=0750
-ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/operations_health.py --backup-root /home/micu/backups/pcep/daily --restore-status /var/lib/pcep-db-restore-check/last-success.json --output /var/lib/pcep-operations-health/status.json --backup-max-age-hours 26 --restore-max-age-hours 170 --offsite-status /var/lib/pcep-db-offsite/last-success --offsite-required-after 2026-10-27 --offsite-max-age-hours 24 --database-security-status /var/lib/pcep-db-security/last-success.json --database-security-max-age-hours 2 --release-root /var/www/pcep --release-staging-max-age-hours 2 --deployment-backup-root /home/micu/backups/pcep --deployment-backup-temporary-max-age-hours 2 --release-snapshot-maximum 10 --release-snapshot-max-allocated-mib 512 --verify-installation --verify-nginx-installation --verify-container-runtime
+ExecStart=/home/micu/PCEP_webApp/backend/.venv/bin/python /home/micu/PCEP_webApp/scripts/operations_health.py --backup-root /home/micu/backups/pcep/daily --backup-job-status /var/lib/pcep-db-backup/last-success.json --backup-job-max-age-hours 26 --restore-status /var/lib/pcep-db-restore-check/last-success.json --output /var/lib/pcep-operations-health/status.json --backup-max-age-hours 26 --restore-max-age-hours 170 --offsite-status /var/lib/pcep-db-offsite/last-success --offsite-required-after 2026-10-27 --offsite-max-age-hours 24 --database-security-status /var/lib/pcep-db-security/last-success.json --database-security-max-age-hours 2 --release-root /var/www/pcep --release-staging-max-age-hours 2 --deployment-backup-root /home/micu/backups/pcep --deployment-backup-temporary-max-age-hours 2 --release-snapshot-maximum 10 --release-snapshot-max-allocated-mib 512 --verify-installation --verify-nginx-installation --verify-container-runtime
 ExecStartPost=/usr/bin/setfacl --modify user:www-data:r-- /var/lib/pcep-operations-health/status.json
 ExecStopPost=-/usr/bin/setfacl --modify user:www-data:r-- /var/lib/pcep-operations-health/status.json
 
@@ -24,6 +24,7 @@ ProtectSystem=strict
 ProtectHome=read-only
 ReadOnlyPaths=/home/micu/backups/pcep/daily
 ReadOnlyPaths=/home/micu/backups/pcep
+ReadOnlyPaths=/var/lib/pcep-db-backup
 ReadOnlyPaths=/var/lib/pcep-db-restore-check
 ReadOnlyPaths=/var/lib/pcep-db-security
 ReadOnlyPaths=-/var/lib/pcep-db-offsite

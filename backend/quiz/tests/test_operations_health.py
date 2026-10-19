@@ -55,6 +55,13 @@ def database_security_status(path, completed_at):
     path.chmod(0o600)
 
 
+def backup_job_status(path, completed_at):
+    path.write_text(
+        json.dumps({'schema': 1, 'completed_at': completed_at}) + '\n'
+    )
+    path.chmod(0o600)
+
+
 def release_snapshot(root, name, payload=b'reviewed release asset'):
     snapshot = root / name
     snapshot.mkdir(mode=0o755)
@@ -703,6 +710,60 @@ def test_database_security_marker_is_required_and_fresh(tmp_path):
         )
 
 
+def test_backup_job_marker_is_required_private_and_fresh(tmp_path):
+    backups = tmp_path / 'backups'
+    backups.mkdir(mode=0o700)
+    complete_backup(backups, '20261019T110000Z')
+    restore = tmp_path / 'restore.json'
+    restore_status(restore, '2026-10-19T10:00:00Z')
+    job_marker = tmp_path / 'backup-job.json'
+    output = tmp_path / 'public' / 'status.json'
+    output.parent.mkdir(mode=0o755)
+    now = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
+
+    with pytest.raises(health.OperationsHealthError, match='job.*unavailable'):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=now,
+            backup_module=backup,
+            backup_job_status=job_marker,
+        )
+    assert json.loads(output.read_text())['status'] == 'degraded'
+
+    backup_job_status(job_marker, '2026-10-19T11:00:00Z')
+    job_marker.chmod(0o644)
+    with pytest.raises(health.OperationsHealthError, match='permissions'):
+        health.verify_backup_job_freshness(job_marker, 26, now)
+    job_marker.chmod(0o600)
+    assert health.execute(
+        backups,
+        restore,
+        output,
+        now=now,
+        backup_module=backup,
+        backup_job_status=job_marker,
+    )['status'] == 'ok'
+
+    backup_job_status(job_marker, '2026-10-18T09:59:59Z')
+    with pytest.raises(health.OperationsHealthError, match='backup job.*stale'):
+        health.execute(
+            backups,
+            restore,
+            output,
+            now=now,
+            backup_module=backup,
+            backup_job_status=job_marker,
+        )
+
+    assert json.loads(output.read_text()) == {
+        'checked_at': '2026-10-19T12:00:00Z',
+        'schema': 1,
+        'status': 'degraded',
+    }
+
+
 def test_installation_drift_publishes_only_generic_degraded_state(tmp_path):
     backups = tmp_path / 'backups'
     backups.mkdir(mode=0o700)
@@ -847,6 +908,11 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
         '/var/lib/pcep-operations-health/status.json'
     ) in service
     assert '--offsite-status /var/lib/pcep-db-offsite/last-success' in service
+    assert (
+        '--backup-job-status /var/lib/pcep-db-backup/last-success.json'
+        in service
+    )
+    assert '--backup-job-max-age-hours 26' in service
     assert '--offsite-required-after 2026-10-27' in service
     assert '--offsite-max-age-hours 24' in service
     assert 'ReadOnlyPaths=-/var/lib/pcep-db-offsite' in service
@@ -865,11 +931,23 @@ def test_systemd_grants_only_nginx_an_explicit_read_acl():
     assert '--verify-nginx-installation' in service
     assert '--verify-container-runtime' in service
     assert 'ReadOnlyPaths=/var/lib/pcep-db-security' in service
+    assert 'ReadOnlyPaths=/var/lib/pcep-db-backup' in service
     assert 'ReadOnlyPaths=/var/www/pcep' in service
     assert 'ReadOnlyPaths=/home/micu/backups/pcep' in service
     assert 'IPAddressDeny=any' in service
     assert 'SystemCallFilter=@system-service' in service
     assert 'SystemCallErrorNumber=EPERM' in service
+
+
+def test_database_backup_service_owns_only_its_private_success_state():
+    service = (PROJECT_ROOT / 'ops/systemd/pcep-db-backup.service').read_text()
+
+    assert 'StateDirectory=pcep-db-backup' in service
+    assert 'StateDirectoryMode=0700' in service
+    assert '--status-file /var/lib/pcep-db-backup/last-success.json' in service
+    assert 'ReadWritePaths=/home/micu/backups/pcep/daily' in service
+    assert 'PrivateNetwork=true' in service
+    assert 'RestrictAddressFamilies=AF_UNIX' in service
 
 
 def test_database_security_timer_is_hourly_networkless_and_marker_only():
