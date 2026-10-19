@@ -102,6 +102,62 @@ def test_refuses_removing_an_image_used_by_any_container():
         )
 
 
+def test_automatic_plan_allows_a_small_valid_inventory_without_pruning():
+    images = candidates(1)
+
+    plan = retention.automatic_retention_plan(
+        images,
+        lambda _reference: metadata(images[0]),
+        set(),
+        keep=5,
+    )
+
+    assert plan == {'keep': images, 'remove': [], 'invalid': {}}
+
+
+def test_automatic_plan_removes_only_one_oldest_verified_unused_tag():
+    images = candidates(6)
+
+    plan = retention.automatic_retention_plan(
+        images,
+        lambda reference: metadata(
+            next(item for item in images if item.reference == reference)
+        ),
+        set(),
+        keep=5,
+    )
+
+    assert plan['keep'] == images[:5]
+    assert plan['remove'] == images[5:]
+    assert not plan['invalid']
+
+
+def test_automatic_plan_preserves_invalid_tags_and_refuses_cleanup():
+    images = candidates(6)
+    invalid = images[-1]
+
+    def inspect(reference):
+        item = next(image for image in images if image.reference == reference)
+        return metadata(item, User='root') if item == invalid else metadata(item)
+
+    with pytest.raises(retention.ImageRetentionError, match='preserving them'):
+        retention.automatic_retention_plan(images, inspect, set(), keep=5)
+
+
+def test_automatic_plan_refuses_more_than_one_removal():
+    images = candidates(7)
+
+    with pytest.raises(retention.ImageRetentionError, match='more than one tag'):
+        retention.automatic_retention_plan(
+            images,
+            lambda reference: metadata(
+                next(item for item in images if item.reference == reference)
+            ),
+            set(),
+            keep=5,
+        )
+
+
 @pytest.mark.parametrize(
     ('overrides', 'message'),
     [

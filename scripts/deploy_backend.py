@@ -52,6 +52,21 @@ def load_deployment_backup_retention():
 deployment_backup_retention = load_deployment_backup_retention()
 
 
+def load_backend_image_retention():
+    path = Path(__file__).with_name('backend_image_retention.py')
+    spec = importlib.util.spec_from_file_location(
+        'pcep_backend_image_retention', path
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError('Cannot load the backend-image retention implementation.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+backend_image_retention = load_backend_image_retention()
+
+
 RELEASE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
 IMAGE_ID_PATTERN = re.compile(r'sha256:[0-9a-f]{64}')
 IMAGE_REFERENCE_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._/:@-]{0,255}')
@@ -87,6 +102,7 @@ class ReleaseConfig:
     fallback_rollback_image: str | None = None
     lock_root: Path | None = None
     database_backup_keep: int = deployment_backup_retention.DEFAULT_KEEP
+    backend_image_keep: int = backend_image_retention.DEFAULT_KEEP
 
 
 @dataclass(frozen=True)
@@ -1046,8 +1062,23 @@ def _deploy_unlocked(config):
 
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     rollback_tag = snapshot_running_backend(config, stamp)
-    backup_path, backup_sha256 = backup_database(config, stamp)
+    try:
+        image_retention = backend_image_retention.apply_retention(
+            config.backend_image_keep
+        )
+    except (
+        backend_image_retention.ImageRetentionError,
+        OSError,
+        ValueError,
+    ) as error:
+        raise ReleaseError(f'Rollback-image retention refused: {error}') from error
     print(f'Rollback image retained: {rollback_tag}', flush=True)
+    print(
+        f'Rollback images retained: {len(image_retention["keep"])}; '
+        f'removed: {len(image_retention["remove"])}',
+        flush=True,
+    )
+    backup_path, backup_sha256 = backup_database(config, stamp)
     print(f'Verified database backup: {backup_path} ({backup_sha256})', flush=True)
     try:
         backup_retention = deployment_backup_retention.apply_retention(
@@ -1184,6 +1215,11 @@ def main():
         default=deployment_backup_retention.DEFAULT_KEEP,
     )
     parser.add_argument(
+        '--backend-image-keep',
+        type=backend_image_retention.keep_count,
+        default=backend_image_retention.DEFAULT_KEEP,
+    )
+    parser.add_argument(
         '--allow-migrations', action='store_true',
         help='Show and allow reviewed pending migrations; otherwise refuse them.',
     )
@@ -1209,6 +1245,7 @@ def main():
         allow_migrations=args.allow_migrations,
         fallback_rollback_image=args.fallback_rollback_image,
         database_backup_keep=args.database_backup_keep,
+        backend_image_keep=args.backend_image_keep,
     )
     try:
         result = deploy(config)

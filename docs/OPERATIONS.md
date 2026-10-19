@@ -745,10 +745,18 @@ a remaining lock file is normal and must not be deleted to bypass an active
 operation.
 
 The deployment command refuses tracked uncommitted changes. Before building, it
-verifies the live container, tags its exact image for rollback and streams a
-gzip-compressed PostgreSQL dump into a mode-`0600` file. It validates the dump
-header and checksum, fsyncs both the completed file and its parent directory, then
-builds the candidate with the Git revision, runs
+verifies the live container and tags its exact image for rollback. While still under
+the shared maintenance lock, it validates every exact rollback tag and retains the
+newest five. The automatic path can untag only one oldest image, rechecks the exact
+immutable ID and all-container use immediately before removal, never uses `--force`
+and never selects another repository. Any invalid tag, in-use removal or inventory
+requiring more than one deletion is preserved and stops deployment before database
+backup, build or cutover; resolve it through the manual preview below.
+
+After the bounded image step, deployment streams a gzip-compressed PostgreSQL dump
+into a mode-`0600` file. It validates the dump header and checksum, fsyncs both the
+completed file and its parent directory, then builds the candidate with the Git
+revision, runs
 Django deploy checks and refuses pending migrations. It resolves the candidate's
 immutable Docker image ID and runs the blocking Trivy audit against that exact
 image. A scan or scanner failure leaves the running container untouched. Only
@@ -1050,6 +1058,15 @@ other repositories, PostgreSQL images, build cache and other applications are
 outside its allowlist. The dry-run and apply paths both take the same
 `backend-maintenance` lock as deployment, so their inventory cannot overlap a
 cooperating deploy/tag/rollback operation.
+
+Routine deploys use the same validator automatically after creating the new rollback
+tag. They preserve five images and may remove at most one tag, the normal one-in/
+one-out transition. If a failed older run left more than one excess tag, or any exact
+tag is invalid, deploy fails closed and preserves the inventory. Run the preview,
+preserve incident evidence, scan and test the five retained immutable IDs, then use
+the explicit reviewed apply command above before retrying. `--backend-image-keep`
+accepts 2 through 100 for a reviewed exception; lowering the current bound must be a
+manual reviewed cleanup whenever it would select more than one tag.
 Question-content migrations 0003 through 0006 update existing rows in place,
 preserve question/choice IDs and are reversible; they need no database restore
 for an application rollback. Database restoration is a separate planned

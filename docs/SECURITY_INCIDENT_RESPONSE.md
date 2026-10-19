@@ -300,6 +300,25 @@ secrets, personal data or raw logs in a public issue.
    not authoritative over the current directory. Escalate repeated failure as a
    host/storage incident.
 
+### Automatic rollback-image retention refusal
+
+1. Stop the deploy before database backup, build or cutover and preserve its private
+   output, `docker events`, the exact rollback tag-to-image-ID inventory, container
+   inventory and shared-lock state. Do not run a host-wide prune.
+2. Scope review only to exact `pcep-backend-rollback:<UTC-basic>-release-<release>`
+   tags. Candidate/review repositories, PostgreSQL, build cache and other host
+   applications are outside this control.
+3. Treat invalid metadata, a changed tag identity, embedded runtime-secret names or
+   an unexpected in-use image as possible tampering. Preserve the tag and follow the
+   host-compromise playbook when it cannot be explained.
+4. Run `make backend-image-retention` without apply, vulnerability-scan and exercise
+   the intended retained rollback IDs, then use the explicit reviewed `--apply` path
+   only if every selected tag is understood. Never force-remove an image or bypass
+   the maintenance lock.
+5. Retry deployment only after the preview selects at most its normal one-in/one-out
+   change and all exact tags validate. Verify the live backend release and external
+   smoke before closure.
+
 ## Recovery gates
 
 Do not close or downgrade the incident until all applicable gates pass:
@@ -371,8 +390,9 @@ never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
    database tampering, restore-readiness race, stale publication staging, stale
-   pre-deploy backup temporary, excessive/unsafe finalized snapshots, retention
-   target replacement, failed health-marker cleanup or malicious service worker.
+   pre-deploy backup temporary, excessive/unsafe finalized snapshots, rollback-image
+   retention refusal, retention target replacement, failed health-marker cleanup or
+   malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.
