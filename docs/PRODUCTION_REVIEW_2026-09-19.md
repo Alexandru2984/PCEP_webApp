@@ -3946,6 +3946,48 @@ downtime, response-cost and incident-frequency inputs. The CISO verdict is **SHI
 WITH GUARDRAILS** after focused/full tests, exact unit installation, healthy live
 publication, green CI and exact-SHA external smoke.
 
+### Deploy-time backend rollback-image bound — 2026-10-19
+
+Backend deployment created one exact timestamped rollback tag on every attempt, but
+its five-image retention was a separate manual operation. The reviewed live dry-run
+is healthy at exactly five valid tags and selects zero removals today. Without an
+automatic gate, the next successful or interrupted deploy would recreate silent
+host-disk growth and make detection depend on a later operator preview.
+
+Deployment now applies the existing exact repository, metadata, secret-name,
+container-use and immutable-ID controls immediately after tagging the verified live
+image, while it still owns `backend-maintenance`. It retains five valid rollback
+images and permits only the normal one-in/one-out removal of one oldest unused tag.
+Any invalid tag is preserved as evidence; an inventory needing two or more removals,
+a tag/ID change or new container use fails closed before database backup, candidate
+build, migration or service cutover. Candidate/review repositories, PostgreSQL,
+build cache and every other host application remain outside the allowlist.
+
+The top STRIDE risks are denial of service through unbounded image accumulation,
+tampering through tag replacement between review and removal, and repudiation when
+an automatic cleanup cannot prove which immutable image it selected. The maximum
+destructive blast radius per deploy is exactly one allowlisted rollback tag and the
+unshared layers Docker associates with that one unused image ID; five newer verified
+tags, all container-used images and all other repositories remain protected. In the
+current live state this is a zero-removal plan across five valid rollback IDs. The
+control creates no network path and reads no database, credential or learner data.
+
+Inventory or validation failure is synchronous in the invoking deploy and precedes
+backup/build/cutover, so machine and invoking-operator MTTD are immediate. Guaranteed
+human acknowledgement outside that terminal remains unbounded. Response preserves
+Docker events and exact tag/ID/container evidence, forbids global prune/force,
+previews manual retention, scans and tests retained IDs, and retries only from a
+one-removal-or-smaller clean state. The tabletop must cover an invalid newest tag,
+tag replacement after plan, a container starting between plan/apply, two excess tags
+after interrupted attempts and a Docker removal failure.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. If a wider
+host compromise exposes personal data, the GDPR Article 33 72-hour assessment remains
+mandatory. FAIR/ALE cannot be defended without deployment frequency, unique-layer
+growth, downtime, response-cost and incident-frequency inputs. The CISO verdict is
+**SHIP WITH GUARDRAILS** after focused/full tests, a healthy live dry-run, green CI
+and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

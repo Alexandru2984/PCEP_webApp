@@ -41,6 +41,8 @@ SENSITIVE_IMAGE_ENV_PREFIXES = (
 )
 SENSITIVE_IMAGE_ENV_NAMES = {'ACCESS_TOKEN', 'PASSWORD', 'SECRET_KEY'}
 MINIMUM_VALID_IMAGES = 2
+DEFAULT_KEEP = 5
+MAXIMUM_AUTOMATIC_REMOVALS = 1
 
 
 class ImageRetentionError(RuntimeError):
@@ -276,7 +278,84 @@ def retention_plan(candidates, metadata_loader, in_use_image_ids, keep=5):
     return {'keep': retained, 'remove': removals, 'invalid': invalid}
 
 
-def _execute_unlocked(*, keep=5, apply=False, runner=run_command):
+def automatic_retention_plan(
+    candidates,
+    metadata_loader,
+    in_use_image_ids,
+    keep=DEFAULT_KEEP,
+):
+    """Plan a narrowly bounded deploy-time cleanup or fail closed."""
+    keep = keep_count(keep)
+    candidates = sorted(candidates, key=lambda image: image.tag, reverse=True)
+    valid = []
+    invalid = {}
+    for candidate in candidates:
+        try:
+            validate_rollback_image(candidate, metadata_loader(candidate.reference))
+        except (ImageRetentionError, OSError, ValueError) as error:
+            invalid[candidate.reference] = str(error)
+        else:
+            valid.append(candidate)
+    if invalid:
+        raise ImageRetentionError(
+            'Automatic rollback-image retention found invalid tags; '
+            'preserving them for reviewed manual handling.'
+        )
+    if len(valid) <= keep:
+        return {'keep': valid, 'remove': [], 'invalid': {}}
+    if len(valid) < MINIMUM_VALID_IMAGES:
+        raise ImageRetentionError(
+            f'Only {len(valid)} rollback image(s) satisfy the deploy contract.'
+        )
+    removals = valid[keep:]
+    if len(removals) > MAXIMUM_AUTOMATIC_REMOVALS:
+        raise ImageRetentionError(
+            'Automatic rollback-image retention would remove more than one tag; '
+            'run the reviewed manual retention workflow.'
+        )
+    in_use_removals = [
+        candidate.reference
+        for candidate in removals
+        if candidate.image_id in in_use_image_ids
+    ]
+    if in_use_removals:
+        raise ImageRetentionError(
+            'Refusing to remove rollback tags used by containers: '
+            + ', '.join(in_use_removals)
+        )
+    return {'keep': valid[:keep], 'remove': removals, 'invalid': {}}
+
+
+def apply_plan(plan, runner=run_command):
+    for candidate in plan['remove']:
+        current_id = runner(
+            ['docker', 'image', 'inspect', candidate.reference, '--format', '{{.Id}}']
+        )
+        if current_id != candidate.image_id:
+            raise ImageRetentionError(
+                f'Rollback tag changed after review: {candidate.reference}'
+            )
+        if image_has_containers(candidate.image_id, runner):
+            raise ImageRetentionError(
+                f'Rollback image became used by a container: {candidate.reference}'
+            )
+        runner(['docker', 'image', 'rm', candidate.reference], timeout=120)
+    return plan
+
+
+def apply_retention(keep=DEFAULT_KEEP, runner=run_command):
+    """Apply the one-tag deploy-time bound while the caller owns the shared lock."""
+    candidates = discover_rollback_tags(runner)
+    plan = automatic_retention_plan(
+        candidates,
+        lambda reference: inspect_metadata(reference, runner),
+        container_image_ids(runner),
+        keep,
+    )
+    return apply_plan(plan, runner)
+
+
+def _execute_unlocked(*, keep=DEFAULT_KEEP, apply=False, runner=run_command):
     candidates = discover_rollback_tags(runner)
     in_use = container_image_ids(runner)
     plan = retention_plan(
@@ -304,24 +383,12 @@ def _execute_unlocked(*, keep=5, apply=False, runner=run_command):
         print('Nothing removed. Re-run with --apply only after reviewing this list.')
         return plan
 
-    for candidate in plan['remove']:
-        current_id = runner(
-            ['docker', 'image', 'inspect', candidate.reference, '--format', '{{.Id}}']
-        )
-        if current_id != candidate.image_id:
-            raise ImageRetentionError(
-                f'Rollback tag changed after review: {candidate.reference}'
-            )
-        if image_has_containers(candidate.image_id, runner):
-            raise ImageRetentionError(
-                f'Rollback image became used by a container: {candidate.reference}'
-            )
-        runner(['docker', 'image', 'rm', candidate.reference], timeout=120)
+    apply_plan(plan, runner)
     print(f'Removed {len(plan["remove"])} reviewed rollback image tags.')
     return plan
 
 
-def execute(*, keep=5, apply=False, runner=run_command, lock_root=None):
+def execute(*, keep=DEFAULT_KEEP, apply=False, runner=run_command, lock_root=None):
     try:
         with exclusive_operation_lock('backend-maintenance', root=lock_root):
             return _execute_unlocked(keep=keep, apply=apply, runner=runner)
@@ -331,7 +398,7 @@ def execute(*, keep=5, apply=False, runner=run_command, lock_root=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--keep', type=keep_count, default=5)
+    parser.add_argument('--keep', type=keep_count, default=DEFAULT_KEEP)
     parser.add_argument(
         '--apply',
         action='store_true',

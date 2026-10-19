@@ -31,6 +31,11 @@ def isolated_database_role_check(monkeypatch):
         'apply_retention',
         lambda *_args: {'keep': [], 'remove': []},
     )
+    monkeypatch.setattr(
+        release.backend_image_retention,
+        'apply_retention',
+        lambda *_args: {'keep': [], 'remove': [], 'invalid': {}},
+    )
 
 
 def candidate_capture(args):
@@ -82,6 +87,14 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
         lambda *_args: events.append(('snapshot',)) or 'rollback:test',
     )
     monkeypatch.setattr(
+        release.backend_image_retention,
+        'apply_retention',
+        lambda *_args: (
+            events.append(('image-retention',))
+            or {'keep': [], 'remove': [], 'invalid': {}}
+        ),
+    )
+    monkeypatch.setattr(
         release,
         'backup_database',
         lambda *_args: events.append(('backup',)) or (tmp_path / 'backup.sql.gz', 'digest'),
@@ -101,6 +114,7 @@ def test_deploy_snapshots_and_backs_up_before_build(tmp_path, monkeypatch):
     up = ('run', ('docker', 'compose', 'up', '-d', '--no-deps', 'backend'))
     assert (
         events.index(('snapshot',))
+        < events.index(('image-retention',))
         < events.index(('backup',))
         < events.index(('retention',))
         < events.index(build)
@@ -151,6 +165,47 @@ def test_deploy_refuses_retention_failure_before_build_or_cutover(
     with pytest.raises(release.ReleaseError, match='unsafe matching backup'):
         release.deploy(config(tmp_path))
 
+    assert ('docker', 'compose', 'build', 'backend') not in commands
+    assert ('docker', 'compose', 'up', '-d', '--no-deps', 'backend') not in commands
+
+
+def test_deploy_refuses_image_retention_failure_before_backup_build_or_cutover(
+    tmp_path, monkeypatch
+):
+    commands = []
+    backup_called = False
+    monkeypatch.setattr(
+        release,
+        'run_command',
+        lambda args, **_kwargs: commands.append(tuple(args)),
+    )
+    monkeypatch.setattr(
+        release,
+        'capture_command',
+        lambda args, **_kwargs: candidate_capture(args),
+    )
+    monkeypatch.setattr(release, 'snapshot_running_backend', lambda *_: 'rollback:test')
+    monkeypatch.setattr(
+        release.backend_image_retention,
+        'apply_retention',
+        lambda *_args: (_ for _ in ()).throw(
+            release.backend_image_retention.ImageRetentionError(
+                'unexpected rollback inventory'
+            )
+        ),
+    )
+
+    def backup(*_args):
+        nonlocal backup_called
+        backup_called = True
+        return tmp_path / 'backup.sql.gz', 'digest'
+
+    monkeypatch.setattr(release, 'backup_database', backup)
+
+    with pytest.raises(release.ReleaseError, match='unexpected rollback inventory'):
+        release.deploy(config(tmp_path))
+
+    assert not backup_called
     assert ('docker', 'compose', 'build', 'backend') not in commands
     assert ('docker', 'compose', 'up', '-d', '--no-deps', 'backend') not in commands
 

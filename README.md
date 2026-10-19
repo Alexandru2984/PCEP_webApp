@@ -284,9 +284,12 @@ the frontend revision is shown in the footer and a static shell metadata marker,
 while Django API responses include the backend revision in `X-PCEP-Release`. The
 Make deploy/build targets inject the current Git revision automatically.
 
-`make deploy-backend` snapshots the running image and creates a verified private
-database dump before it can replace the local image tag, then checks and deploys
-only the backend service. Each successful dump also validates the exact modern
+`make deploy-backend` snapshots the running image, bounds the verified rollback set
+to five and creates a verified private database dump before it can replace the local
+image tag, then checks and deploys only the backend service. Automatic image
+retention can remove only one exact oldest unused tag; invalid or unexpectedly large
+inventories stop before backup/build and remain available for review. Each successful
+dump also validates the exact modern
 pre-deploy set and durably retains the newest 10; named recovery/role backups and
 legacy filename formats remain outside the deletion allowlist. Schema changes run
 in a separate, one-shot hardened
