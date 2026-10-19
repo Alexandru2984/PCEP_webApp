@@ -70,7 +70,7 @@ person receives and acknowledges it.
 | Required PR checks, CodeQL and secret scanning | unsafe change, code weakness or committed credential | block merge; triage the same day |
 | Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
 | Twice-hourly-target production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | best effort; GitHub schedule delays/drops mean no guaranteed external MTTD |
-| Hourly local recovery attestation consumed by external smoke | missing/corrupt/stale local backup, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
+| Hourly local recovery attestation consumed by external smoke | missing/corrupt/stale local backup, stale full-job success marker, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run after its age threshold; external delivery has no guaranteed upper bound |
 | Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
 | Hourly finalized-release snapshot inventory via the public recovery attestation | more than 10 frontend rollback/external snapshots, more than 512 MiB allocated per location, or an unsafe reserved-prefix tree | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
 | Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
@@ -172,6 +172,25 @@ secrets, personal data or raw logs in a public issue.
    and question invariants.
 5. Rebuild production and re-run the exact role-posture verifier, migration check,
    question audit and public smoke contract before allowing traffic.
+
+### Stale or failed daily-backup job
+
+1. Preserve the backup and operations-health journals, the private success-marker
+   metadata and contents, the newest dump/checksum metadata, free space and relevant
+   filesystem/kernel events. Never hand-edit or refresh the marker.
+2. Distinguish dump/checksum failure from a later retention, final-inventory or
+   marker-publication failure. A fresh dump alone does not prove that the complete
+   scheduled job succeeded; the prior marker must remain authoritative.
+3. Verify every complete retained checksum read-only. Preserve an unpaired dump or
+   sidecar as possible crash evidence; never use a wildcard or broad age-based
+   cleanup. Treat unsafe type, owner, mode or unexplained content failure as a
+   storage or host-integrity incident.
+4. After fixing the specific failure, start the reviewed backup service once. Require
+   a successful unit result, a newly written private marker, healthy operations
+   publication and an isolated restore before closure.
+5. If personal data may have been lost, exposed or made unrecoverable, start the
+   documented breach assessment and applicable GDPR Article 33 72-hour decision
+   clock; backup recovery work does not pause that clock.
 
 ### Isolated restore-check readiness failure
 
@@ -389,7 +408,8 @@ Run at least twice a year and after control-plane changes. Use synthetic evidenc
 never rotate production secrets merely to simulate an incident.
 
 1. Pick one scenario: malicious `main` release, active token leak, host compromise,
-   database tampering, restore-readiness race, stale publication staging, stale
+   database tampering, failed backup after dump publication, restore-readiness race,
+   stale publication staging, stale
    pre-deploy backup temporary, excessive/unsafe finalized snapshots, rollback-image
    retention refusal, retention target replacement, failed health-marker cleanup or
    malicious service worker.

@@ -7,9 +7,11 @@ from datetime import datetime, timezone
 import fcntl
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import re
+import sys
 import uuid
 
 
@@ -106,6 +108,74 @@ def fsync_directory(path):
         os.close(descriptor)
 
 
+def remove_temporary_durably(path, parent):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    fsync_directory(parent)
+    return True
+
+
+def write_success_status(path, now=None):
+    if path is None:
+        return None
+    status = Path(path).absolute()
+    parent = status.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise BackupError('Backup status directory must be a real directory.')
+    parent_details = parent.stat()
+    if parent_details.st_uid != os.getuid() or parent_details.st_mode & 0o022:
+        raise BackupError(
+            'Backup status directory must be owned by the invoking user and not '
+            'writable by group or others.'
+        )
+    if status.exists() or status.is_symlink():
+        if status.is_symlink() or not status.is_file():
+            raise BackupError('Existing backup status must be a real file.')
+        if status.stat().st_uid != os.getuid():
+            raise BackupError('Existing backup status has the wrong owner.')
+
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        raise BackupError('Backup completion time must include a timezone.')
+    payload = {
+        'completed_at': moment.astimezone(timezone.utc).strftime(
+            '%Y-%m-%dT%H:%M:%SZ'
+        ),
+        'schema': 1,
+    }
+    temporary = parent / f'.{status.name}.partial-{uuid.uuid4().hex}'
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_CLOEXEC', 0)
+    if hasattr(os, 'O_NOFOLLOW'):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(temporary, flags, 0o600)
+    published = False
+    try:
+        with os.fdopen(descriptor, 'w') as output:
+            json.dump(payload, output, separators=(',', ':'), sort_keys=True)
+            output.write('\n')
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, status)
+        published = True
+        status.chmod(0o600)
+        fsync_directory(parent)
+    except BaseException as error:
+        if not published and os.path.lexists(temporary):
+            try:
+                remove_temporary_durably(temporary, parent)
+            except Exception as cleanup_error:
+                note = (
+                    'Failed to durably remove backup status temporary '
+                    f'{temporary}: {cleanup_error}'
+                )
+                error.add_note(note)
+                print(f'Database backup cleanup warning: {note}', file=sys.stderr)
+        raise
+    return payload
+
+
 def write_checksum(backup, digest):
     final = checksum_path(backup)
     if final.exists() or final.is_symlink():
@@ -193,6 +263,8 @@ def execute(
     keep=30,
     now=None,
     dump_creator=create_dump,
+    status_file=None,
+    status_now=None,
 ):
     keep = keep_count(keep)
     project_root = Path(project_root).resolve()
@@ -213,11 +285,12 @@ def execute(
             os.fsync(source.fileno())
         checksum = write_checksum(backup, digest)
         removed = prune_backups(root, keep)
+        retained = len(discover_complete_backups(root))
+        write_success_status(status_file, now=status_now)
 
     print(f'Verified database backup: {backup}')
     print(f'Database backup SHA-256: {digest}')
     print(f'Checksum file: {checksum}')
-    retained = len(discover_complete_backups(root))
     print(f'Retained {retained} daily backups; removed {len(removed)}.')
     return backup, digest, removed
 
@@ -236,9 +309,16 @@ def main():
     )
     parser.add_argument('--container', default='pcep_db')
     parser.add_argument('--keep', type=keep_count, default=30)
+    parser.add_argument('--status-file', type=Path)
     args = parser.parse_args()
     try:
-        execute(args.project_root, args.backup_root, args.container, args.keep)
+        execute(
+            args.project_root,
+            args.backup_root,
+            args.container,
+            args.keep,
+            status_file=args.status_file,
+        )
     except (BackupError, OSError, ValueError) as error:
         parser.exit(1, f'Database backup failed: {error}\n')
 

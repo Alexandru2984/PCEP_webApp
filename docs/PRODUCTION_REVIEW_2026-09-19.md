@@ -3529,12 +3529,13 @@ at an interruption; earlier selected pairs are already durably removed, while al
 7–365 configured newest retained pairs remain outside deletion.
 
 Unlink or fsync failure is synchronous and fails the daily oneshot, giving immediate
-local machine state. Operations health does not inspect a unit's failed state; it
-degrades only if subsequent failures let the newest verified backup exceed 26 hours.
-The next external smoke can then observe generic degradation, but its GitHub schedule
-has no guaranteed delivery bound, and human MTTD remains unbounded until notification
-delivery is confirmed. Response is to preserve the journal and directory inventory,
-never delete an unpaired dump automatically,
+local machine state. The hourly installation verifier also rejects the backup
+service's failed systemd state; if that volatile state is reset, the full-job success
+marker documented below still ages out independently. The next external smoke can
+then observe generic degradation, but its GitHub schedule has no guaranteed delivery
+bound, and human MTTD remains unbounded until notification delivery is confirmed.
+Response is to preserve the journal and directory inventory, never delete an
+unpaired dump automatically,
 verify all remaining complete pairs, copy important evidence off-host, restore disk
 headroom and rerun backup/restore validation. The tabletop must cover failure after
 the dump unlink, checksum unlink failure and power loss before each directory fsync.
@@ -3990,6 +3991,52 @@ mandatory. FAIR/ALE cannot be defended without deployment frequency, unique-laye
 growth, downtime, response-cost and incident-frequency inputs. The CISO verdict is
 **SHIP WITH GUARDRAILS** after focused/full tests, a healthy live dry-run, green CI
 and exact-SHA external smoke.
+
+### End-to-end daily-backup success attestation — 2026-10-19
+
+A complete, checksum-valid dump previously proved only that the first part of the
+daily job succeeded. If retention, its final inventory or later durable bookkeeping
+failed after dump publication, backup freshness could still appear healthy. The
+failed systemd state supplied a separate hourly signal, but that state is volatile
+across an explicit reset and is not the durable end-to-end record of the job.
+
+The backup service now owns a private mode-0700 systemd state directory and
+atomically writes one mode-0600, two-field success marker only after dump durability,
+checksum publication, verification of every retained pair, bounded retention and a
+second complete inventory all succeed. Pre-replacement failure durably removes the
+random temporary and preserves the prior marker. Operations health reads this state
+through one read-only path and requires both the newest verified dump and the last
+complete-job marker to be no more than 26 hours old. Public output remains the same
+three generic fields and contains no path, digest, count or failure detail.
+
+The top STRIDE risks are repudiation through a partial job being mistaken for full
+success, denial of service against recovery assurance through repeated late-stage
+failure, and tampering with a forged or unsafe marker. The direct data blast radius
+is one private JSON file smaller than the existing 256-byte reader ceiling and one
+daily backup run; this change adds no database write, remote operation or deletion.
+Existing retention remains bounded to complete pairs beyond the newest 30, and a
+marker failure does not expand that allowlist. A process already controlling
+`micu`/Docker can forge this same-host signal and remains a host-compromise boundary.
+
+A failed oneshot is machine-visible immediately in systemd and on the next hourly
+health invocation. Independently, a last-success marker older than 26 hours becomes
+degraded on the next hourly run, so marker-based detection is bounded to roughly 27
+hours after the last complete success. GitHub's requested external schedule can be
+delayed or dropped, and verified human delivery/acknowledgement is still absent, so
+guaranteed external and human MTTD remain unbounded. Response preserves both
+journals, marker/dump metadata and storage events, verifies all complete pairs,
+forbids hand-written markers and requires one successful backup plus isolated restore
+before closure. The tabletop must cover a dump that succeeds before retention fails,
+a checksum-unlink or directory-`fsync` failure, marker temporary-write/replace/flush
+failure, a stale prior marker and a reset failed-unit state.
+
+No vendor, credential, subprocessor, DPA, personal-data flow or retention period is
+added. If a wider incident risks personal-data confidentiality, integrity or
+availability, the applicable GDPR Article 33 72-hour assessment remains mandatory.
+FAIR/ALE cannot be defended without backup value, failure frequency, outage,
+response-cost and loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after
+failure-injection/full tests, exact unit installation, one real successful backup,
+healthy local publication, green CI and exact-SHA external smoke.
 
 ## 15. Breaking changes
 

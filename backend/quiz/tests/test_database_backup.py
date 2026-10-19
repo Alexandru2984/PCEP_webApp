@@ -1,6 +1,7 @@
 import gzip
 import hashlib
 import importlib.util
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -55,6 +56,93 @@ def test_daily_backup_is_private_checksummed_and_bounded(tmp_path):
     assert checksum.read_text() == f'{digest}  {path.name}\n'
     assert removed == list(reversed(old[:2]))
     assert len(backup.discover_complete_backups(root)) == 7
+
+
+def test_complete_job_atomically_publishes_a_private_success_marker(tmp_path):
+    root = tmp_path / 'backups'
+    root.mkdir(mode=0o700)
+    status_root = tmp_path / 'state'
+    status_root.mkdir(mode=0o700)
+    status = status_root / 'last-success.json'
+    completed_at = datetime(2026, 10, 19, 8, 30, tzinfo=timezone.utc)
+
+    backup.execute(
+        tmp_path,
+        root,
+        container='test_db',
+        keep=7,
+        now=datetime(2026, 10, 19, 8, tzinfo=timezone.utc),
+        dump_creator=fake_dump,
+        status_file=status,
+        status_now=completed_at,
+    )
+
+    assert json.loads(status.read_text()) == {
+        'completed_at': '2026-10-19T08:30:00Z',
+        'schema': 1,
+    }
+    assert status.stat().st_mode & 0o777 == 0o600
+    assert list(status_root.glob('.last-success.json.partial-*')) == []
+
+
+def test_retention_failure_preserves_the_previous_success_marker(
+    tmp_path, monkeypatch
+):
+    root = tmp_path / 'backups'
+    root.mkdir(mode=0o700)
+    status_root = tmp_path / 'state'
+    status_root.mkdir(mode=0o700)
+    status = status_root / 'last-success.json'
+    previous = b'{"completed_at":"2026-10-18T08:30:00Z","schema":1}\n'
+    status.write_bytes(previous)
+    status.chmod(0o600)
+    monkeypatch.setattr(
+        backup,
+        'prune_backups',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            backup.BackupError('simulated retention failure')
+        ),
+    )
+
+    with pytest.raises(backup.BackupError, match='retention failure'):
+        backup.execute(
+            tmp_path,
+            root,
+            container='test_db',
+            keep=7,
+            dump_creator=fake_dump,
+            status_file=status,
+        )
+
+    assert status.read_bytes() == previous
+
+
+def test_failed_status_write_durably_removes_its_temporary(
+    tmp_path, monkeypatch
+):
+    status_root = tmp_path / 'state'
+    status_root.mkdir(mode=0o700)
+    status = status_root / 'last-success.json'
+    flushed = []
+    monkeypatch.setattr(
+        backup.json,
+        'dump',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            OSError('simulated marker write failure')
+        ),
+    )
+    monkeypatch.setattr(
+        backup,
+        'fsync_directory',
+        lambda path: flushed.append(Path(path)),
+    )
+
+    with pytest.raises(OSError, match='marker write failure'):
+        backup.write_success_status(status)
+
+    assert list(status_root.glob('.last-success.json.partial-*')) == []
+    assert flushed == [status_root]
+    assert not status.exists()
 
 
 def test_failed_dump_never_prunes_existing_backups(tmp_path):

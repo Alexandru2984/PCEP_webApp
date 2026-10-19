@@ -449,6 +449,12 @@ def verify_backup_freshness(backup_root, max_age_hours, now, backup_module=None)
     return moment
 
 
+def verify_backup_job_freshness(path, max_age_hours, now):
+    moment = read_success_status(path, 'Backup job success', private=True)
+    require_fresh(moment, now, max_age_hours, 'Last complete backup job')
+    return moment
+
+
 def read_success_status(path, label, private=False):
     status = Path(path).absolute()
     if status.is_symlink() or not status.is_file():
@@ -615,6 +621,8 @@ def execute(
     offsite_max_age_hours=24,
     database_security_status=None,
     database_security_max_age_hours=2,
+    backup_job_status=None,
+    backup_job_max_age_hours=26,
     verify_installation=False,
     installation_module=None,
     verify_nginx_installation=False,
@@ -637,6 +645,7 @@ def execute(
     database_security_max_age_hours = bounded_hours(
         database_security_max_age_hours
     )
+    backup_job_max_age_hours = bounded_hours(backup_job_max_age_hours)
     release_staging_max_age_hours = bounded_hours(
         release_staging_max_age_hours
     )
@@ -658,6 +667,15 @@ def execute(
         )
     except OperationsHealthError as error:
         failures.append(str(error))
+    if backup_job_status is not None:
+        try:
+            verify_backup_job_freshness(
+                backup_job_status,
+                backup_job_max_age_hours,
+                moment,
+            )
+        except OperationsHealthError as error:
+            failures.append(str(error))
     if offsite_required_after is not None and moment.date() >= offsite_required_after:
         try:
             verify_offsite_freshness(offsite_status, offsite_max_age_hours, moment)
@@ -817,6 +835,10 @@ def main():
     )
     parser.add_argument('--output', type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument('--backup-max-age-hours', type=bounded_hours, default=26)
+    parser.add_argument('--backup-job-status', type=Path)
+    parser.add_argument(
+        '--backup-job-max-age-hours', type=bounded_hours, default=26
+    )
     parser.add_argument('--restore-max-age-hours', type=bounded_hours, default=170)
     parser.add_argument('--offsite-status', type=Path)
     parser.add_argument('--offsite-required-after', type=calendar_date)
@@ -867,6 +889,8 @@ def main():
             database_security_max_age_hours=(
                 args.database_security_max_age_hours
             ),
+            backup_job_status=args.backup_job_status,
+            backup_job_max_age_hours=args.backup_job_max_age_hours,
             release_root=args.release_root,
             release_staging_max_age_hours=(
                 args.release_staging_max_age_hours
