@@ -521,7 +521,9 @@ to be private, owned by the dedicated `umami` account and at most 26 hours old. 
 retention service runs at 02:17 local time with up to 15 minutes of jitter, before
 the 02:47 health window, so ACL publication cannot race the normal health run. A
 missing, unreadable, malformed, wrongly owned or stale marker degrades only the same
-generic public status.
+generic public status. If persistent timers catch up together after downtime,
+systemd also orders operations health after an already queued retention service; the
+dependency does not start retention or grant health any database access.
 
 The same run inventories the real, owner-controlled `/var/www/pcep` release parent
 read-only. It accepts only exact temporary publisher names for `frontend`, `static`
