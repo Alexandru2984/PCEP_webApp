@@ -307,6 +307,74 @@ gh workflow run production-smoke.yml -f exercise_alert=false
 gh run watch --exit-status
 ```
 
+## Reviewed Host Patch and Reboot
+
+Host package installation and reboot remain explicit operator actions because this
+machine serves projects outside PCEP. The PCEP proof commands are deliberately
+read-only except for one private evidence file: they never invoke `apt`, restart a
+service, stop a timer or reboot the host. Confirm a provider-console recovery path
+and a maintenance window for every co-tenant before starting.
+
+Before package installation, create a fresh verified backup, run the isolated
+restore drill and republish healthy operations state. Preserve their private
+journals and do not continue on any failure:
+
+```bash
+sudo systemctl start pcep-db-backup.service
+sudo systemctl start pcep-db-restore-check.service
+sudo systemctl start pcep-operations-health.service
+make verify-operations-installation verify-container-runtime production-smoke
+```
+
+Review the exact package transaction before accepting it. Package installation can
+restart Docker, Nginx, Cloudflared or unrelated services even before the host
+reboot, so revalidate all co-tenants separately. After installation has completed,
+fetch and fast-forward the reviewed PCEP `main`, wait for every PCEP oneshot to be
+inactive, and create a unique evidence path in the existing private backup root:
+
+```bash
+git fetch origin main
+git switch main
+git merge --ff-only origin/main
+PCEP_MAINTENANCE_STATE=/home/micu/backups/pcep/pcep-host-maintenance-20261019T180000Z.json
+make host-maintenance-preflight HOST_MAINTENANCE_STATE="$PCEP_MAINTENANCE_STATE"
+```
+
+The preflight refuses a dirty or divergent tracked worktree, a branch other than
+`main`, active/failed PCEP work, inactive Nginx/Docker/Cloudflared, installed-policy
+drift, unhealthy containers, a failed external production contract, unsafe kernel
+image metadata or an existing evidence filename. It records the kernel boot ID,
+running and newest installed same-flavour kernels, exact repository revision and
+reboot-required flag in a mode-`0600`, owner-controlled, atomically durable JSON
+file. Untracked operator files such as `.claude/` do not enter the evidence or block
+the check.
+
+Only after the preflight succeeds, perform the separately reviewed reboot from the
+provider console or an SSH session with verified recovery access. After SSH returns,
+use the exact same evidence path:
+
+```bash
+PCEP_MAINTENANCE_STATE=/home/micu/backups/pcep/pcep-host-maintenance-20261019T180000Z.json
+make host-maintenance-postflight HOST_MAINTENANCE_STATE="$PCEP_MAINTENANCE_STATE"
+```
+
+Postflight reruns every installation, runtime, service and public-contract check. It
+also requires a different kernel boot ID, the exact preflight-expected kernel, an
+unchanged reviewed commit and no remaining `/var/run/reboot-required`. Only then is
+the evidence atomically changed from `preflight` to `complete`. Preserve that file
+with the maintenance record; never hand-edit it, reuse its filename or mark an
+incomplete run complete.
+
+If postflight fails, stop promotion and preserve the evidence file plus boot,
+kernel, Docker, Nginx, Cloudflared and PCEP journals. Use the provider console to
+select the preceding kernel if the new kernel cannot boot. Restart only a precisely
+identified failed dependency, rerun the exact installation/runtime checks, and run
+postflight again. A public response alone is insufficient: boot identity, kernel,
+local health and the external answer-secrecy contract must all agree. The tabletop
+must cover a boot ID that does not change, the old kernel returning, Docker failing
+to recover, a timer starting during the window, an unsafe/replaced state file and a
+healthy homepage with degraded operations status.
+
 ## Bounded Capacity Smoke
 
 Run the local-origin capacity smoke only during a controlled maintenance window:

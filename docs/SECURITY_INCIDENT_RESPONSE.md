@@ -433,8 +433,8 @@ never rotate production secrets merely to simulate an incident.
    retention, restore-readiness race,
    stale publication staging, stale
    pre-deploy backup temporary, excessive/unsafe finalized snapshots, rollback-image
-   retention refusal, retention target replacement, failed health-marker cleanup or
-   malicious service worker.
+   retention refusal, retention target replacement, failed health-marker cleanup,
+   incomplete host reboot recovery or malicious service worker.
 2. Name the incident lead, recorder and notification recipient.
 3. Measure time to receive the alert, acknowledge, identify releases and choose the
    containment boundary.
