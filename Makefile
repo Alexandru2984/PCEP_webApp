@@ -35,7 +35,7 @@ CAPACITY_DURATION ?= 20
 CAPACITY_RATE ?= 15
 CAPACITY_CONCURRENCY ?= 6
 
-.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation verify-container-runtime host-maintenance-preflight host-maintenance-postflight build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend predeploy-backup-retention backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
+.PHONY: help install install-backend install-frontend lock-backend test test-backend test-frontend audit audit-backend audit-frontend audit-secrets audit-misconfig audit-image audit-db-image check-workflows check-systemd verify-nginx-installation verify-operations-installation verify-container-runtime host-maintenance-preflight host-maintenance-postflight build build-frontend compose-build-frontend fetch-pyodide django-check production-smoke capacity-smoke compose-up compose-build deploy-backend predeploy-backup-retention backup-database verify-database-restore separate-database-roles offsite-backup-preflight offsite-backup seed-reset deploy-frontend release-retention backend-image-retention status
 
 help:
 	@printf '%s\n' \
@@ -43,8 +43,9 @@ help:
 		'  install          Install backend dev deps and frontend deps' \
 		'  lock-backend     Regenerate hashed Python dependency locks' \
 		'  test             Run backend and frontend checks' \
-		'  audit            Run dependency, question and tracked-secret audits' \
+		'  audit            Run dependency, question, secret and config audits' \
 		'  audit-secrets    Scan tracked files and complete Git history for secrets' \
+		'  audit-misconfig  Scan tracked infrastructure for high/critical misconfigurations' \
 		'  audit-image      Fail on fixable high/critical backend image CVEs' \
 		'  audit-db-image   Fail on fixable high/critical PostgreSQL image CVEs' \
 		'  check-workflows  Validate GitHub Actions syntax, shell and security' \
@@ -94,7 +95,7 @@ test-backend:
 test-frontend: fetch-pyodide
 	cd frontend && $(NPM) run test:pyodide-integrity && $(NPM) run test && $(NPM) run lint && $(NPM) run format:check && VITE_PCEP_RELEASE="$(RELEASE)" VITE_PYTHON_RUNNER_ORIGIN="$(PYTHON_RUNNER_ORIGIN)" $(NPM) run build
 
-audit: audit-backend audit-frontend audit-secrets
+audit: audit-backend audit-frontend audit-secrets audit-misconfig
 
 audit-backend:
 	cd backend && DJANGO_SETTINGS_MODULE=pcep_project.test_settings "$(PYTHON_BIN)" manage.py audit_questions --fail-on-warnings
@@ -107,6 +108,9 @@ audit-frontend:
 
 audit-secrets:
 	TRIVY_IMAGE="$(TRIVY_IMAGE)" bash scripts/check_tracked_secrets.sh
+
+audit-misconfig:
+	TRIVY_IMAGE="$(TRIVY_IMAGE)" bash scripts/check_tracked_misconfigurations.sh
 
 audit-image:
 	TRIVY_IMAGE="$(TRIVY_IMAGE)" TRIVY_CACHE="$(TRIVY_CACHE)" \
