@@ -66,7 +66,7 @@ locate remnants only with the exact
 The PostgreSQL runtime check builds the reviewed image,
 starts a disposable cluster with the production restrictions, writes data, verifies
 the kernel controls and read-only root, restarts it and verifies persistence.
-The runtime base pins both Python 3.12.14 and the official multi-architecture
+The runtime base pins both Python 3.12.15 and the official multi-architecture
 image digest. The runtime stage applies current Debian updates so a versioned
 upstream image cannot leave newly fixed packages behind between image rebuilds.
 Update the Python version and digest together only after rebuilding, scanning and
@@ -123,8 +123,8 @@ CI actions are also pinned to full release commit SHAs. Keep the adjacent
 version comments synchronized and review official release notes before updating
 those pins; current action majors use the supported Node 24 runtime. Every workflow
 uses the explicit Ubuntu 24.04 runner label instead of the moving `ubuntu-latest`
-alias. Python jobs pin 3.12.14, matching the backend image and local review
-environment. Upgrade either runner or interpreter only as a reviewed change after
+alias. Python jobs pin 3.12.15, matching the backend image. Upgrade either runner
+or interpreter only as a reviewed change after
 the complete CI suite passes on the candidate combination.
 
 Repository Actions policy enforces full-length commit SHA references and permits

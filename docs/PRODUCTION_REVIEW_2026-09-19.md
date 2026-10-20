@@ -4300,6 +4300,38 @@ cannot be defended without user volume, outage, response-cost, loss and frequenc
 inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, green
 required CI, a clean hosted Docker updater run and exact-SHA external smoke.
 
+### Python 3.12.15 runtime patch — 2026-10-20
+
+After the interpreter-line policy reached `main`, hosted Docker updater run
+`39451619778` enumerated Python, PostgreSQL and Node and selected only the eligible
+Python patch from 3.12.14 to 3.12.15. Its PR `#123` updated the two direct,
+digest-pinned `FROM` instructions. Required CI failed closed only because the three
+Python workflow toolchains intentionally remained on 3.12.14; 551 other backend
+tests passed. The Ops job successfully built and scanned the 3.12.15 candidate.
+The controlled replacement updates the two image references and all three CI pins
+together while preserving hashed application dependencies and the 3.12 language
+compatibility boundary.
+
+The top STRIDE risks are supplier tampering in the refreshed official image, denial
+of service from a patch regression and repudiation through runtime/CI version drift.
+The immutable multi-architecture digest, fail-closed synchrony test, complete suite
+and fixable-HIGH/CRITICAL image scan constrain them. Worst-case blast radius is the
+backend service and all active learners; this source change has no direct production,
+database or customer-data write path. Pin drift and image findings fail immediately
+in required CI, while the weekly updater provides patch-discovery MTTD subject to
+GitHub scheduling and human notification delivery.
+
+Response preserves the failed bot proposal and candidate scan, retains the prior
+reviewed image for rollback, and reverts all five coupled runtime pins together if
+post-merge validation fails. The next supply-chain tabletop should cover a clean
+patch that fails application behavior after passing vulnerability scanning. No new
+vendor, credential, subprocessor, DPA or personal-data flow is added. A wider
+incident affecting personal-data confidentiality, integrity or availability keeps
+the GDPR Article 33 72-hour assessment requirement. FAIR/ALE cannot be defended
+without user volume, outage, response-cost, loss and frequency inputs. The CISO
+verdict is **SHIP WITH GUARDRAILS** after full CI, image scanning, local production
+checks and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
