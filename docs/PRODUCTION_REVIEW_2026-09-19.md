@@ -4162,6 +4162,36 @@ expanded. A broader incident involving personal data retains the GDPR Article 33
 frequency and business-loss inputs. The CISO verdict for this bounded tool refresh
 is **SHIP** after scanner regression checks and full CI.
 
+### Container base-image update monitoring — 2026-10-20
+
+Dependabot now proposes weekly updates for the pinned backend/frontend Dockerfiles
+and root Docker Compose manifest in addition to Actions, npm and pip. It cannot
+merge any proposal. Major image changes remain excluded from routine updates, the
+seven-day cooldown applies to ordinary releases, and every resulting pull request
+must pass the existing required CI and dependency-review controls. Regression tests
+also bind the Python and Node image versions to every CI toolchain declaration and
+the PostgreSQL base digest to the CI service, causing an incomplete automated edit
+to fail closed.
+
+The top STRIDE risks are supplier tampering in a refreshed base image, denial of
+service from an incompatible image and repudiation when coupled runtime/CI pins
+drift. Immutable digests, explicit version tags, mandatory rebuilds, Trivy scans and
+protected-branch CI limit these risks. A malicious accepted base could affect the
+backend database/question-bank availability or the ephemeral frontend build output;
+Dependabot itself receives repository metadata and can only propose a branch, not
+access production or merge. Detection occurs on the weekly proposal and synchrony
+failures are immediate in CI. Response closes or reverts the proposal, preserves
+scan/build evidence and retains the last reviewed runtime image for rollback. The
+existing image rollback drills cover runtime failure; the general human tabletop
+remains outstanding.
+
+GitHub/Dependabot and the existing official-image registries are already in scope;
+no vendor, credential, subprocessor, DPA or personal-data flow is added. A broader
+incident involving personal data retains the GDPR Article 33 72-hour assessment.
+FAIR/ALE remains indefensible without incident frequency and business-loss inputs.
+The CISO verdict is **SHIP WITH GUARDRAILS** after configuration validation, full CI
+and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
