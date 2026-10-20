@@ -4332,6 +4332,62 @@ without user volume, outage, response-cost, loss and frequency inputs. The CISO
 verdict is **SHIP WITH GUARDRAILS** after full CI, image scanning, local production
 checks and exact-SHA external smoke.
 
+### Redirect credential-stripping advisories — 2026-10-20
+
+The full frontend audit detected HIGH advisories `GHSA-q3jh-wrc6-jgq8` and
+`GHSA-8r9p-f939-6h3c` in transitive `follow-redirects 1.16.0`. Axios permits the
+patched `1.16.1`, so only the npm lock changed. A clean install selected the patched
+artifact, registry signature/attestation verification passed, the full static build
+passed and the generated browser bundle contains no `follow-redirects` code.
+
+The top STRIDE risks are information disclosure of authorization or cookie headers
+across an attacker-controlled redirect, spoofing of the redirect destination and
+tampering with authenticated requests. The vulnerable library is the Node adapter
+behind frontend Axios, while production serves static browser assets and excludes
+that adapter; practical blast radius is therefore developer/CI Node execution, not
+learner browser sessions or the backend/database. Required `npm audit` detected the
+advisory on the first full audit after the database update, giving same-run machine
+MTTD; human acknowledgement still depends on GitHub notification delivery.
+
+Response preserves the failed report, updates only the transitive lock entry, uses
+a clean install and repeats signature, attestation, test and build validation. The
+next supply-chain tabletop should exercise a malicious cross-origin redirect from a
+Node-side build or audit helper and identify any credential that would require
+rotation. No vendor, subprocessor, DPA or personal-data flow changes. Evidence of
+personal-data exposure would retain the GDPR Article 33 72-hour assessment. FAIR/ALE
+cannot be defended without execution frequency, credential value, response-cost and
+loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after clean dependency/full
+CI audits and exact-SHA external smoke.
+
+### Development audit trust-store incident — 2026-10-20
+
+The full dependency audit detected critical advisory `GHSA-6q48-6c7w-9gw2` in
+`certifi 2026.7.22`, pulled only into the development lock through `pip-audit` and
+its HTTPS client. The production lock and deployed backend image do not contain
+`certifi`. The development input now enforces `certifi>=2026.10.19`, the upstream
+patched release, and the regenerated hash-locked dependency graph prevents an
+ordinary install from selecting the affected trust store again.
+
+The top STRIDE risks are spoofing a TLS peer through a certificate chained to a
+compromised intermediate, tampering with downloaded audit data or packages, and
+information disclosure from intercepted CI/developer HTTPS traffic. Blast radius
+is limited to a developer or CI environment installing the development lock; no
+production process, database or learner request imports this package. Automated
+MTTD was the same audit run in which the advisory became available; future drift
+fails `pip-audit` in required CI, while human acknowledgement still depends on
+GitHub notification delivery.
+
+Response is to preserve the failed audit, refresh only the affected hashed lock,
+rerun dependency and full CI checks, and rotate or rebuild any downstream artifact
+if evidence later shows intercepted traffic. The next supply-chain tabletop should
+exercise a compromised CA affecting a CI-only tool and determine whether any token
+or downloaded artifact requires revocation. No new vendor, subprocessor, credential,
+DPA or personal-data flow is introduced. A wider incident with evidence of affected
+personal data retains the GDPR Article 33 72-hour assessment requirement. FAIR/ALE
+cannot be defended without exposure frequency, traffic, response-cost and loss
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after clean dependency/full CI
+audits and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

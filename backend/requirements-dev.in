@@ -1,4 +1,6 @@
 -r requirements.in
+# Security floor for the CA bundle used by pip-audit's HTTPS client.
+certifi>=2026.10.19
 pytest==9.1.1
 pytest-django==4.14.0
 pip-audit==2.10.1
