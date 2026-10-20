@@ -4388,6 +4388,35 @@ cannot be defended without exposure frequency, traffic, response-cost and loss
 inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after clean dependency/full CI
 audits and exact-SHA external smoke.
 
+### Tracked infrastructure misconfiguration gate — 2026-10-20
+
+The existing pinned Trivy container now scans the candidate tracked tree for
+HIGH/CRITICAL infrastructure misconfigurations in addition to secrets and built
+image vulnerabilities. Only Git-tracked paths are staged, so local `.env`, backup
+and operator state never enter the scanner. The container has no network, Docker
+socket, credentials or repository write path. Repository Trivy configuration,
+ignore files and custom policies are explicitly disabled; the checks embedded in
+the immutable scanner image are used offline. The initial scan identified all three
+Dockerfiles and reported zero HIGH/CRITICAL findings.
+
+The top STRIDE risks are tampering through an unsafe infrastructure definition,
+elevation of privilege from a future container regression and repudiation if a
+repository-owned ignore silently hides its own finding. The fail-closed required CI
+job, unsuppressible inputs and existing runtime checks constrain them. Blast radius
+is the service built from an accepted unsafe definition and therefore potentially
+all active learners; the scanner itself can read only the staged public source tree
+and cannot reach production or customer data. Machine MTTD is immediate on each PR
+and push. Human acknowledgement continues to depend on GitHub notification delivery.
+
+Response preserves the failed report, rejects the candidate, fixes the narrow
+definition and repeats both static and runtime validation; the next CI-compromise
+tabletop should include a malicious ignore file and a privileged Dockerfile change.
+No vendor, credential, subprocessor, DPA or personal-data flow is added. A wider
+incident affecting personal data retains the GDPR Article 33 72-hour assessment.
+FAIR/ALE remains unavailable without frequency and loss inputs. The CISO verdict is
+**SHIP WITH GUARDRAILS** after focused/full tests, a clean offline scan, required CI
+and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

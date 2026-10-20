@@ -21,6 +21,7 @@ def test_trivy_defaults_are_immutable_and_synchronized():
     sources = (
         (ROOT / 'Makefile').read_text(),
         (ROOT / 'scripts' / 'audit_docker_image.sh').read_text(),
+        (ROOT / 'scripts' / 'check_tracked_misconfigurations.sh').read_text(),
         (ROOT / 'scripts' / 'check_tracked_secrets.sh').read_text(),
     )
 
@@ -99,6 +100,29 @@ def test_image_scanner_never_receives_the_docker_socket():
     ]
 
     assert all('/var/run/docker.sock' not in source for source in sources)
+
+
+def test_misconfiguration_scanner_is_isolated_and_unsuppressible():
+    script = (
+        ROOT / 'scripts' / 'check_tracked_misconfigurations.sh'
+    ).read_text()
+
+    for control in (
+        'git -C "$ROOT" ls-files --cached -z',
+        '--network none',
+        '--read-only',
+        '--cap-drop ALL',
+        '--security-opt no-new-privileges',
+        '--volume "$tree:/workspace:ro"',
+        '--config ""',
+        '--ignorefile ""',
+        '--skip-check-update',
+        '--severity HIGH,CRITICAL',
+        '--exit-code 1',
+    ):
+        assert control in script
+
+    assert '/var/run/docker.sock' not in script
 
 
 def test_image_scanner_is_unprivileged_and_reads_an_immutable_archive():

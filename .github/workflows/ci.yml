@@ -229,6 +229,9 @@ jobs:
       - name: Scan tracked files and Git history for secrets
         run: make audit-secrets
 
+      - name: Scan tracked infrastructure for misconfigurations
+        run: make audit-misconfig
+
       - name: Validate Docker Compose config
         run: docker compose config >/dev/null
 

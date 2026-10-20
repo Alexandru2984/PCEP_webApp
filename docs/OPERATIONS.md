@@ -93,6 +93,15 @@ Scanner output redacts matched values. Treat a finding as exposed even if a late
 commit removes it, rotate the credential first, then purge history only through a
 separately reviewed procedure.
 
+`make audit-misconfig` applies the immutable scanner's embedded HIGH/CRITICAL
+infrastructure checks to the same current tracked-file boundary. It does not include
+Git history because configuration findings concern the candidate tree rather than
+past secret exposure. The container is read-only, unprivileged, networkless and has
+no Docker socket. Empty explicit `--config` and `--ignorefile` values, disabled check
+updates and the scanner's `/` working directory prevent a tracked `trivy.yaml`,
+ignore file or custom policy from suppressing the scan that evaluates it. CI runs
+this control before Compose, systemd, PostgreSQL, Nginx and image validation.
+
 The frontend builder uses a versioned Node 24/Alpine tag plus the official
 multi-architecture image digest. Run it through `make compose-build-frontend`;
 the target maps the invoking host UID/GID into the disposable container so a

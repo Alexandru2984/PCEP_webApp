@@ -235,6 +235,10 @@ The ops job also scans every tracked file and the complete reachable Git history
 for known secret formats using the same digest-pinned Trivy image as container
 auditing. Ignored `.env` files and other untracked operator state are never copied
 into the scanner.
+It separately scans tracked infrastructure definitions for HIGH/CRITICAL
+misconfigurations with the same immutable Trivy release. That scanner has no
+network or Docker-socket access, and repository configuration or ignore files
+cannot suppress its embedded checks.
 Its Nginx job starts a disposable TLS vhost and verifies the actual 413/429 JSON,
 cache, CSP, request-ID and retry contracts in addition to configuration syntax.
 It also resolves and validates every repository-owned systemd service, timer and
