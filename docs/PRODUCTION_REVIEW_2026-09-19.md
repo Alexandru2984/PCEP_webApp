@@ -4332,6 +4332,33 @@ without user volume, outage, response-cost, loss and frequency inputs. The CISO
 verdict is **SHIP WITH GUARDRAILS** after full CI, image scanning, local production
 checks and exact-SHA external smoke.
 
+### Redirect credential-stripping advisories — 2026-10-20
+
+The full frontend audit detected HIGH advisories `GHSA-q3jh-wrc6-jgq8` and
+`GHSA-8r9p-f939-6h3c` in transitive `follow-redirects 1.16.0`. Axios permits the
+patched `1.16.1`, so only the npm lock changed. A clean install selected the patched
+artifact, registry signature/attestation verification passed, the full static build
+passed and the generated browser bundle contains no `follow-redirects` code.
+
+The top STRIDE risks are information disclosure of authorization or cookie headers
+across an attacker-controlled redirect, spoofing of the redirect destination and
+tampering with authenticated requests. The vulnerable library is the Node adapter
+behind frontend Axios, while production serves static browser assets and excludes
+that adapter; practical blast radius is therefore developer/CI Node execution, not
+learner browser sessions or the backend/database. Required `npm audit` detected the
+advisory on the first full audit after the database update, giving same-run machine
+MTTD; human acknowledgement still depends on GitHub notification delivery.
+
+Response preserves the failed report, updates only the transitive lock entry, uses
+a clean install and repeats signature, attestation, test and build validation. The
+next supply-chain tabletop should exercise a malicious cross-origin redirect from a
+Node-side build or audit helper and identify any credential that would require
+rotation. No vendor, subprocessor, DPA or personal-data flow changes. Evidence of
+personal-data exposure would retain the GDPR Article 33 72-hour assessment. FAIR/ALE
+cannot be defended without execution frequency, credential value, response-cost and
+loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after clean dependency/full
+CI audits and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
