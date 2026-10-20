@@ -6,6 +6,15 @@ ROOT = Path(__file__).resolve().parents[3]
 TRIVY_REFERENCE = re.compile(
     r'ghcr\.io/aquasecurity/trivy:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}'
 )
+PYTHON_REFERENCE = re.compile(
+    r'python:(\d+\.\d+\.\d+)-slim@sha256:[0-9a-f]{64}'
+)
+NODE_REFERENCE = re.compile(
+    r'node:(\d+\.\d+\.\d+)-alpine\d+\.\d+@sha256:[0-9a-f]{64}'
+)
+POSTGRES_REFERENCE = re.compile(
+    r'postgres:16-alpine@sha256:[0-9a-f]{64}'
+)
 
 
 def test_trivy_defaults_are_immutable_and_synchronized():
@@ -19,6 +28,47 @@ def test_trivy_defaults_are_immutable_and_synchronized():
 
     assert all(len(matches) == 1 for matches in references)
     assert len({matches[0] for matches in references}) == 1
+
+
+def test_runtime_image_versions_match_ci_toolchains():
+    backend_dockerfile = (ROOT / 'backend' / 'Dockerfile').read_text()
+    frontend_dockerfile = (ROOT / 'frontend' / 'Dockerfile').read_text()
+    workflows = ''.join(
+        path.read_text() for path in (ROOT / '.github' / 'workflows').glob('*.yml')
+    )
+
+    python_matches = PYTHON_REFERENCE.findall(backend_dockerfile)
+    node_matches = NODE_REFERENCE.findall(frontend_dockerfile)
+
+    assert len(python_matches) == 1
+    assert len(node_matches) == 1
+    assert set(re.findall(r'python-version: "([0-9.]+)"', workflows)) == {
+        python_matches[0]
+    }
+    assert set(re.findall(r'node-version: "([0-9.]+)"', workflows)) == {
+        node_matches[0]
+    }
+
+
+def test_postgres_base_image_is_immutable_and_synchronized_with_ci():
+    compose = (ROOT / 'docker-compose.yml').read_text()
+    ci = (ROOT / '.github' / 'workflows' / 'ci.yml').read_text()
+
+    compose_matches = POSTGRES_REFERENCE.findall(compose)
+    ci_matches = POSTGRES_REFERENCE.findall(ci)
+
+    assert len(compose_matches) == 1
+    assert ci_matches == compose_matches
+
+
+def test_dependabot_monitors_dockerfiles_and_compose_without_auto_merge():
+    config = (ROOT / '.github' / 'dependabot.yml').read_text()
+
+    assert config.count('package-ecosystem: "docker"') == 1
+    assert config.count('package-ecosystem: "docker-compose"') == 1
+    assert '- "/backend"' in config
+    assert '- "/frontend"' in config
+    assert 'auto-merge' not in config.lower()
 
 
 def test_image_scanner_never_receives_the_docker_socket():

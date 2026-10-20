@@ -252,7 +252,8 @@ The frontend pins Workbox's deprecated `glob@11` transitive dependency to
 `glob@13.0.6`; Workbox uses only the retained `globSync` library API. Keep this
 override exact and remove it when Workbox supports the current major directly.
 Dependabot checks GitHub Actions every Monday, frontend npm dependencies every
-Tuesday and backend Python dependencies every Wednesday. Python's conventional
+Tuesday, backend Python dependencies every Wednesday, Dockerfiles every Thursday
+and Docker Compose every Friday. Python's conventional
 `.in` manifests and SHA-256 `.txt` locks are regenerated and checked together.
 Normal version updates wait seven days after release and group compatible
 minor/patch changes; the cooldown does not apply to security-update PRs. Dependabot
