@@ -226,7 +226,7 @@ manual dispatch. It runs GitHub's `security-extended` query suite and uploads
 results with a job-scoped `security-events: write` permission; all action
 revisions are pinned to reviewed commit SHAs.
 Its jobs use the explicit Ubuntu 24.04 runner image; Python jobs use the same
-3.12.14 patch release as the backend runtime, avoiding unreviewed toolchain changes
+3.12.15 patch release as the backend runtime, avoiding unreviewed toolchain changes
 when GitHub advances its `ubuntu-latest` alias.
 The ops job validates every workflow with checksum-pinned `actionlint` and
 `zizmor` releases: embedded shell blocks are checked, action references must be
