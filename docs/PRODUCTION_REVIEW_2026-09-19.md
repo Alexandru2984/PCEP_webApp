@@ -4192,6 +4192,33 @@ FAIR/ALE remains indefensible without incident frequency and business-loss input
 The CISO verdict is **SHIP WITH GUARDRAILS** after configuration validation, full CI
 and exact-SHA external smoke.
 
+### Pinned zizmor workflow scanner refresh — 2026-10-20
+
+The offline GitHub Actions security scanner moved from `zizmor` 1.30.1 to the
+upstream 1.31.1 Linux x86_64 release. The archive remains bound to the SHA-256
+published with that release (`d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99`)
+before extraction. Version 1.31.1 fixes a 1.31.0 regression in the
+`dangerous-triggers` audit; the repository had not adopted the affected 1.31.0
+release. The scanner still runs without credentials, configuration or repository
+ignore rules, in strict-collection, pedantic and offline modes.
+
+The top STRIDE risks are supplier tampering with the downloaded scanner, denial of
+service from a scanner regression and repudiation if a workflow finding could be
+silently ignored. The release digest, fail-closed checksum, credential stripping,
+disabled ignores and required CI gate constrain these risks. Blast radius is the
+ephemeral CI/local scan and its read-only repository inputs; the scanner has no
+production or customer-data access. Checksum and audit failures are synchronous, so
+machine MTTD is immediate. Response preserves the failed run and archive metadata,
+reverts the two scanner constants together and repeats the offline audit; the
+dangerous-trigger scenario belongs in the next general CI-compromise tabletop.
+
+The existing GitHub/upstream supply-chain dependency is refreshed, not expanded;
+no vendor, credential, subprocessor, DPA or personal-data flow is added. A broader
+incident involving personal data retains the GDPR Article 33 72-hour assessment.
+FAIR/ALE remains indefensible without incident frequency and business-loss inputs.
+The CISO verdict is **SHIP** after checksum verification, the pedantic offline audit,
+the full test suite and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
