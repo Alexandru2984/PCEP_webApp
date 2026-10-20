@@ -91,6 +91,8 @@ updates:
     commit-message:
       prefix: "build"
 
+  # The Docker updater only discovers literal FROM references. Keep every
+  # monitored Dockerfile's immutable base in FROM, never behind an ARG.
   - package-ecosystem: "docker"
     directories:
       - "/backend"
