@@ -4359,6 +4359,35 @@ cannot be defended without execution frequency, credential value, response-cost 
 loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after clean dependency/full
 CI audits and exact-SHA external smoke.
 
+### Development audit trust-store incident — 2026-10-20
+
+The full dependency audit detected critical advisory `GHSA-6q48-6c7w-9gw2` in
+`certifi 2026.7.22`, pulled only into the development lock through `pip-audit` and
+its HTTPS client. The production lock and deployed backend image do not contain
+`certifi`. The development input now enforces `certifi>=2026.10.19`, the upstream
+patched release, and the regenerated hash-locked dependency graph prevents an
+ordinary install from selecting the affected trust store again.
+
+The top STRIDE risks are spoofing a TLS peer through a certificate chained to a
+compromised intermediate, tampering with downloaded audit data or packages, and
+information disclosure from intercepted CI/developer HTTPS traffic. Blast radius
+is limited to a developer or CI environment installing the development lock; no
+production process, database or learner request imports this package. Automated
+MTTD was the same audit run in which the advisory became available; future drift
+fails `pip-audit` in required CI, while human acknowledgement still depends on
+GitHub notification delivery.
+
+Response is to preserve the failed audit, refresh only the affected hashed lock,
+rerun dependency and full CI checks, and rotate or rebuild any downstream artifact
+if evidence later shows intercepted traffic. The next supply-chain tabletop should
+exercise a compromised CA affecting a CI-only tool and determine whether any token
+or downloaded artifact requires revocation. No new vendor, subprocessor, credential,
+DPA or personal-data flow is introduced. A wider incident with evidence of affected
+personal data retains the GDPR Article 33 72-hour assessment requirement. FAIR/ALE
+cannot be defended without exposure frequency, traffic, response-cost and loss
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after clean dependency/full CI
+audits and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.
