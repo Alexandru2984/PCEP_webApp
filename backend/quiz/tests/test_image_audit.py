@@ -75,6 +75,7 @@ def test_postgres_base_image_is_immutable_and_synchronized_with_ci():
 
 def test_dependabot_monitors_every_dockerfile_without_auto_merge():
     config = (ROOT / '.github' / 'dependabot.yml').read_text()
+    docker_config = config.split('package-ecosystem: "docker"', maxsplit=1)[1]
 
     assert config.count('package-ecosystem: "docker"') == 1
     assert 'package-ecosystem: "docker-compose"' not in config
@@ -82,6 +83,13 @@ def test_dependabot_monitors_every_dockerfile_without_auto_merge():
     assert '- "/docker/postgres"' in config
     assert '- "/frontend"' in config
     assert 'auto-merge' not in config.lower()
+    assert config.count('dependency-name: "python"') == 1
+    assert re.search(
+        r'- dependency-name: "python"\s+'
+        r'update-types:\s+'
+        r'- "version-update:semver-minor"',
+        docker_config,
+    )
 
 
 def test_image_scanner_never_receives_the_docker_socket():

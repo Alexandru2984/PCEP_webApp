@@ -256,9 +256,11 @@ Tuesday, backend Python dependencies every Wednesday and every runtime/build
 Dockerfile every Thursday. Python's conventional
 `.in` manifests and SHA-256 `.txt` locks are regenerated and checked together.
 Normal version updates wait seven days after release and group compatible
-minor/patch changes; the cooldown does not apply to security-update PRs. Dependabot
-security updates are enabled, but every proposal still triggers the full CI suite
-and awaits human review—nothing is auto-merged by this configuration.
+minor/patch changes; the cooldown does not apply to security-update PRs. Routine
+Python container proposals stay within the reviewed 3.12 interpreter line; an
+interpreter-minor migration is planned together with CI and dependency validation.
+Dependabot security updates are enabled, but every proposal still triggers the full
+CI suite and awaits human review—nothing is auto-merged by this configuration.
 The repository dependency graph and Dependabot alerts are enabled, and the project
 includes a required PR-only GitHub dependency review workflow. It fails on newly
 added or upgraded dependencies with
