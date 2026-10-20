@@ -7,8 +7,8 @@ readonly ACTIONLINT_VERSION='1.7.12'
 readonly ACTIONLINT_SHA256='8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
 readonly ACTIONLINT_ARCHIVE="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
 readonly ACTIONLINT_URL="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${ACTIONLINT_ARCHIVE}"
-readonly ZIZMOR_VERSION='1.30.1'
-readonly ZIZMOR_SHA256='e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a'
+readonly ZIZMOR_VERSION='1.31.1'
+readonly ZIZMOR_SHA256='d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99'
 readonly ZIZMOR_ARCHIVE='zizmor-x86_64-unknown-linux-gnu.tar.gz'
 readonly ZIZMOR_URL="https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/${ZIZMOR_ARCHIVE}"
 

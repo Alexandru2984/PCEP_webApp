@@ -135,7 +135,7 @@ commit reference before its workflow can merge. Workflow tokens default to read-
 and cannot approve pull requests.
 
 Run `make check-workflows` after changing `.github/workflows/`. It downloads the
-Linux/amd64 `actionlint` 1.7.12 and `zizmor` 1.30.1 archives over HTTPS, verifies
+Linux/amd64 `actionlint` 1.7.12 and `zizmor` 1.31.1 archives over HTTPS, verifies
 each release's pinned SHA-256 before extraction, and validates every workflow.
 Actionlint checks schema, expressions and embedded shell; zizmor's pedantic offline
 persona checks hash pinning, permissions, triggers, secret handling and other static
