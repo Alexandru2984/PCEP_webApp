@@ -40,7 +40,8 @@ def test_runtime_image_versions_match_ci_toolchains():
     python_matches = PYTHON_REFERENCE.findall(backend_dockerfile)
     node_matches = NODE_REFERENCE.findall(frontend_dockerfile)
 
-    assert len(python_matches) == 1
+    assert len(python_matches) == 2
+    assert len(set(python_matches)) == 1
     assert len(node_matches) == 1
     assert set(re.findall(r'python-version: "([0-9.]+)"', workflows)) == {
         python_matches[0]
@@ -48,6 +49,16 @@ def test_runtime_image_versions_match_ci_toolchains():
     assert set(re.findall(r'node-version: "([0-9.]+)"', workflows)) == {
         node_matches[0]
     }
+    assert all(
+        line.startswith('FROM python:')
+        for line in backend_dockerfile.splitlines()
+        if line.startswith('FROM ')
+    )
+    assert all(
+        line.startswith('FROM node:')
+        for line in frontend_dockerfile.splitlines()
+        if line.startswith('FROM ')
+    )
 
 
 def test_postgres_base_image_is_immutable_and_synchronized_with_ci():

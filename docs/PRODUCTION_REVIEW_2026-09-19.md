@@ -4248,6 +4248,26 @@ FAIR/ALE remains indefensible without incident frequency and business-loss input
 The CISO verdict is **SHIP WITH GUARDRAILS** after a clean hosted Docker updater run,
 full CI, database-image scanning and exact-SHA external smoke.
 
+### Python and Node image-monitoring correction — 2026-10-20
+
+Hosted Docker updater run `39373789866` proved the PostgreSQL correction but also
+showed empty dependency snapshots for `/backend` and `/frontend`. Their immutable
+Python and Node references were hidden behind Docker build arguments, which the
+updater's direct `FROM` parser does not expand. Both Dockerfiles now use direct,
+digest-pinned `FROM` instructions; the backend repeats the identical reference in
+its dependency and runtime stages. Regression tests require those instructions to
+remain direct, mutually identical and version-synchronized with every CI toolchain.
+
+This closes the silent-detection variant of the prior spoofing/repudiation risk:
+a green scheduler run must enumerate all three intended suppliers rather than only
+exit successfully. Blast radius, response, vendor/DPA scope and the GDPR 72-hour
+assessment remain as documented above. Machine MTTD is weekly for an upstream image
+change and immediate in CI for pin drift; guaranteed human acknowledgement remains
+dependent on GitHub notification delivery. FAIR/ALE is still unavailable without
+frequency and business-loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS**
+only after a hosted dependency snapshot explicitly includes Python, PostgreSQL and
+Node, full CI passes and exact-SHA external smoke succeeds.
+
 ## 15. Breaking changes
 
 None.
