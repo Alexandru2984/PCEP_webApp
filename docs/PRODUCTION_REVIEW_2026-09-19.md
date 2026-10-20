@@ -4268,6 +4268,38 @@ frequency and business-loss inputs. The CISO verdict is **SHIP WITH GUARDRAILS**
 only after a hosted dependency snapshot explicitly includes Python, PostgreSQL and
 Node, full CI passes and exact-SHA external smoke succeeds.
 
+### Python interpreter-line update policy — 2026-10-20
+
+Hosted Docker monitoring correctly opened PR `#121` for `python:3.14.8-slim`, but
+Dependabot's SemVer model classified the Python 3.12 to 3.14 language migration as
+a routine minor update. Required CI rejected it: the runtime/CI synchrony test
+detected that the workflows remained on 3.12.14, and the rebuilt image scan found
+four fixable HIGH findings in bundled `msgpack`, `setuptools` and `urllib3`. The PR
+was closed rather than weakening either gate. Docker version updates now ignore
+minor changes for the `python` dependency while retaining patch and digest updates
+on the reviewed 3.12 line. A future interpreter minor requires a dedicated migration
+covering CI, hashed dependencies, application compatibility and image findings.
+
+The top STRIDE risks are supplier tampering through an unsafe base refresh, denial
+of service or incompatibility from an unplanned interpreter jump, and repudiation
+if an automated green label is mistaken for compatibility evidence. Worst-case
+blast radius is the backend service and all active learners; the question bank is
+reconstructible and this policy change itself has no production, database or
+customer-data write path. Drift and fixable image findings fail synchronously in
+required CI, giving immediate machine MTTD; upstream patch discovery remains weekly,
+while human acknowledgement still depends on GitHub notification delivery.
+
+Response is to preserve and close the failed proposal, retain the last reviewed
+image, triage scanner findings and perform any interpreter migration on a dedicated
+branch with explicit rollback. The next supply-chain tabletop should inject both an
+apparently routine language-line jump and a candidate image with newly fixable HIGH
+findings. No new vendor, credential, subprocessor, DPA or personal-data flow is
+added. A wider incident affecting personal-data confidentiality, integrity or
+availability retains the GDPR Article 33 72-hour assessment requirement. FAIR/ALE
+cannot be defended without user volume, outage, response-cost, loss and frequency
+inputs. The CISO verdict is **SHIP WITH GUARDRAILS** after focused/full tests, green
+required CI, a clean hosted Docker updater run and exact-SHA external smoke.
+
 ## 15. Breaking changes
 
 None.

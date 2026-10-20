@@ -110,6 +110,12 @@ updates:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
+      # Python's language minor is a compatibility boundary even though the
+      # Docker tag is SemVer-shaped. Keep routine updates on the reviewed 3.12
+      # line; plan 3.13+ migrations together with CI and dependency validation.
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-minor"
     groups:
       container-minor-patch:
         patterns:

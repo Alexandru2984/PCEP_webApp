@@ -180,6 +180,14 @@ type, while major upgrades stay isolated. At most three routine PRs per ecosyste
 remain open; security PRs are outside that limit. There is no auto-merge
 configuration.
 
+Docker image tags are not assumed to share the language's compatibility model.
+In particular, Dependabot's SemVer interpretation treats `3.12` to `3.14` as a
+minor container update, while Python treats each language minor as a planned
+runtime migration. Routine Docker proposals therefore keep `python` on the reviewed
+3.12 line and still allow patch and digest refreshes. Move to 3.13 or later only in
+an explicit migration that updates every CI toolchain, rebuilds the hashed locks,
+runs the complete compatibility suite and passes the rebuilt image scan.
+
 The configuration file enables version-update proposals after it reaches the
 default branch. Dependabot alerts and security updates remain repository settings;
 both are enabled. This file's cooldown and routine PR limit do not delay or count
