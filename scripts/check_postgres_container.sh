@@ -71,7 +71,7 @@ trap cleanup EXIT
 cd "$root"
 docker compose --profile maintenance config --format json >"$config_file"
 
-db_image="$(python3 - "$config_file" <<'PY'
+db_image="$(python3 - "$config_file" "$root/docker/postgres/Dockerfile" <<'PY'
 import json
 import sys
 
@@ -91,13 +91,20 @@ expected_base = (
     "postgres:16-alpine@"
     "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
 )
+with open(sys.argv[2], encoding="utf-8") as dockerfile:
+    from_lines = [line.strip() for line in dockerfile if line.startswith("FROM ")]
+
+require(
+    from_lines == [f"FROM {expected_base}"],
+    "the PostgreSQL Dockerfile must use the reviewed digest directly",
+)
 require(
     service.get("image") == "pcep_webapp-postgres:16.15-alpine3.24",
     "the service must use the reviewed local image",
 )
 require(
-    service.get("build", {}).get("args", {}).get("POSTGRES_IMAGE") == expected_base,
-    "the upstream PostgreSQL image must use the reviewed digest",
+    service.get("build", {}).get("context", "").endswith("/docker/postgres"),
+    "the service must build the reviewed PostgreSQL Dockerfile",
 )
 require(service.get("user") == "postgres", "the container must start as postgres")
 require(service.get("read_only") is True, "the root filesystem must be read-only")

@@ -170,8 +170,8 @@ attestations for the resolved packages. Reproduce either failure locally with
 
 `.github/dependabot.yml` proposes reviewed version updates for GitHub Actions each
 Monday, frontend npm dependencies each Tuesday, backend pip/pip-compile dependencies
-each Wednesday, Dockerfiles each Thursday and Docker Compose each Friday at 05:23
-Europe/Bucharest. Python uses conventional
+each Wednesday and the backend, PostgreSQL and frontend Dockerfiles each Thursday
+at 05:23 Europe/Bucharest. Python uses conventional
 `requirements.in` and `requirements-dev.in` manifests with generated, hashed
 `.txt` locks; CI regenerates both locks and rejects drift. A seven-day cooldown
 applies only to routine version updates; GitHub security updates are not delayed by
@@ -231,7 +231,7 @@ re-verify protection immediately after the incident.
 
 Python is included through pip-compile's supported `.in`/`.txt` convention. Both
 SHA-256 locks must still be regenerated together with `make lock-backend`, reviewed
-and audited. Dependabot proposes Dockerfile and Compose base-image changes, but each
+and audited. Dependabot proposes Dockerfile base-image changes, but each
 tag/digest pair remains a manual merge decision and must be rebuilt, runtime tested
 and scanned together. Regression tests require the Python and Node build versions to
 match CI and the PostgreSQL base digest to match the CI service, so a partial image

@@ -51,22 +51,24 @@ def test_runtime_image_versions_match_ci_toolchains():
 
 
 def test_postgres_base_image_is_immutable_and_synchronized_with_ci():
-    compose = (ROOT / 'docker-compose.yml').read_text()
+    dockerfile = (ROOT / 'docker' / 'postgres' / 'Dockerfile').read_text()
     ci = (ROOT / '.github' / 'workflows' / 'ci.yml').read_text()
 
-    compose_matches = POSTGRES_REFERENCE.findall(compose)
+    dockerfile_matches = POSTGRES_REFERENCE.findall(dockerfile)
     ci_matches = POSTGRES_REFERENCE.findall(ci)
 
-    assert len(compose_matches) == 1
-    assert ci_matches == compose_matches
+    assert len(dockerfile_matches) == 2
+    assert len(set(dockerfile_matches)) == 1
+    assert ci_matches == dockerfile_matches[:1]
 
 
-def test_dependabot_monitors_dockerfiles_and_compose_without_auto_merge():
+def test_dependabot_monitors_every_dockerfile_without_auto_merge():
     config = (ROOT / '.github' / 'dependabot.yml').read_text()
 
     assert config.count('package-ecosystem: "docker"') == 1
-    assert config.count('package-ecosystem: "docker-compose"') == 1
+    assert 'package-ecosystem: "docker-compose"' not in config
     assert '- "/backend"' in config
+    assert '- "/docker/postgres"' in config
     assert '- "/frontend"' in config
     assert 'auto-merge' not in config.lower()
 

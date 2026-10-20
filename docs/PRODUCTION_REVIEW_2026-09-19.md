@@ -4164,8 +4164,8 @@ is **SHIP** after scanner regression checks and full CI.
 
 ### Container base-image update monitoring — 2026-10-20
 
-Dependabot now proposes weekly updates for the pinned backend/frontend Dockerfiles
-and root Docker Compose manifest in addition to Actions, npm and pip. It cannot
+Dependabot now proposes weekly updates for the pinned backend, PostgreSQL and
+frontend Dockerfiles in addition to Actions, npm and pip. It cannot
 merge any proposal. Major image changes remain excluded from routine updates, the
 seven-day cooldown applies to ordinary releases, and every resulting pull request
 must pass the existing required CI and dependency-review controls. Regression tests
@@ -4218,6 +4218,35 @@ incident involving personal data retains the GDPR Article 33 72-hour assessment.
 FAIR/ALE remains indefensible without incident frequency and business-loss inputs.
 The CISO verdict is **SHIP** after checksum verification, the pedantic offline audit,
 the full test suite and exact-SHA external smoke.
+
+### PostgreSQL image-monitoring correction — 2026-10-20
+
+The first hosted `docker-compose` Dependabot run failed because it interpreted the
+locally built `pcep_webapp-postgres` image name as a private Docker Hub repository.
+It could not see the actual upstream PostgreSQL source supplied only through a
+Compose build argument. The ineffective Compose updater was removed. The immutable
+PostgreSQL source is now a direct `FROM` instruction, `/docker/postgres` is covered
+by the working Docker updater, and regression/runtime checks bind that Dockerfile,
+its OCI provenance label and the CI database service to the same reviewed digest.
+The hosted failure was preserved as run `39372944027`; no credential was added to
+mask a public/local image-modeling error.
+
+The top STRIDE risks are spoofing a local image as a remote registry dependency,
+supplier tampering with the real PostgreSQL base and denial of service from silent
+monitoring failure. Direct immutable provenance, a weekly proposal, fail-closed
+synchrony tests and mandatory image scanning constrain them. Blast radius remains
+the database image and its availability; Dependabot has repository metadata but no
+production or database access. A hosted update failure is visible on each config
+change or weekly run, while digest drift fails synchronously in CI. Response keeps
+the failing run, rejects registry credentials for local-only names, reverts the
+proposal if needed and rebuilds/scans the last reviewed digest. The next general
+supply-chain tabletop should include a red update job with otherwise green CI.
+
+No vendor, credential, subprocessor, DPA or personal-data flow is added. A broader
+incident involving personal data retains the GDPR Article 33 72-hour assessment.
+FAIR/ALE remains indefensible without incident frequency and business-loss inputs.
+The CISO verdict is **SHIP WITH GUARDRAILS** after a clean hosted Docker updater run,
+full CI, database-image scanning and exact-SHA external smoke.
 
 ## 15. Breaking changes
 
