@@ -236,7 +236,7 @@ function StudyPlan({
             <button
               type="button"
               onClick={onAdaptiveFlashcards}
-              className="rounded-lg border border-violet-600 bg-white px-4 py-2.5 font-medium text-violet-800 hover:bg-violet-100 dark:bg-slate-900 dark:text-violet-300"
+              className="rounded-lg border border-violet-600 bg-white px-4 py-2.5 font-medium text-violet-800 hover:bg-violet-100 dark:border-violet-400 dark:bg-slate-900 dark:text-violet-300 dark:hover:bg-violet-950/60"
             >
               Recommended flashcards ({adaptivePlan.count})
             </button>
