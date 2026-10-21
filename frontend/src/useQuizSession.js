@@ -32,6 +32,17 @@ import { EXAM_SECONDS_PER_QUESTION, PCEP_30_02_PRESET, validPcep30_02Set } from 
 
 const COMPLETION_SAVE_ERROR =
   'The completed session could not be saved safely. Resolve the browser storage warning, then retry.'
+const ACTIVE_SESSION_KEYS = new Set([
+  'pcep.activeExam',
+  'pcep.activePractice',
+  'pcep.activeFlashcards',
+])
+
+const loadRecoveries = () => ({
+  exam: loadActiveExam(),
+  practice: loadActivePractice(),
+  flashcards: loadActiveFlashcards(),
+})
 
 function emptyState(
   lastConfig = null,
@@ -61,11 +72,12 @@ function emptyState(
   }
 }
 function initialState() {
+  const recoveries = loadRecoveries()
   return emptyState(
     loadSettings(),
-    loadActiveExam(),
-    loadActivePractice(),
-    loadActiveFlashcards()
+    recoveries.exam,
+    recoveries.practice,
+    recoveries.flashcards
   )
 }
 
@@ -154,16 +166,16 @@ export function sessionReducer(state, event) {
     case 'discard-flashcards-resume':
       return { ...state, resumableFlashcards: null }
     case 'storage-conflict':
-      return emptyState(state.lastConfig, event.exam)
-    case 'practice-storage-conflict':
-      return emptyState(state.lastConfig, state.resumableExam, event.practice)
-    case 'flashcards-storage-conflict':
-      return emptyState(
-        state.lastConfig,
-        state.resumableExam,
-        state.resumablePractice,
-        event.flashcards
-      )
+      return emptyState(state.lastConfig, event.exam, event.practice, event.flashcards)
+    case 'refresh-recoveries':
+      return state.phase === 'setup'
+        ? {
+            ...state,
+            resumableExam: event.exam,
+            resumablePractice: event.practice,
+            resumableFlashcards: event.flashcards,
+          }
+        : state
     case 'load-error':
       return { ...state, phase: 'error', error: event.error }
     case 'answering':
@@ -252,14 +264,24 @@ export default function useQuizSession() {
     if (state.phase === 'answering') questionStartedAt.current = Date.now()
   }, [state.index, state.phase])
   useEffect(() => {
+    if (state.phase !== 'setup') return
+    const syncRecoveries = (event) => {
+      // localStorage.clear() reports a null key and can remove every snapshot.
+      if (event.key !== null && !ACTIVE_SESSION_KEYS.has(event.key)) return
+      dispatch({ type: 'refresh-recoveries', ...loadRecoveries() })
+    }
+    window.addEventListener('storage', syncRecoveries)
+    return () => window.removeEventListener('storage', syncRecoveries)
+  }, [state.phase])
+  useEffect(() => {
     const sessionId = state.examProgress?.sessionId
     if (state.phase !== 'exam' || !sessionId) return
     const stopStaleExam = () => {
-      const currentExam = loadActiveExam()
-      if (currentExam?.sessionId === sessionId) return
+      const recoveries = loadRecoveries()
+      if (recoveries.exam?.sessionId === sessionId) return
       request.current?.abort()
       request.current = null
-      dispatch({ type: 'storage-conflict', exam: currentExam })
+      dispatch({ type: 'storage-conflict', ...recoveries })
     }
     const changedInAnotherTab = (event) => {
       if (event.key !== 'pcep.activeExam') return
@@ -282,11 +304,11 @@ export default function useQuizSession() {
     )
       return
     const stopStalePractice = () => {
-      const currentPractice = loadActivePractice()
-      if (currentPractice?.sessionId === sessionId) return
+      const recoveries = loadRecoveries()
+      if (recoveries.practice?.sessionId === sessionId) return
       request.current?.abort()
       request.current = null
-      dispatch({ type: 'practice-storage-conflict', practice: currentPractice })
+      dispatch({ type: 'storage-conflict', ...recoveries })
     }
     const changedInAnotherTab = (event) => {
       if (event.key !== 'pcep.activePractice') return
@@ -305,14 +327,11 @@ export default function useQuizSession() {
     const sessionId = state.flashcardProgress?.sessionId
     if (state.phase !== 'flashcards' || !sessionId) return
     const stopStaleFlashcards = () => {
-      const currentFlashcards = loadActiveFlashcards()
-      if (currentFlashcards?.sessionId === sessionId) return
+      const recoveries = loadRecoveries()
+      if (recoveries.flashcards?.sessionId === sessionId) return
       request.current?.abort()
       request.current = null
-      dispatch({
-        type: 'flashcards-storage-conflict',
-        flashcards: currentFlashcards,
-      })
+      dispatch({ type: 'storage-conflict', ...recoveries })
     }
     const changedInAnotherTab = (event) => {
       if (event.key !== 'pcep.activeFlashcards') return
@@ -455,7 +474,7 @@ export default function useQuizSession() {
         })
         const currentExam = loadActiveExam()
         if (!saved && currentExam && currentExam.sessionId !== examProgress.sessionId) {
-          dispatch({ type: 'storage-conflict', exam: currentExam })
+          dispatch({ type: 'storage-conflict', ...loadRecoveries() })
           return
         }
       }
@@ -472,10 +491,7 @@ export default function useQuizSession() {
           currentFlashcards &&
           currentFlashcards.sessionId !== flashcardProgress.sessionId
         ) {
-          dispatch({
-            type: 'flashcards-storage-conflict',
-            flashcards: currentFlashcards,
-          })
+          dispatch({ type: 'storage-conflict', ...loadRecoveries() })
           return
         }
       }
@@ -727,13 +743,7 @@ export default function useQuizSession() {
     if (state.practiceSessionId) clearActivePractice(state.practiceSessionId)
     if (state.flashcardProgress?.sessionId)
       clearActiveFlashcards(state.flashcardProgress.sessionId)
-    dispatch({
-      type: 'reset',
-      config: loadSettings(),
-      exam: loadActiveExam(),
-      practice: loadActivePractice(),
-      flashcards: loadActiveFlashcards(),
-    })
+    dispatch({ type: 'reset', config: loadSettings(), ...loadRecoveries() })
   }
   const resumeExam = () => {
     const exam = loadActiveExam()
@@ -743,7 +753,7 @@ export default function useQuizSession() {
     }
     const claimed = { ...exam, sessionId: crypto.randomUUID() }
     if (!saveActiveExam(claimed, exam.sessionId)) {
-      dispatch({ type: 'storage-conflict', exam: loadActiveExam() })
+      dispatch({ type: 'storage-conflict', ...loadRecoveries() })
       return
     }
     finished.current = false
@@ -752,7 +762,7 @@ export default function useQuizSession() {
   const discardSavedExam = () => {
     if (clearActiveExam(state.resumableExam?.sessionId))
       dispatch({ type: 'discard-resume' })
-    else dispatch({ type: 'storage-conflict', exam: loadActiveExam() })
+    else dispatch({ type: 'storage-conflict', ...loadRecoveries() })
   }
   const resumePractice = () => {
     const practice = loadActivePractice()
@@ -762,10 +772,7 @@ export default function useQuizSession() {
     }
     const claimed = { ...practice, sessionId: crypto.randomUUID() }
     if (!saveActivePractice(claimed, practice.sessionId)) {
-      dispatch({
-        type: 'practice-storage-conflict',
-        practice: loadActivePractice(),
-      })
+      dispatch({ type: 'storage-conflict', ...loadRecoveries() })
       return
     }
     finished.current = false
@@ -774,11 +781,7 @@ export default function useQuizSession() {
   const discardSavedPractice = () => {
     if (clearActivePractice(state.resumablePractice?.sessionId))
       dispatch({ type: 'discard-practice-resume' })
-    else
-      dispatch({
-        type: 'practice-storage-conflict',
-        practice: loadActivePractice(),
-      })
+    else dispatch({ type: 'storage-conflict', ...loadRecoveries() })
   }
   const resumeFlashcards = () => {
     const flashcards = loadActiveFlashcards()
@@ -788,10 +791,7 @@ export default function useQuizSession() {
     }
     const claimed = { ...flashcards, sessionId: crypto.randomUUID() }
     if (!saveActiveFlashcards(claimed, flashcards.sessionId)) {
-      dispatch({
-        type: 'flashcards-storage-conflict',
-        flashcards: loadActiveFlashcards(),
-      })
+      dispatch({ type: 'storage-conflict', ...loadRecoveries() })
       return
     }
     finished.current = false
@@ -800,11 +800,7 @@ export default function useQuizSession() {
   const discardSavedFlashcards = () => {
     if (clearActiveFlashcards(state.resumableFlashcards?.sessionId))
       dispatch({ type: 'discard-flashcards-resume' })
-    else
-      dispatch({
-        type: 'flashcards-storage-conflict',
-        flashcards: loadActiveFlashcards(),
-      })
+    else dispatch({ type: 'storage-conflict', ...loadRecoveries() })
   }
   const saveExamProgress = (progress) => {
     if (state.phase !== 'exam') return false

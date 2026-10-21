@@ -1028,6 +1028,26 @@ test('resuming an exam in another tab transfers recovery ownership', async ({
   await secondTab.close()
 })
 
+test('saved session cards refresh while setup stays open in another tab', async ({
+  page,
+  context,
+}) => {
+  await mockApi(page)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+
+  const studyTab = await context.newPage()
+  await mockApi(studyTab)
+  await studyTab.goto('/')
+  await studyTab.getByRole('button', { name: /Start practice/ }).click()
+  await expect(studyTab.getByText('Question 1 of 4')).toBeVisible()
+
+  await expect(page.getByRole('heading', { name: 'Resume saved practice' })).toBeVisible()
+  await studyTab.evaluate(() => localStorage.removeItem('pcep.activePractice'))
+  await expect(page.getByRole('heading', { name: 'Start a new quiz' })).toBeVisible()
+  await studyTab.close()
+})
+
 test('progress completed in another tab refreshes the open dashboard', async ({
   page,
   context,
