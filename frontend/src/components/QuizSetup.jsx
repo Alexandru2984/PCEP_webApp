@@ -207,7 +207,7 @@ export default function QuizSetup({
               <button
                 type="button"
                 onClick={onFlashcardDueReviews}
-                className="min-h-11 rounded-lg border border-emerald-600 bg-white px-4 py-2.5 font-medium text-emerald-800 hover:bg-emerald-100 dark:bg-slate-900 dark:text-emerald-300"
+                className="min-h-11 rounded-lg border border-emerald-600 bg-white px-4 py-2.5 font-medium text-emerald-800 hover:bg-emerald-100 dark:border-emerald-400 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
               >
                 Review due as flashcards
               </button>
@@ -252,7 +252,7 @@ export default function QuizSetup({
               <button
                 type="button"
                 onClick={onFlashcardMistakes}
-                className="min-h-11 rounded-lg border border-amber-600 bg-white px-4 py-2.5 font-medium text-amber-800 hover:bg-amber-100 dark:bg-slate-900 dark:text-amber-300"
+                className="min-h-11 rounded-lg border border-amber-600 bg-white px-4 py-2.5 font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-400 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-950/60"
               >
                 Mistakes as flashcards
               </button>
@@ -296,7 +296,7 @@ export default function QuizSetup({
               <button
                 type="button"
                 onClick={onFlashcardBookmarks}
-                className="min-h-11 rounded-lg border border-sky-600 bg-white px-4 py-2.5 font-medium text-sky-800 hover:bg-sky-100 dark:bg-slate-900 dark:text-sky-300"
+                className="min-h-11 rounded-lg border border-sky-600 bg-white px-4 py-2.5 font-medium text-sky-800 hover:bg-sky-100 dark:border-sky-400 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950/60"
               >
                 Bookmarks as flashcards
               </button>
