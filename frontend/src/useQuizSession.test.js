@@ -85,6 +85,44 @@ const quizResponse = (questions, extra = {}) => ({
   questions,
   ...extra,
 })
+const seedRecoverySnapshots = () => {
+  const startedAt = Date.now()
+  const snapshots = {
+    exam: {
+      config: { ...config, mode: 'exam', count: 1 },
+      questions: [question],
+      startedAt,
+      deadline: startedAt + 80_000,
+      index: 0,
+      answers: {},
+      flagged: [],
+      sessionId: 'saved-exam',
+    },
+    practice: {
+      config: { ...config, count: 1 },
+      questions: [question],
+      startedAt,
+      index: 0,
+      phase: 'answering',
+      history: [],
+      confidence: null,
+      sessionId: 'saved-practice',
+    },
+    flashcards: {
+      config: { ...config, mode: 'flashcards', count: 1 },
+      questions: [question],
+      startedAt,
+      index: 0,
+      items: [],
+      revealed: null,
+      sessionId: 'saved-flashcards',
+    },
+  }
+  expect(saveActiveExam(snapshots.exam)).toBe(true)
+  expect(saveActivePractice(snapshots.practice)).toBe(true)
+  expect(saveActiveFlashcards(snapshots.flashcards)).toBe(true)
+  return snapshots
+}
 beforeEach(() => {
   vi.clearAllMocks()
   fetchQuizSet.mockResolvedValue(quizResponse([question]))
@@ -95,6 +133,115 @@ beforeEach(() => {
   })
 })
 afterEach(() => vi.useRealTimers())
+
+describe('cross-tab recovery synchronization', () => {
+  const modes = [
+    {
+      label: 'exam',
+      resume: 'resumeExam',
+      resumable: 'resumableExam',
+      load: loadActiveExam,
+      save: saveActiveExam,
+      key: 'pcep.activeExam',
+    },
+    {
+      label: 'practice',
+      resume: 'resumePractice',
+      resumable: 'resumablePractice',
+      load: loadActivePractice,
+      save: saveActivePractice,
+      key: 'pcep.activePractice',
+    },
+    {
+      label: 'flashcards',
+      resume: 'resumeFlashcards',
+      resumable: 'resumableFlashcards',
+      load: loadActiveFlashcards,
+      save: saveActiveFlashcards,
+      key: 'pcep.activeFlashcards',
+    },
+  ]
+
+  it.each(modes)(
+    'keeps every saved mode visible when another tab claims the $label session',
+    ({ label, resume, load, save, key }) => {
+      seedRecoverySnapshots()
+      const { result } = renderHook(useQuizSession)
+
+      act(() => result.current[resume]())
+      const current = load()
+      const claimed = { ...current, sessionId: `${label}-in-another-tab` }
+      act(() => {
+        expect(save(claimed, current.sessionId)).toBe(true)
+        window.dispatchEvent(
+          new StorageEvent('storage', {
+            key,
+            newValue: localStorage.getItem(key),
+          })
+        )
+      })
+
+      expect(result.current.phase).toBe('setup')
+      expect(result.current.resumableExam).toMatchObject({
+        sessionId: label === 'exam' ? claimed.sessionId : 'saved-exam',
+      })
+      expect(result.current.resumablePractice).toMatchObject({
+        sessionId: label === 'practice' ? claimed.sessionId : 'saved-practice',
+      })
+      expect(result.current.resumableFlashcards).toMatchObject({
+        sessionId: label === 'flashcards' ? claimed.sessionId : 'saved-flashcards',
+      })
+    }
+  )
+
+  it('refreshes every recovery card while setup remains open in another tab', () => {
+    const { result } = renderHook(useQuizSession)
+    expect(result.current.resumableExam).toBeNull()
+
+    seedRecoverySnapshots()
+    act(() =>
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'pcep.activePractice',
+          newValue: localStorage.getItem('pcep.activePractice'),
+        })
+      )
+    )
+    expect(result.current.resumableExam).toMatchObject({ sessionId: 'saved-exam' })
+    expect(result.current.resumablePractice).toMatchObject({
+      sessionId: 'saved-practice',
+    })
+    expect(result.current.resumableFlashcards).toMatchObject({
+      sessionId: 'saved-flashcards',
+    })
+
+    localStorage.clear()
+    act(() =>
+      window.dispatchEvent(new StorageEvent('storage', { key: null, newValue: null }))
+    )
+    expect(result.current.resumableExam).toBeNull()
+    expect(result.current.resumablePractice).toBeNull()
+    expect(result.current.resumableFlashcards).toBeNull()
+  })
+
+  it.each(modes)(
+    'removes only the stale $label card when its snapshot vanishes before resume',
+    ({ resume, resumable, key }) => {
+      seedRecoverySnapshots()
+      const { result } = renderHook(useQuizSession)
+      localStorage.removeItem(key)
+
+      act(() => result.current[resume]())
+
+      expect(result.current.phase).toBe('setup')
+      expect(result.current[resumable]).toBeNull()
+      const remaining = modes
+        .filter((mode) => mode.resumable !== resumable)
+        .map((mode) => result.current[mode.resumable])
+      expect(remaining.every(Boolean)).toBe(true)
+    }
+  )
+})
 
 describe('quiz session requests', () => {
   it('starts the server-defined daily set and records its challenge date', async () => {
