@@ -229,7 +229,7 @@ export default function QuestionSearch({
               type="button"
               disabled={selected.size === 0}
               onClick={() => onStart([...selected], 'flashcards')}
-              className="min-h-11 rounded-lg border border-sky-600 bg-white px-4 py-2.5 font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500 dark:bg-slate-900 dark:text-sky-300 dark:disabled:border-slate-700 dark:disabled:text-slate-500"
+              className="min-h-11 rounded-lg border border-sky-600 bg-white px-4 py-2.5 font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-500 dark:border-sky-400 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-sky-950/60 dark:disabled:border-slate-700 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
             >
               Flashcards selected ({selected.size})
             </button>

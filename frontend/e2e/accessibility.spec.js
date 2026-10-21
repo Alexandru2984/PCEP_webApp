@@ -110,6 +110,47 @@ for (const theme of ['light', 'dark']) {
   })
 }
 
+test('dark secondary study actions keep AA contrast while hovered', async ({ page }) => {
+  test.setTimeout(60_000)
+  await mockApi(page)
+  await page.addInitScript(() =>
+    localStorage.setItem('pcep.theme', JSON.stringify('dark'))
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: /Start practice/ }).click()
+  await page.getByRole('button', { name: '☆ Bookmark' }).click()
+  for (let index = 0; index < 4; index += 1) {
+    await page.getByRole('button', { name: /option 2/ }).click()
+    await page.getByRole('button', { name: /Next Question|See Results/ }).click()
+  }
+  await page.getByRole('button', { name: 'New quiz' }).click()
+
+  for (const name of [
+    /Start adaptive flashcards/,
+    'Review due as flashcards',
+    'Mistakes as flashcards',
+    'Bookmarks as flashcards',
+  ]) {
+    await page.getByRole('button', { name }).hover()
+    await accessible(page)
+  }
+
+  const search = page.getByRole('searchbox', {
+    name: 'Search question text or code',
+  })
+  await search.fill('output')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await page.getByRole('button', { name: 'Select all results' }).click()
+  await page.getByRole('button', { name: /Flashcards selected/ }).hover()
+  await accessible(page)
+
+  await page.getByRole('button', { name: /Progress/ }).click()
+  for (const name of [/Recommended flashcards/, /Flashcards due/]) {
+    await page.getByRole('button', { name }).hover()
+    await accessible(page)
+  }
+})
+
 test('populated study momentum is accessible and responsive', async ({ page }) => {
   await mockApi(page)
   await page.addInitScript(() => {
