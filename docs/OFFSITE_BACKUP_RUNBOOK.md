@@ -340,7 +340,7 @@ heartbeat and a failure page before installing the `OnSuccess` drop-in. The heal
 monitor reads `/var/lib/pcep-db-offsite/last-success` without exposing its private
 fields. The tracked operations-health service begins failing closed on 2026-10-27
 when that marker is missing, malformed or older than 24 hours; its generic public
-state is polled by the twice-hourly external smoke. This is the technical
-missed-success alert, not proof that a human notification was delivered. Remove the
+state is checked by the manually dispatched external smoke. This is a
+machine-readable missed-success signal, not an automatic human notification. Remove the
 plaintext staging config after its offline recovery copy and encrypted systemd
 credential have both been verified.
