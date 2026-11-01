@@ -74,7 +74,7 @@ def test_postgres_base_image_is_immutable_and_synchronized_with_ci():
     assert ci_matches == dockerfile_matches[:1]
 
 
-def test_dependabot_monitors_every_dockerfile_without_auto_merge():
+def test_dependabot_updates_are_paused_without_losing_docker_coverage():
     config = (ROOT / '.github' / 'dependabot.yml').read_text()
     docker_config = config.split('package-ecosystem: "docker"', maxsplit=1)[1]
 
@@ -84,6 +84,7 @@ def test_dependabot_monitors_every_dockerfile_without_auto_merge():
     assert '- "/docker/postgres"' in config
     assert '- "/frontend"' in config
     assert 'auto-merge' not in config.lower()
+    assert config.count('open-pull-requests-limit: 0') == 4
     assert config.count('dependency-name: "python"') == 1
     assert re.search(
         r'- dependency-name: "python"\s+'

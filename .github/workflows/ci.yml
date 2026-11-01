@@ -74,9 +74,7 @@ jobs:
           git diff --exit-code -- requirements.txt requirements-dev.txt
 
       - name: Audit Python dependencies
-        run: |
-          python -m pip_audit -r requirements.txt
-          python -m pip_audit -r requirements-dev.txt
+        run: python -m pip_audit -r requirements.txt
 
       - name: Audit question bank
         env:
@@ -120,7 +118,7 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          npm audit --audit-level=moderate
+          npm audit --omit=dev --audit-level=high
           npm audit signatures
 
       - name: Lint

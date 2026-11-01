@@ -68,13 +68,13 @@ person receives and acknowledges it.
 | Signal | Intended detection target | Response target |
 | --- | --- | --- |
 | Required PR checks, CodeQL and secret scanning | unsafe change, code weakness or committed credential | block merge; triage the same day |
-| Daily dependency audit | newly published Python or Node advisory | under 24 hours after the scheduled run |
-| Twice-hourly-target production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | best effort; GitHub schedule delays/drops mean no guaranteed external MTTD |
-| Hourly local recovery attestation consumed by external smoke | missing/corrupt/stale local backup, stale full-job success marker, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run after its age threshold; external delivery has no guaranteed upper bound |
-| Hourly analytics-retention success attestation | missed/failed applied retention, stale marker, unsafe owner/mode or broken reader ACL | local machine signal on the next hourly run after the 26-hour threshold; external delivery has no guaranteed upper bound |
-| Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
-| Hourly finalized-release snapshot inventory via the public recovery attestation | more than 10 frontend rollback/external snapshots, more than 512 MiB allocated per location, or an unsafe reserved-prefix tree | local machine signal on the next hourly run; external delivery has no guaranteed upper bound |
-| Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | local machine signal within roughly 3 hours of creation; external delivery has no guaranteed upper bound |
+| Manual dependency audit | known Python or Node advisory at review time | operator-initiated; no unattended notification target |
+| Manual production smoke + deduplicated GitHub issue | release mismatch, answer leak, broken isolation, headers or availability | after deployment or during incident response; no continuous external MTTD claim |
+| Hourly local recovery attestation consumed by manual smoke | missing/corrupt/stale local backup, stale full-job success marker, missed restore or failed/stopped health-marker publisher | local machine signal on the next hourly run after its age threshold; external verification is operator-initiated |
+| Hourly analytics-retention success attestation | missed/failed applied retention, stale marker, unsafe owner/mode or broken reader ACL | local machine signal on the next hourly run after the 26-hour threshold; external verification is manual |
+| Hourly release-staging inventory via the public recovery attestation | unsafe or more-than-two-hour-old frontend/static/SEO staging | local machine signal within roughly 3 hours of creation; external verification is manual |
+| Hourly finalized-release snapshot inventory via the public recovery attestation | more than 10 frontend rollback/external snapshots, more than 512 MiB allocated per location, or an unsafe reserved-prefix tree | local machine signal on the next hourly run; external verification is manual |
+| Hourly pre-deploy-backup temporary inventory via the public recovery attestation | unsafe or more-than-two-hour-old partial dump/legacy stderr residue | local machine signal within roughly 3 hours of creation; external verification is manual |
 | GitHub private vulnerability report | researcher-reported weakness | acknowledge within two business days |
 | Cloudflare, Nginx, application and system journals | traffic or runtime anomaly | evidence only until an alert rule pages the owner |
 

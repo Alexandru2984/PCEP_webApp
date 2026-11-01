@@ -152,9 +152,8 @@ CI security properties. No GitHub token is exposed to the scanner.
 
 `.github/workflows/codeql.yml` runs GitHub CodeQL advanced setup for the repository's
 GitHub Actions, Python and JavaScript/TypeScript sources. Pull requests and pushes
-to `main` are analyzed immediately; the Thursday schedule catches query-pack
-improvements while the repository is idle, and manual dispatch supports incident
-response. The workflow uses the `security-extended` suite, no-build analysis for
+to `main` are analyzed immediately, and manual dispatch supports incident response.
+The workflow uses the `security-extended` suite, no-build analysis for
 all three interpreted languages, a 20-minute bound and a separate matrix result per
 language. Repository access remains read-only except for the job-scoped
 `security-events: write` permission required to publish SARIF results. Keep both
@@ -167,27 +166,21 @@ documentation together after reviewing the upstream release; never replace a fix
 version with `latest`.
 
 `.github/workflows/dependency-audit.yml` installs and audits the committed hashed
-Python locks and audits the npm lockfile every day at 04:17 UTC, with manual
-dispatch available.
-It is independent of repository activity, uses read-only repository permissions,
-has ten-minute job limits and runs `npm ci --ignore-scripts` before the Node audit.
-This detects advisories published between code changes without granting a scanner
-write access or executing dependency lifecycle scripts. Both the push/PR and daily
-audits run `npm audit signatures` to verify registry signatures and provenance
-attestations for the resolved packages. Reproduce either failure locally with
-`make audit` before changing a version pin.
+production Python lock and production npm dependency tree on manual dispatch.
+It uses read-only repository permissions, has ten-minute job limits and runs
+`npm ci --ignore-scripts` before the Node audit. Both the push/PR and manual audits
+run `npm audit signatures` to verify registry signatures and provenance attestations
+for the resolved packages. Run the broader development-tree check locally with
+`make audit` before changing a version pin; newly published development-tool
+advisories do not create unattended failing workflows.
 
-`.github/dependabot.yml` proposes reviewed version updates for GitHub Actions each
-Monday, frontend npm dependencies each Tuesday, backend pip/pip-compile dependencies
-each Wednesday and the backend, PostgreSQL and frontend Dockerfiles each Thursday
-at 05:23 Europe/Bucharest. Python uses conventional
+`.github/dependabot.yml` retains ecosystem grouping and compatibility policy, but
+sets every ecosystem's open pull-request limit to zero so routine update PRs are
+paused. Python uses conventional
 `requirements.in` and `requirements-dev.in` manifests with generated, hashed
-`.txt` locks; CI regenerates both locks and rejects drift. A seven-day cooldown
-applies only to routine version updates; GitHub security updates are not delayed by
-that setting. Compatible minor/patch updates are grouped by ecosystem and dependency
-type, while major upgrades stay isolated. At most three routine PRs per ecosystem
-remain open; security PRs are outside that limit. There is no auto-merge
-configuration.
+`.txt` locks; CI regenerates both locks and rejects drift. Compatible minor/patch
+grouping, major-version exclusions and runtime-line constraints remain documented
+for a future deliberate reactivation. There is no auto-merge configuration.
 
 Docker image tags are not assumed to share the language's compatibility model.
 In particular, Dependabot's SemVer interpretation treats `3.12` to `3.14` as a
@@ -197,10 +190,9 @@ runtime migration. Routine Docker proposals therefore keep `python` on the revie
 an explicit migration that updates every CI toolchain, rebuilds the hashed locks,
 runs the complete compatibility suite and passes the rebuilt image scan.
 
-The configuration file enables version-update proposals after it reaches the
-default branch. Dependabot alerts and security updates remain repository settings;
-both are enabled. This file's cooldown and routine PR limit do not delay or count
-security-update PRs.
+Dependabot alerts and the dependency graph remain enabled for visibility. Automatic
+security-fix PRs are disabled at repository level, so alerts require an explicit
+operator-initiated dependency change instead of starting CI without intervention.
 
 `.github/workflows/dependency-review.yml` compares the dependency snapshots for
 every pull request targeting `main` through GitHub's dependency review API. It
@@ -213,8 +205,8 @@ License enforcement is intentionally disabled: the repository has not adopted a
 reviewed allowlist, so a generic scanner default must not stand in for legal policy.
 OpenSSF scorecard output is also disabled because it is informational rather than a
 merge rule. Revisit both settings only through a documented policy change. This
-PR-time comparison complements rather than replaces the full-tree push audit and
-the daily advisory audit; it cannot be reproduced offline because the comparison
+PR-time comparison complements rather than replaces runtime audits and the explicit
+manual full-tree audit; it cannot be reproduced offline because the comparison
 comes from GitHub's dependency graph. Run `make check-workflows` locally after any
 configuration change.
 
@@ -224,8 +216,9 @@ Dependabot alert at activation time. Check the current setting without changing 
 with `gh api -i repos/Alexandru2984/PCEP_webApp/vulnerability-alerts`: HTTP 204 means
 enabled. Do not disable it; GitHub's disable endpoint removes both alerts and the
 dependency graph that this workflow requires. Dependabot security updates were
-enabled on 2026-10-07. GitHub may now open a security-update PR when it can resolve
-an alert, but branch protection and CI still prevent automatic merging.
+enabled on 2026-10-07 and disabled on 2026-11-01 after they repeatedly opened
+unattended PRs against a base with newly disclosed development-tool advisories.
+Alerts remain enabled and visible.
 
 The hosted dependency review, all four CI jobs and all three CodeQL language jobs
 are required by `main` branch protection. Required checks are bound to the GitHub
@@ -280,7 +273,7 @@ the retained rollback trees.
 The same contract requires every runner path to be 404 on the learner origin,
 then verifies the separate runner document, bridge, worker, pinned runtime version,
 cookie-free headers, exact CSPs and absence of an API route. It does not execute
-arbitrary Python during the twice-hourly read-only probe.
+arbitrary Python during the read-only probe.
 It validates strict answer-safe shapes for random, daily, detail and search
 responses, then verifies that a three-question targeted drill preserves the
 requested order. It never calls an answer, grade or other write endpoint and does
@@ -290,9 +283,9 @@ Successful output reports `frontend_release` from the static shell metadata and
 `backend_release` from the API response headers. This makes an incomplete or stale
 frontend publication visible even when the backend is healthy.
 
-`.github/workflows/production-smoke.yml` runs this contract at minutes 7 and 37 of
-every hour and on manual dispatch. The smoke job has read-only repository
-permissions. A failure gives a separate two-minute job only `issues: write`; that
+`.github/workflows/production-smoke.yml` runs this contract only on manual dispatch,
+normally after deployment or during incident response. The smoke job has read-only
+repository permissions. A failure gives a separate two-minute job only `issues: write`; that
 job opens one deduplicated, sanitized issue containing the workflow-run URL but no
 response, learner, host or log data. It assigns and mentions the repository owner as
 the named responder; a repeated failure also repairs a missing assignment on the
@@ -300,13 +293,10 @@ existing issue. The next completely successful run closes the matching issue. Th
 push/pull-request CI remains independent of production availability, so a transient
 Internet or production outage cannot block code review.
 
-The cron expresses a twice-hourly target, not a guaranteed polling interval. GitHub
-can delay or drop scheduled workflow events; during the 2026-10-18 restore-readiness
-incident the first external failure arrived 3 hours 49 minutes after the local
-service failed, and observed scheduled-run gaps exceeded four hours. Local hourly
-health publication remains the first machine signal, while guaranteed external and
-human MTTD are unbounded until an independently scheduled monitor and acknowledged
-notification path exist. Use manual dispatch for recovery verification.
+Local hourly health publication remains the machine-readable signal. The GitHub
+workflow is an explicit verification tool and no longer claims continuous external
+monitoring or a bounded human MTTD. Use manual dispatch for post-deployment and
+recovery verification.
 
 The technical alert path was exercised again after named-responder routing was
 installed on 2026-10-13: the real contract passed, a synthetic final step opened
@@ -623,8 +613,8 @@ publication is not treated as an incident; anything older degrades health. The a
 uses the newer inode change or modification time, so copying an old source mtime
 cannot immediately age a live staging operation. This control reports and never
 deletes a tree. With the hourly publisher, stale staging reaches machine-visible
-`degraded` in at most roughly three hours after creation. GitHub's requested
-twice-hourly external poll is best effort and has no guaranteed delivery bound.
+`degraded` in at most roughly three hours after creation. No GitHub poll runs
+automatically; use the manual production smoke when external verification is needed.
 
 It also inventories `/home/micu/backups/pcep` read-only for exact pre-deploy
 `.sql.gz.partial-<32 lowercase hex>` names and legacy
@@ -633,7 +623,7 @@ owned by `micu`, use a bounded backup prefix and exact UTC timestamp, and remain
 more than two hours old; unsafe, future-dated or stale entries degrade health. A
 fresh match is tolerated so the hourly verifier cannot race a legitimate deployment.
 The control reports but never reads or deletes dump/error contents. The same roughly
-three-hour machine-detection bound applies; external delivery remains best effort.
+three-hour machine-detection bound applies; external verification is manual.
 Complete backup retention is deliberately outside this temporary-artifact control.
 The deploy-time bounded policy above owns only completed exact modern names; this
 hourly health inventory remains non-destructive and limited to temporary residue.
@@ -1703,9 +1693,9 @@ before publication continues, so a crash cannot silently remove that pointer fro
 the immediate rollback generation. Its `Expires` value is an intentional renewal gate: update it to a UTC
 timestamp less than 365 days ahead, review that the private-advisory form and policy
 links still work, and deploy before the smoke's 30-day renewal window begins ahead
-of `2027-10-01T00:00:00Z`. The twice-hourly production smoke treats an expiry inside
-that window, a cacheable or non-canonical document, a public-issue contact or an
-HTML response as a production incident.
+of `2027-10-01T00:00:00Z`. The manually dispatched production smoke treats an expiry
+inside that window, a cacheable or non-canonical document, a public-issue contact or
+an HTML response as a production incident.
 Cloudflare initially imposed its four-hour default TTL on plain no-cache
 JavaScript responses. Public GET/HEAD requests now report BYPASS with the stronger
 policy; verify both origin and public cache headers after each deployment. Common headers cover worker, SEO,
@@ -1907,9 +1897,9 @@ the returned ID. The contract fails if it cannot prove both zero labelled contai
 and removal of the exact temporary tree. The check never contacts the production
 hostname.
 Browser tests use mocked APIs; Python execution uses the real self-hosted runtime.
-The push/pull-request CI never calls production. The scheduled dependency audit
-only reads manifests and advisory services; the separate scheduled smoke workflow
-performs only the bounded public checks documented above.
+The push/pull-request CI never calls production. The manually dispatched dependency
+audit only reads manifests and advisory services; the manually dispatched smoke
+workflow performs only the bounded public checks documented above.
 
 CI also supports an explicit manual dispatch so an operator can validate the exact
 current `main` commit if GitHub misses a push event. This does not replace PR checks

@@ -1,7 +1,6 @@
 # PCEP Quiz
 
 [![CI](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml/badge.svg)](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/ci.yml)
-[![Production smoke](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/production-smoke.yml/badge.svg)](https://github.com/Alexandru2984/PCEP_webApp/actions/workflows/production-smoke.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.2_LTS-092E20.svg)](https://www.djangoproject.com/)
@@ -221,8 +220,8 @@ cd frontend && npm run e2e
 Push/PR CI runs the backend, frontend, audit and build checks without calling
 production, plus `manage.py check --deploy` against a production-like config.
 An independent CodeQL workflow analyzes GitHub Actions, Python and
-JavaScript/TypeScript on every push and pull request to `main`, weekly, and on
-manual dispatch. It runs GitHub's `security-extended` query suite and uploads
+JavaScript/TypeScript on every push and pull request to `main`, and on manual
+dispatch. It runs GitHub's `security-extended` query suite and uploads
 results with a job-scoped `security-events: write` permission; all action
 revisions are pinned to reviewed commit SHAs.
 Its jobs use the explicit Ubuntu 24.04 runner image; Python jobs use the same
@@ -246,26 +245,23 @@ drop-in so unsupported directives or orphan overrides cannot reach an operator.
 Its pinned Trivy scan fails on HIGH/CRITICAL operating-system or Python findings
 that have a vendor fix, while still reporting separately tracked findings without
 a patch.
-The separate **Scheduled dependency audit** runs daily at 04:17 UTC and on manual
-dispatch, so newly published Python or Node advisories are detected even when no
-push or pull request occurs. It has read-only repository permissions and installs
-the Node tree with package scripts disabled before auditing the committed lockfile.
-Both push/PR CI and the scheduled job also verify npm registry signatures and
-provenance attestations for the resolved dependency tree.
+The separate **Dependency audit** runs only on manual dispatch. It has read-only
+repository permissions and installs the Node tree with package scripts disabled
+before auditing production dependencies from the committed lockfiles. A full
+development-tree audit remains available locally with `make audit`, without
+creating unattended workflow failures. Both push/PR CI and the manual job also
+verify npm registry signatures and provenance attestations for the resolved
+dependency tree.
 The frontend pins Workbox's deprecated `glob@11` transitive dependency to
 `glob@13.0.6`; Workbox uses only the retained `globSync` library API. Keep this
 override exact and remove it when Workbox supports the current major directly.
-Dependabot checks GitHub Actions every Monday, frontend npm dependencies every
-Tuesday, backend Python dependencies every Wednesday and every runtime/build
-Dockerfile every Thursday. Python's conventional
+Dependabot's ecosystem coverage remains documented, but routine version-update
+PRs are paused with a zero open-PR limit and automated security-fix PRs are disabled.
+Python's conventional
 `.in` manifests and SHA-256 `.txt` locks are regenerated and checked together.
-Normal version updates wait seven days after release and group compatible
-minor/patch changes; the cooldown does not apply to security-update PRs. Routine
-Python container proposals stay within the reviewed 3.12 interpreter line; an
-interpreter-minor migration is planned together with CI and dependency validation.
-Dependabot security updates are enabled, but every proposal still triggers the full
-CI suite and awaits human review—nothing is auto-merged by this configuration.
-The repository dependency graph and Dependabot alerts are enabled, and the project
+Dependency changes are initiated manually and still receive the same lock,
+compatibility and image validation. The repository dependency graph and Dependabot
+alerts remain enabled, and the project
 includes a required PR-only GitHub dependency review workflow. It fails on newly
 added or upgraded dependencies with
 moderate-or-higher known vulnerabilities in runtime, development or unknown scopes.
@@ -273,10 +269,9 @@ The review has read-only repository access, neither comments on the PR nor grant
 write permission, and deliberately does not enforce a license allowlist until the
 project adopts a reviewed license policy. Protected `main` also requires all four
 CI jobs, an up-to-date PR branch, resolved conversations and linear history.
-The separate **Production smoke** workflow requests runs at minutes 7 and 37 of
-every hour and supports manual dispatch. GitHub does not guarantee scheduled start
-time or delivery, so this is a best-effort external signal rather than a bounded
-MTTD claim. It uses bounded read-only requests to verify the public shell and its
+The separate **Production smoke** workflow runs only on explicit manual dispatch,
+normally after a deployment or during incident response. It uses bounded read-only
+requests to verify the public shell and its
 entry assets, separate frontend/backend release identities, liveness/readiness,
 security/cache headers,
 all aggregate matrices, answer secrecy across quiz, daily, detail and search
